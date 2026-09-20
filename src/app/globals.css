@@ -1,0 +1,147 @@
+@import "tailwindcss";
+
+/* =====================================================================
+   Родослов — визуальный язык семейного фотоальбома:
+   тёмно-синяя обложка, латунное тиснение, холодный свет архива.
+   ===================================================================== */
+
+@theme {
+  /* Чернила — основа тёмных поверхностей */
+  --color-ink-900: #0a1120;
+  --color-ink-800: #0f1a2e;
+  --color-ink-700: #131e33;
+  --color-ink-600: #1c2b45;
+  --color-ink-500: #2b3d5c;
+  --color-ink-400: #47597a;
+  --color-ink-300: #7487a5;
+
+  /* Холодный свет архива */
+  --color-mist-50: #f7f9fc;
+  --color-mist-100: #eef1f6;
+  --color-mist-200: #dfe5ee;
+  --color-mist-300: #c6cfdd;
+
+  /* Латунь — единственный яркий акцент */
+  --color-brass-500: #c9a227;
+  --color-brass-400: #d9b64a;
+  --color-brass-600: #a3821a;
+
+  /* Линия супружества */
+  --color-bond-400: #7fa6c9;
+  --color-bond-500: #5b87ae;
+
+  --color-danger: #c05a4d;
+
+  --font-display: var(--font-literata), Georgia, serif;
+  --font-sans: var(--font-golos), "Segoe UI", system-ui, sans-serif;
+
+  --radius-card: 14px;
+
+  --shadow-lift: 0 1px 2px rgba(10, 17, 32, 0.06), 0 12px 32px -12px rgba(10, 17, 32, 0.24);
+  --shadow-plate: 0 2px 0 rgba(10, 17, 32, 0.04), 0 18px 48px -24px rgba(10, 17, 32, 0.4);
+}
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-mist-100);
+  color: var(--color-ink-800);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Тиснёная поверхность: очень тонкая фактура на тёмных блоках */
+.plate {
+  background-image:
+    radial-gradient(120% 90% at 8% -10%, rgba(201, 162, 39, 0.16), transparent 58%),
+    linear-gradient(180deg, var(--color-ink-700), var(--color-ink-900));
+}
+
+.grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.35;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/></filter><rect width='120' height='120' filter='url(%23n)' opacity='0.5'/></svg>");
+}
+
+/* Латунная линия-разделитель — отсылка к тиснению на обложке */
+.rule-brass {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--color-brass-500), transparent);
+  opacity: 0.55;
+}
+
+h1, h2, h3, .display {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.015em;
+}
+
+::selection {
+  background: var(--color-brass-400);
+  color: var(--color-ink-900);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brass-500);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ---------- React Flow ---------- */
+.react-flow__attribution { display: none; }
+
+.react-flow__edge-path {
+  stroke-width: 1.75;
+}
+
+.react-flow__handle {
+  width: 7px;
+  height: 7px;
+  background: var(--color-ink-300);
+  border: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.react-flow__node:hover .react-flow__handle,
+.react-flow__node.selected .react-flow__handle {
+  opacity: 1;
+}
+
+.react-flow__node.selected .person-card {
+  border-color: var(--color-brass-500);
+  box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.22), var(--shadow-lift);
+}
+
+/* Скрываем интерфейсные элементы при экспорте картинки */
+.exporting .react-flow__handle,
+.exporting .react-flow__controls,
+.exporting .react-flow__minimap,
+.exporting .react-flow__background { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Появление героя — единственная не спровоцированная пользователем анимация */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.rise { animation: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
