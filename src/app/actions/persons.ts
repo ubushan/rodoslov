@@ -19,7 +19,7 @@ function str(v: FormDataEntryValue | null) {
 
 function personPayload(formData: FormData) {
   const isLiving = formData.get("is_living") === "on";
-  return {
+  const payload: Record<string, unknown> = {
     last_name: String(formData.get("last_name") ?? "").trim(),
     first_name: String(formData.get("first_name") ?? "").trim(),
     middle_name: String(formData.get("middle_name") ?? "").trim(),
@@ -27,12 +27,22 @@ function personPayload(formData: FormData) {
     other_names: str(formData.get("other_names")),
     gender: (String(formData.get("gender") ?? "unknown") as Gender),
     birth_year: num(formData.get("birth_year")),
+    birth_date: str(formData.get("birth_date")),
     birth_place: str(formData.get("birth_place")),
     residence: str(formData.get("residence")),
     is_living: isLiving,
     death_year: isLiving ? null : num(formData.get("death_year")),
+    death_date: isLiving ? null : str(formData.get("death_date")),
     bio: str(formData.get("bio")),
   };
+
+  // Поле места смерти пишем, только если колонка уже есть в базе
+  // (форма отмечает это скрытым полем) — иначе Postgres отверг бы всю запись.
+  if (formData.get("has_death_place")) {
+    payload.death_place = isLiving ? null : str(formData.get("death_place"));
+  }
+
+  return payload;
 }
 
 export async function createPerson(treeId: string, formData: FormData) {

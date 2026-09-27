@@ -122,6 +122,7 @@ create table if not exists public.persons (
   is_living    boolean not null default true,
   death_year   int,
   death_date   date,
+  death_place  text,
   bio          text,
   photo_path   text,
   pos_x        double precision not null default 0,
@@ -247,8 +248,10 @@ create policy profiles_update_self on public.profiles for update
 
 -- trees
 drop policy if exists trees_read on public.trees;
+-- owner_id проверяется отдельно: при insert ... returning членство ещё не видно,
+-- потому что строка в tree_members создаётся триггером on_tree_created в том же операторе
 create policy trees_read on public.trees for select
-  using (public.is_tree_member(id));
+  using (owner_id = auth.uid() or public.is_tree_member(id));
 
 drop policy if exists trees_insert on public.trees;
 create policy trees_insert on public.trees for insert

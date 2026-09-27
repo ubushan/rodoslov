@@ -40,7 +40,7 @@ export default async function LandingPage() {
   return (
     <div className="min-h-dvh bg-mist-100">
       {/* ---------------- Шапка ---------------- */}
-      <header className="absolute inset-x-0 top-0 z-20">
+      <header className="absolute inset-x-0 top-0 z-20" style={{ paddingTop: "env(safe-area-inset-top)" }}>
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
           <Link href="/" className="flex items-center gap-2.5">
             <span

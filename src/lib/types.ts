@@ -18,6 +18,7 @@ export type Person = {
   is_living: boolean;
   death_year: number | null;
   death_date: string | null;
+  death_place: string | null;
   bio: string | null;
   photo_path: string | null;
   pos_x: number;

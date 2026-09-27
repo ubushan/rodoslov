@@ -2,7 +2,10 @@ import Link from "next/link";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid min-h-dvh lg:grid-cols-[1fr_1.05fr]">
+    <div
+      className="grid min-h-dvh lg:grid-cols-[1fr_1.05fr]"
+      style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}
+    >
       <div className="flex flex-col justify-center px-5 py-12 sm:px-12 lg:px-16">
         <Link href="/" className="mb-10 flex items-center gap-2.5">
           <span

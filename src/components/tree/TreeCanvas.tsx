@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   ReactFlow,
@@ -16,29 +16,55 @@ import {
   getViewportForBounds,
   type Node,
   type Edge,
-  type Connection,
   type NodeChange,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { toPng } from "html-to-image";
 import { toast } from "sonner";
 
-import { PersonNode } from "./PersonNode";
-import { PersonEditor } from "./PersonEditor";
+import { PersonNode, type NewRelative } from "./PersonNode";
+import { CouplePlate } from "./CouplePlate";
+import { CouplePlus } from "./CouplePlus";
+import { FamilyBusEdge } from "./FamilyBusEdge";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { publicUrl } from "@/lib/format";
-import { autoLayout } from "@/lib/layout";
-import {
-  createPerson,
-  savePositions,
-  createRelationship,
-  deleteRelationship,
-} from "@/app/actions/persons";
-import type { Person, Relationship, Attachment, MemberRole } from "@/lib/types";
+import { autoLayout, CARD_W, CARD_H } from "@/lib/layout";
+import { paternalLine } from "@/lib/paternal";
+import { savePositions, deleteRelationship } from "@/app/actions/persons";
+import type { Gender, Person, Relationship, Attachment, MemberRole } from "@/lib/types";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const nodeTypes = { person: PersonNode };
+const nodeTypes = { person: PersonNode, couplePlate: CouplePlate, couplePlus: CouplePlus };
+const edgeTypes = { family: FamilyBusEdge };
+
+/* Иконки панели: тонкие штрихи, размер 18, цвет наследуется от кнопки */
+function IconAdd() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+      <path d="M9 3.5v11M3.5 9h11" />
+    </svg>
+  );
+}
+
+function IconLayout() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
+      <rect x="2.5" y="2.5" width="5" height="4" rx="1" />
+      <rect x="10.5" y="2.5" width="5" height="4" rx="1" />
+      <rect x="6.5" y="11.5" width="5" height="4" rx="1" />
+      <path d="M5 6.5v2.5h8V6.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconDownload() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 2.5v9M5.5 8.5 9 12l3.5-3.5M3 15.5h12" />
+    </svg>
+  );
+}
 
 type Props = {
   treeId: string;
@@ -47,16 +73,47 @@ type Props = {
   persons: Person[];
   relationships: Relationship[];
   attachments: Attachment[];
+  /** на странице ветки раскладку не сохраняем в базу, чтобы не сдвигать общее древо */
+  persistLayout?: boolean;
 };
 
-function Canvas({ treeId, treeTitle, role, persons, relationships, attachments }: Props) {
+function Canvas({
+  treeId,
+  treeTitle,
+  role,
+  persons,
+  relationships,
+  attachments,
+  persistLayout = true,
+}: Props) {
   const router = useRouter();
   const canEdit = role === "owner" || role === "editor";
   const { getNodes, fitView } = useReactFlow();
 
-  const [openId, setOpenId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
-  const [, startTransition] = useTransition();
+  // карточка под курсором — по ней показываем «+» на линии её пары
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  // чей род по отцу подсвечен: включается кнопкой на карточке
+  const [paternalOf, setPaternalOf] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  // Пол родителей каждого человека — чтобы в меню не предлагать
+  // завести второго отца или вторую мать
+  const parentGendersByChild = useMemo(() => {
+    const genderById = new Map(persons.map((p) => [p.id, p.gender]));
+    const out = new Map<string, Gender[]>();
+    for (const r of relationships) {
+      if (r.kind !== "parent") continue;
+      const g = genderById.get(r.from_person_id) ?? "unknown";
+      out.set(r.to_person_id, [...(out.get(r.to_person_id) ?? []), g]);
+    }
+    return out;
+  }, [persons, relationships]);
+
+  const paternal = useMemo(
+    () => (paternalOf ? paternalLine(paternalOf, persons, relationships) : null),
+    [paternalOf, persons, relationships]
+  );
 
   const initialNodes = useMemo<Node[]>(
     () =>
@@ -68,10 +125,21 @@ function Canvas({ treeId, treeTitle, role, persons, relationships, attachments }
         data: {
           person: p,
           photoUrl: publicUrl(SUPABASE_URL, "photos", p.photo_path),
-          onOpen: (id: string) => setOpenId(id),
+          canEdit,
+          parentGenders: parentGendersByChild.get(p.id) ?? [],
+          highlighted: paternal ? paternal.has(p.id) : false,
+          dimmed: paternal ? !paternal.has(p.id) : false,
+          paternalActive: paternalOf === p.id,
+          onPaternal: (id: string) => setPaternalOf((cur) => (cur === id ? null : id)),
+          onBranch: (id: string) => router.push(`/tree/${treeId}/branch/${id}`),
+          onHover: (id: string, over: boolean) =>
+            setHoveredId((cur) => (over ? id : cur === id ? null : cur)),
+          onOpen: (id: string) => router.push(`/tree/${treeId}/person/${id}`),
+          onAdd: (id: string, relation: NewRelative) =>
+            router.push(`/tree/${treeId}/person/new?relateTo=${id}&relation=${relation}`),
         },
       })),
-    [persons, canEdit]
+    [persons, canEdit, parentGendersByChild, paternal, paternalOf, router, treeId]
   );
 
   const initialEdges = useMemo<Edge[]>(
@@ -82,13 +150,13 @@ function Canvas({ treeId, treeTitle, role, persons, relationships, attachments }
         target: r.to_person_id,
         sourceHandle: r.kind === "spouse" ? "spouse-r" : "child-out",
         targetHandle: r.kind === "spouse" ? "spouse-l" : "parent-in",
-        type: r.kind === "spouse" ? "straight" : "smoothstep",
+        type: r.kind === "spouse" ? "straight" : "family",
         animated: false,
         data: { kind: r.kind },
         style:
           r.kind === "spouse"
             ? { stroke: "#7fa6c9", strokeDasharray: "6 5" }
-            : { stroke: "#c9a227" },
+            : { stroke: "#7a8ca6", strokeWidth: 1.5 },
       })),
     [relationships]
   );
@@ -96,8 +164,108 @@ function Canvas({ treeId, treeTitle, role, persons, relationships, attachments }
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-  useEffect(() => setNodes(initialNodes), [initialNodes, setNodes]);
+  // Синхронизация с серверными данными. Возвращаем прежний массив, если ничего
+  // не поменялось: иначе React Flow пересобирает узлы и рёбра пропадают до
+  // первого обновления. Измеренные размеры карточек при этом сохраняем.
+  useEffect(() => {
+    setNodes((prev) => {
+      const prevById = new Map(prev.map((n) => [n.id, n]));
+      const next = initialNodes.map((n) => {
+        const p = prevById.get(n.id);
+        if (!p) return { ...n, measured: n.measured };
+        const sameData = (p.data as { person?: unknown })?.person === (n.data as { person?: unknown })?.person;
+        const same =
+          sameData &&
+          p.position.x === n.position.x &&
+          p.position.y === n.position.y &&
+          p.measured === n.measured;
+        return same ? p : { ...n, measured: p.measured };
+      });
+      const unchanged = next.length === prev.length && next.every((n, i) => n === prev[i]);
+      return unchanged ? prev : next;
+    });
+  }, [initialNodes, setNodes]);
   useEffect(() => setEdges(initialEdges), [initialEdges, setEdges]);
+
+  // Ветка открывается уже разложенной; в базу эти позиции не пишем
+  const arrangedOnce = useRef(false);
+  useEffect(() => {
+    if (persistLayout || arrangedOnce.current) return;
+    const t = setTimeout(() => {
+      arrangedOnce.current = true;
+      arrange();
+    }, 900);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [persistLayout]);
+
+  // Только карточки людей (без служебных узлов-рамок)
+  const personNodes = useCallback(() => getNodes().filter((n) => n.type === "person"), [getNodes]);
+
+  // Мягкая рамка вокруг пары супругов — когда они рядом
+  const plateNodes = useMemo<Node[]>(() => {
+    const out: Node[] = [];
+    const byId = new Map(nodes.map((n) => [n.id, n]));
+    for (const e of edges) {
+      if (e.data?.kind !== "spouse") continue;
+      const a = byId.get(e.source);
+      const b = byId.get(e.target);
+      if (!a || !b) continue;
+      const aw = a.measured?.width ?? CARD_W;
+      const ah = a.measured?.height ?? CARD_H;
+      const bw = b.measured?.width ?? CARD_W;
+      const bh = b.measured?.height ?? CARD_H;
+      if (Math.abs(a.position.y + ah / 2 - (b.position.y + bh / 2)) > 48) continue;
+      const gap = Math.max(b.position.x - (a.position.x + aw), a.position.x - (b.position.x + bw));
+      if (gap > 120) continue;
+      const left = Math.min(a.position.x, b.position.x) - 10;
+      const top = Math.min(a.position.y, b.position.y) - 10;
+      // центр просвета между карточками — туда встанет «+» добавления ребёнка
+      const [l, r] = a.position.x <= b.position.x ? [a, b] : [b, a];
+      const lw = l === a ? aw : bw;
+      const gapLeft = l.position.x + lw;
+      const gapW = Math.max(24, r.position.x - gapLeft);
+      const gapH = Math.max(ah, bh);
+      const centerY = (a.position.y + ah / 2 + (b.position.y + bh / 2)) / 2;
+      out.push({
+        id: `plate-${e.id}`,
+        type: "couplePlate",
+        position: { x: left, y: top },
+        data: {
+          w: Math.max(a.position.x + aw, b.position.x + bw) + 10 - left,
+          h: Math.max(a.position.y + ah, b.position.y + bh) + 10 - top,
+        },
+        zIndex: -1,
+        draggable: false,
+        selectable: false,
+        focusable: false,
+        connectable: false,
+      });
+
+      // «+» по центру просвета — отдельным узлом поверх линий, иначе линия связи
+      // перехватывает клик. Показывается, когда курсор на любой карточке пары.
+      out.push({
+        id: `plus-${e.id}`,
+        type: "couplePlus",
+        position: { x: gapLeft, y: centerY - gapH / 2 },
+        data: {
+          w: gapW,
+          h: gapH,
+          canEdit,
+          open: hoveredId === a.id || hoveredId === b.id,
+          anchorId: e.source,
+          onAddChild: (id: string) =>
+            router.push(`/tree/${treeId}/person/new?relateTo=${id}&relation=child`),
+        },
+        zIndex: 2,
+        draggable: false,
+        selectable: false,
+        focusable: false,
+        connectable: false,
+      });
+    }
+    return out;
+  }, [nodes, edges, canEdit, hoveredId, router, treeId]);
 
   // ---- Правки родственников приходят без перезагрузки страницы ----
   useEffect(() => {
@@ -135,57 +303,41 @@ function Canvas({ treeId, treeTitle, role, persons, relationships, attachments }
         .filter((n) => finished.some((c) => c.id === n.id))
         .map((n) => ({ id: n.id, x: n.position.x, y: n.position.y }));
 
+      if (!persistLayout) return;
       startTransition(() => {
         savePositions(treeId, moved);
       });
     },
-    [onNodesChange, getNodes, canEdit, treeId]
+    [onNodesChange, getNodes, canEdit, treeId, persistLayout]
   );
-
-  // ---- Протягивание связи мышью ----
-  const onConnect = useCallback(
-    (c: Connection) => {
-      if (!canEdit || !c.source || !c.target) return;
-      const kind = c.sourceHandle === "spouse-r" ? "spouse" : "parent";
-
-      startTransition(async () => {
-        const res = await createRelationship(treeId, kind, c.source!, c.target!);
-        if (res.error) toast.error(res.error);
-        else {
-          router.refresh();
-          toast.success(kind === "spouse" ? "Супруги связаны" : "Связь родитель — ребёнок создана");
-        }
-      });
-    },
-    [canEdit, treeId, router]
-  );
-
-  // ---- Добавление человека ----
-  function addPerson() {
-    const bounds = getNodesBounds(getNodes());
-    const fd = new FormData();
-    fd.set("first_name", "Новый");
-    fd.set("last_name", "родственник");
-    fd.set("is_living", "on");
-    fd.set("pos_x", String(bounds.x ?? 0));
-    fd.set("pos_y", String((bounds.y ?? 0) + (bounds.height ?? 0) + 140));
-
-    startTransition(async () => {
-      const id = await createPerson(treeId, fd);
-      router.refresh();
-      setOpenId(id);
-    });
-  }
 
   // ---- Автоматическая раскладка по поколениям ----
   function arrange() {
-    const laid = autoLayout(getNodes(), edges);
+    // Размеры карточек берём из DOM: измерение React Flow приходит с задержкой
+    // (шрифты в dev-режиме), а раскладка с дефолтными 208×104 съезжает.
+    const vp = document.querySelector(".react-flow__viewport") as HTMLElement | null;
+    const zoom = vp ? new DOMMatrix(getComputedStyle(vp).transform).a || 1 : 1;
+    const withSizes = personNodes().map((n) => {
+      if (n.measured) return n;
+      const card = document
+        .querySelector(`[data-id="${n.id}"]`)
+        ?.querySelector(".person-card") as HTMLElement | null;
+      if (!card) return n;
+      return {
+        ...n,
+        measured: { width: card.offsetWidth / zoom, height: card.offsetHeight / zoom },
+      };
+    });
+    const laid = autoLayout(withSizes, edges);
     setNodes(laid);
     startTransition(async () => {
-      await savePositions(
-        treeId,
-        laid.map((n) => ({ id: n.id, x: n.position.x, y: n.position.y }))
-      );
+      // на странице ветки позиции не пишем — иначе сдвинем общее древо
+      if (persistLayout) {
+        await savePositions(
+          treeId,
+          laid.map((n) => ({ id: n.id, x: n.position.x, y: n.position.y }))
+        );
+      }
       setTimeout(() => fitView({ padding: 0.15, duration: 400 }), 30);
       toast.success("Древо выстроено по поколениям");
     });
@@ -194,7 +346,7 @@ function Canvas({ treeId, treeTitle, role, persons, relationships, attachments }
   // ---- Экспорт в картинку ----
   async function exportPng() {
     const viewport = document.querySelector<HTMLElement>(".react-flow__viewport");
-    if (!viewport || getNodes().length === 0) {
+    if (!viewport || personNodes().length === 0) {
       return toast.error("В древе пока нет карточек");
     }
 
@@ -202,7 +354,7 @@ function Canvas({ treeId, treeTitle, role, persons, relationships, attachments }
     await new Promise((r) => setTimeout(r, 60));
 
     try {
-      const bounds = getNodesBounds(getNodes());
+      const bounds = getNodesBounds(personNodes());
       const pad = 120;
       const width = Math.ceil(bounds.width + pad * 2);
       const height = Math.ceil(bounds.height + pad * 2 + 90); // место под подпись
@@ -236,17 +388,15 @@ function Canvas({ treeId, treeTitle, role, persons, relationships, attachments }
     }
   }
 
-  const openPerson = persons.find((p) => p.id === openId) ?? null;
-
   return (
     <div className={`relative h-full w-full ${exporting ? "exporting" : ""}`}>
       <ReactFlow
-        nodes={nodes}
+        nodes={[...nodes, ...plateNodes]}
         edges={edges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
         onEdgeDoubleClick={(_, edge) => {
           if (!canEdit) return;
           if (!confirm("Разорвать эту связь?")) return;
@@ -255,10 +405,9 @@ function Canvas({ treeId, treeTitle, role, persons, relationships, attachments }
             router.refresh();
           });
         }}
-        nodesConnectable={canEdit}
         elementsSelectable
         fitView
-        fitViewOptions={{ padding: 0.2 }}
+        fitViewOptions={{ padding: 0.2, minZoom: 0.45 }}
         minZoom={0.15}
         maxZoom={2}
         proOptions={{ hideAttribution: true }}
@@ -276,42 +425,57 @@ function Canvas({ treeId, treeTitle, role, persons, relationships, attachments }
       </ReactFlow>
 
       {/* Панель действий */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center p-3">
-        <div className="pointer-events-auto flex flex-wrap items-center gap-2 rounded-2xl border border-mist-200 bg-white/95 px-2.5 py-2 shadow-lift backdrop-blur">
-          {canEdit && <Button size="sm" onClick={addPerson}>Добавить человека</Button>}
+      <div className="pointer-events-none absolute left-3 top-3 flex flex-col">
+        <div className="pointer-events-auto flex flex-col gap-2.5 rounded-2xl border border-mist-200 bg-white/95 p-2.5 shadow-lift backdrop-blur">
           {canEdit && (
-            <Button size="sm" variant="secondary" onClick={arrange}>
-              Выстроить по поколениям
-            </Button>
+            <button
+              type="button"
+              onClick={() => router.push(`/tree/${treeId}/person/new`)}
+              disabled={pending}
+              aria-label="Добавить человека"
+              title="Добавить человека"
+              className="grid h-10 w-10 place-items-center rounded-xl text-ink-600 transition-colors
+                         hover:bg-mist-100 hover:text-ink-900 disabled:pointer-events-none disabled:opacity-45"
+            >
+              <IconAdd />
+            </button>
           )}
-          <Button size="sm" variant="secondary" onClick={exportPng} disabled={exporting}>
-            {exporting ? "Собираем…" : "Скачать картинку"}
-          </Button>
+          {canEdit && (
+            <button
+              type="button"
+              onClick={arrange}
+              aria-label="Выстроить по поколениям"
+              title="Выстроить по поколениям"
+              className="grid h-10 w-10 place-items-center rounded-xl text-ink-600 transition-colors
+                         hover:bg-mist-100 hover:text-ink-900"
+            >
+              <IconLayout />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={exportPng}
+            disabled={exporting}
+            aria-label="Скачать картинку"
+            title={exporting ? "Собираем картинку…" : "Скачать картинку"}
+            className="grid h-10 w-10 place-items-center rounded-xl text-ink-600 transition-colors
+                       hover:bg-mist-100 hover:text-ink-900 disabled:pointer-events-none disabled:opacity-45"
+          >
+            <IconDownload />
+          </button>
         </div>
       </div>
 
       {/* Легенда */}
-      <div className="pointer-events-none absolute right-3 top-20 hidden rounded-xl border border-mist-200 bg-white/95 px-3 py-2.5 text-[12px] text-ink-500 shadow-sm sm:block">
+      <div className="pointer-events-none absolute right-3 top-3 hidden rounded-xl border border-mist-200 bg-white/95 px-3 py-2.5 text-[12px] text-ink-500 shadow-sm sm:block">
         <span className="flex items-center gap-2">
-          <span className="h-0.5 w-6 rounded bg-brass-500" /> родитель — ребёнок
+          <span className="h-0.5 w-6 rounded bg-[#7a8ca6]" /> родитель — ребёнок
         </span>
         <span className="mt-1.5 flex items-center gap-2">
           <span className="h-0.5 w-6 rounded border-t-2 border-dashed border-bond-400" /> супруги
         </span>
       </div>
 
-      {openPerson && (
-        <PersonEditor
-          treeId={treeId}
-          person={openPerson}
-          people={persons}
-          relationships={relationships}
-          attachments={attachments.filter((a) => a.person_id === openPerson.id)}
-          canEdit={canEdit}
-          onClose={() => setOpenId(null)}
-          onChanged={() => router.refresh()}
-        />
-      )}
     </div>
   );
 }

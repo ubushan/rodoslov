@@ -38,7 +38,7 @@ export function SignupForm() {
         </Field>
 
         <Field label="Электронная почта">
-          <Input name="email" type="email" required autoComplete="email" placeholder="anna@example.com" />
+          <Input name="email" type="email" required autoComplete="email" placeholder="anna@gmail.com" />
         </Field>
 
         <Field label="Пароль" hint="Не короче 8 символов">
@@ -48,6 +48,12 @@ export function SignupForm() {
         {state?.error && (
           <p className="rounded-[10px] border border-[#e4c3bd] bg-[#fdf4f2] px-3 py-2 text-sm text-[#c05a4d]">
             {state.error}
+          </p>
+        )}
+
+        {state?.notice && (
+          <p className="rounded-[10px] border border-[#cdd9c7] bg-[#f3f7f1] px-3 py-2 text-sm text-[#4a6b3f]">
+            {state.notice}
           </p>
         )}
 

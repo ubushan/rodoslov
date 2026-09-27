@@ -26,7 +26,13 @@
   --color-brass-400: #d9b64a;
   --color-brass-600: #a3821a;
 
+  /* Метка женского пола — тёплый глиняный акцент */
+  --color-clay-400: #e0a05f;
+  --color-clay-500: #d1873f;
+
   /* Линия супружества */
+  --color-bond-100: #e7f0f7;
+  --color-bond-200: #c9dcea;
   --color-bond-400: #7fa6c9;
   --color-bond-500: #5b87ae;
 
@@ -99,29 +105,67 @@ h1, h2, h3, .display {
 }
 
 /* ---------- React Flow ---------- */
+
+/* Мини-карта: на телефоне компактнее, чтобы не закрывала холст */
+@media (max-width: 640px) {
+  .react-flow__minimap {
+    width: 108px;
+    height: 80px;
+  }
+  .react-flow__minimap-svg {
+    width: 100%;
+    height: 100%;
+  }
+}
 .react-flow__attribution { display: none; }
 
 .react-flow__edge-path {
-  stroke-width: 1.75;
+  stroke-linecap: round;
 }
 
+/* Точки-хэндлы не показываем: связи заводятся через «+» на карточке.
+   Сами хэндлы оставлены в разметке — к ним крепятся линии.
+   !important — у класса .connectable из библиотеки pointer-events: all. */
 .react-flow__handle {
   width: 7px;
   height: 7px;
   background: var(--color-ink-300);
   border: none;
-  opacity: 0;
-  transition: opacity 0.15s ease;
-}
-
-.react-flow__node:hover .react-flow__handle,
-.react-flow__node.selected .react-flow__handle {
-  opacity: 1;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 .react-flow__node.selected .person-card {
   border-color: var(--color-brass-500);
   box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.22), var(--shadow-lift);
+}
+
+/* На тач-экранах наведения нет — кнопки карточки показываем всегда
+   и делаем чуть крупнее, чтобы попадать пальцем */
+@media (hover: none) {
+  .card-actions {
+    display: flex;
+  }
+  .card-btn {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+/* Кнопки на карточке в древе: белый фон, обводка и значок — в цвет карточки */
+.node-btn {
+  background-color: #fff;
+  border: 1.5px solid var(--accent, var(--color-mist-300));
+  color: var(--accent, var(--color-ink-600));
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.45) inset, 0 2px 6px rgba(10, 17, 32, 0.18);
+  transition: background-color 0.15s ease;
+}
+.node-btn:hover {
+  background-color: color-mix(in srgb, var(--accent, #c6cfdd) 14%, #fff);
+}
+.node-btn-on {
+  background-color: var(--accent, var(--color-mist-300));
+  color: var(--color-ink-900);
 }
 
 /* Скрываем интерфейсные элементы при экспорте картинки */

@@ -37,7 +37,7 @@ export function LoginForm({ next }: { next: string }) {
         <input type="hidden" name="next" value={next} />
 
         <Field label="Электронная почта">
-          <Input name="email" type="email" required autoComplete="email" placeholder="anna@example.com" />
+          <Input name="email" type="email" required autoComplete="email" placeholder="anna@gmail.com" />
         </Field>
 
         <Field label="Пароль">
