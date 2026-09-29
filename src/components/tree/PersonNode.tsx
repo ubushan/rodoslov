@@ -2,31 +2,28 @@
 
 import { memo, useRef, useState } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { shortName, lifespan, ageYears, yearsWord } from "@/lib/format";
+import { shortName, lifespan, ageYears, yearsWord, peopleWord } from "@/lib/format";
 import type { Gender, Person } from "@/lib/types";
+import type { NewRelative } from "@/lib/place";
 import { NodeMenu, MenuItem } from "./NodeMenu";
+
+export type { NewRelative };
 
 export type PersonNodeData = {
   person: Person;
   photoUrl: string | null;
   canEdit: boolean;
-  /** входит в подсвеченную линию по отцу */
-  highlighted: boolean;
-  /** линия по отцу показана, но этот человек в неё не входит */
-  dimmed: boolean;
-  /** у этого человека сейчас включена подсветка линии по отцу */
-  paternalActive: boolean;
-  onPaternal: (id: string) => void;
-  onBranch: (id: string) => void;
+  /** есть супруги или дети — семейную ветку есть что показывать */
+  canOpenBranch: boolean;
+  /** на странице ветки: сколько человек общего древа в неё не попало */
+  hiddenCount?: number;
   /** Пол уже добавленных родителей: чтобы не завести второго отца или мать */
   parentGenders: Gender[];
   onOpen: (id: string) => void;
   onAdd: (id: string, relation: NewRelative) => void;
+  onBranch: (id: string) => void;
   onHover: (id: string, over: boolean) => void;
 };
-
-/** Кем приходится новый человек тому, от чьей карточки его добавляют. */
-export type NewRelative = "child" | "spouse" | "father" | "mother";
 
 type AddOption = { key: NewRelative; label: string; disabled?: boolean; hint?: string };
 
@@ -49,8 +46,8 @@ function IconEdit() {
   );
 }
 
-/** Стрелки наружу для кнопки «открыть семейную ветку» */
-function IconExpand() {
+/** Стрелки внутрь — кнопка сужает вид до семейной ветки */
+function IconCollapse() {
   return (
     <svg
       width="17"
@@ -62,7 +59,7 @@ function IconExpand() {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <path d="M10.6 3.5h3.9v3.9M14.5 3.5 9.6 8.4M7.4 14.5H3.5v-3.9M3.5 14.5l4.9-4.9" />
+      <path d="M3 10.5h4.5V15M15 7.5h-4.5V3M10.5 7.5l5-5M2.5 15.5l5-5" />
     </svg>
   );
 }
@@ -73,11 +70,11 @@ function IconExpand() {
  * длинные имена не режутся многоточием, а переносятся на новую строку.
  * Умершие отмечены приглушённым портретом и тире в годах.
  *
- * Точки-хэндлы скрыты: вместо них два «+» — по центру нижнего края
- * (ребёнок или супруг) и верхнего (отец или мать).
+ * Точки-хэндлы скрыты: вместо них ряд кнопок на верхней грани — «+» с меню
+ * (отец, мать, супруг(а), ребёнок), правка карточки и открытие семейной ветки.
  */
 function PersonNodeComponent({ data, selected }: NodeProps) {
-  const { person, photoUrl, canEdit, parentGenders, highlighted, dimmed, paternalActive, onPaternal, onBranch, onOpen, onAdd, onHover } =
+  const { person, photoUrl, canEdit, parentGenders, canOpenBranch, hiddenCount, onBranch, onOpen, onAdd, onHover } =
     data as PersonNodeData;
   const years = lifespan(person);
   const age = ageYears(person);
@@ -87,6 +84,8 @@ function PersonNodeComponent({ data, selected }: NodeProps) {
     person.gender === "male" ? "Супруга" : person.gender === "female" ? "Супруг" : "Супруг(а)";
   const hasFather = parentGenders.includes("male");
   const hasMother = parentGenders.includes("female");
+  // брат или сестра — родство по общим родителям: без них связывать не с чем
+  const hasParents = hasFather || hasMother;
 
 
   // цвет карточки: рамка, подсветка выделения и кнопки — всё по полу
@@ -105,11 +104,14 @@ function PersonNodeComponent({ data, selected }: NodeProps) {
   const plusRef = useRef<HTMLButtonElement>(null);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
 
-  // порядок по иерархии: отец, мать, супруг(а), ребёнок.
+  // порядок по иерархии: отец, мать, брат, сестра, супруг(а), ребёнок.
   // Занятый родительский слот не предлагаем повторно.
+  const siblingHint = hasParents ? undefined : "Сначала укажите родителей";
   const addOptions: AddOption[] = [
     { key: "father", label: "Отец", disabled: hasFather, hint: hasFather ? "Отец уже указан" : undefined },
     { key: "mother", label: "Мать", disabled: hasMother, hint: hasMother ? "Мать уже указана" : undefined },
+    { key: "brother", label: "Брат", disabled: !hasParents, hint: siblingHint },
+    { key: "sister", label: "Сестра", disabled: !hasParents, hint: siblingHint },
     { key: "spouse", label: spouseLabel },
     { key: "child", label: "Ребёнок" },
   ];
@@ -125,9 +127,7 @@ function PersonNodeComponent({ data, selected }: NodeProps) {
       style={{
         backgroundColor: accentTint,
         borderColor: accent,
-        borderWidth: highlighted ? 2.5 : undefined,
-        opacity: dimmed ? 0.45 : undefined,
-        ...(selected || highlighted
+        ...(selected
           ? {
               boxShadow: `0 0 0 3px ${accentRing}, 0 1px 2px rgba(10,17,32,.06), 0 12px 32px -12px rgba(10,17,32,.24)`,
             }
@@ -173,9 +173,7 @@ function PersonNodeComponent({ data, selected }: NodeProps) {
 
       <span className="min-w-0 flex-1">
         <span
-          className={`block font-display text-[15px] leading-tight text-ink-800 ${
-            highlighted ? "font-bold" : "font-semibold"
-          }`}
+          className="block font-display text-[15px] font-semibold leading-tight text-ink-800"
         >
           {shortName(person)}
         </span>
@@ -212,7 +210,14 @@ function PersonNodeComponent({ data, selected }: NodeProps) {
         )}
       </span>
 
-      {/* три кнопки на верхней грани, слева: добавить, редактировать, линия по отцу */}
+      {/* сколько человек общего древа не попало в открытую ветку */}
+      {!!hiddenCount && (
+        <span className="pointer-events-none absolute -top-11 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-mist-200 bg-white/95 px-2.5 py-1 text-[11px] font-medium text-ink-500 shadow-sm">
+          скрыто {hiddenCount} {peopleWord(hiddenCount)}
+        </span>
+      )}
+
+      {/* кнопки на верхней грани, слева: добавить, редактировать, открыть ветку */}
       <span className="card-actions absolute -top-4 left-3 hidden gap-1.5 group-hover:flex">
         {canEdit && (
           <button
@@ -248,28 +253,16 @@ function PersonNodeComponent({ data, selected }: NodeProps) {
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
-            onPaternal(person.id);
-          }}
-          className={`node-btn card-btn grid h-8 w-8 place-items-center rounded-full text-[15px] font-bold leading-none ${
-            paternalActive ? "node-btn-on" : ""
-          }`}
-          aria-label="Показать линию по отцу"
-          title="Линия по отцу"
-        >
-          ↑
-        </button>
-        <button
-          style={{ "--accent": accent } as React.CSSProperties}
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
             onBranch(person.id);
           }}
-          className="node-btn card-btn grid h-8 w-8 place-items-center rounded-full"
-          aria-label="Открыть ветку"
-          title="Открыть семейную ветку"
+          disabled={!canOpenBranch}
+          className={`node-btn card-btn grid h-8 w-8 place-items-center rounded-full ${
+            canOpenBranch ? "" : "node-btn-off"
+          }`}
+          aria-label="Открыть семейную ветку"
+          title={canOpenBranch ? "Открыть семейную ветку" : "Нет супругов и детей"}
         >
-          <IconExpand />
+          <IconCollapse />
         </button>
       </span>
 

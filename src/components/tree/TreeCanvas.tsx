@@ -30,7 +30,6 @@ import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { publicUrl } from "@/lib/format";
 import { autoLayout, CARD_W, CARD_H } from "@/lib/layout";
-import { paternalLine } from "@/lib/paternal";
 import { savePositions, deleteRelationship } from "@/app/actions/persons";
 import type { Gender, Person, Relationship, Attachment, MemberRole } from "@/lib/types";
 
@@ -66,6 +65,15 @@ function IconDownload() {
   );
 }
 
+/** Стрелки наружу — кнопка раскрывает всё древо вместо ветки */
+function IconExpand() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10.8 3.5h3.7v3.7M14.5 3.5 9.8 8.2M7.2 14.5H3.5V10.8M3.5 14.5l4.7-4.7" />
+    </svg>
+  );
+}
+
 type Props = {
   treeId: string;
   treeTitle: string;
@@ -75,6 +83,10 @@ type Props = {
   attachments: Attachment[];
   /** на странице ветки раскладку не сохраняем в базу, чтобы не сдвигать общее древо */
   persistLayout?: boolean;
+  /** на странице ветки — ссылка на всё древо: кнопка с расходящимися стрелками */
+  wholeTreeHref?: string;
+  /** на странице ветки — её родоначальник и число людей, не попавших в ветку */
+  branchRoot?: { id: string; hidden: number };
 };
 
 function Canvas({
@@ -85,6 +97,8 @@ function Canvas({
   relationships,
   attachments,
   persistLayout = true,
+  wholeTreeHref,
+  branchRoot,
 }: Props) {
   const router = useRouter();
   const canEdit = role === "owner" || role === "editor";
@@ -93,8 +107,6 @@ function Canvas({
   const [exporting, setExporting] = useState(false);
   // карточка под курсором — по ней показываем «+» на линии её пары
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  // чей род по отцу подсвечен: включается кнопкой на карточке
-  const [paternalOf, setPaternalOf] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   // Пол родителей каждого человека — чтобы в меню не предлагать
@@ -110,10 +122,20 @@ function Canvas({
     return out;
   }, [persons, relationships]);
 
-  const paternal = useMemo(
-    () => (paternalOf ? paternalLine(paternalOf, persons, relationships) : null),
-    [paternalOf, persons, relationships]
-  );
+  // Кому есть что показывать на отдельной странице ветки: у кого есть супруги
+  // или дети. У остальных кнопка ветки неактивна.
+  const branchable = useMemo(() => {
+    const ids = new Set<string>();
+    for (const r of relationships) {
+      if (r.kind === "spouse") {
+        ids.add(r.from_person_id);
+        ids.add(r.to_person_id);
+      } else if (r.kind === "parent") {
+        ids.add(r.from_person_id);
+      }
+    }
+    return ids;
+  }, [relationships]);
 
   const initialNodes = useMemo<Node[]>(
     () =>
@@ -127,10 +149,8 @@ function Canvas({
           photoUrl: publicUrl(SUPABASE_URL, "photos", p.photo_path),
           canEdit,
           parentGenders: parentGendersByChild.get(p.id) ?? [],
-          highlighted: paternal ? paternal.has(p.id) : false,
-          dimmed: paternal ? !paternal.has(p.id) : false,
-          paternalActive: paternalOf === p.id,
-          onPaternal: (id: string) => setPaternalOf((cur) => (cur === id ? null : id)),
+          canOpenBranch: branchable.has(p.id),
+          hiddenCount: branchRoot?.id === p.id ? branchRoot.hidden : undefined,
           onBranch: (id: string) => router.push(`/tree/${treeId}/branch/${id}`),
           onHover: (id: string, over: boolean) =>
             setHoveredId((cur) => (over ? id : cur === id ? null : cur)),
@@ -139,7 +159,7 @@ function Canvas({
             router.push(`/tree/${treeId}/person/new?relateTo=${id}&relation=${relation}`),
         },
       })),
-    [persons, canEdit, parentGendersByChild, paternal, paternalOf, router, treeId]
+    [persons, canEdit, parentGendersByChild, branchable, branchRoot, router, treeId]
   );
 
   const initialEdges = useMemo<Edge[]>(
@@ -427,6 +447,18 @@ function Canvas({
       {/* Панель действий */}
       <div className="pointer-events-none absolute left-3 top-3 flex flex-col">
         <div className="pointer-events-auto flex flex-col gap-2.5 rounded-2xl border border-mist-200 bg-white/95 p-2.5 shadow-lift backdrop-blur">
+          {wholeTreeHref && (
+            <button
+              type="button"
+              onClick={() => router.push(wholeTreeHref)}
+              aria-label="Раскрыть всё древо"
+              title="Раскрыть всё древо"
+              className="grid h-10 w-10 place-items-center rounded-xl text-ink-600 transition-colors
+                         hover:bg-mist-100 hover:text-ink-900"
+            >
+              <IconExpand />
+            </button>
+          )}
           {canEdit && (
             <button
               type="button"

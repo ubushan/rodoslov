@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { TreeCanvas } from "@/components/tree/TreeCanvas";
 import { familyBranch } from "@/lib/branch";
-import { shortName } from "@/lib/format";
+import { peopleWord, shortName } from "@/lib/format";
 import type { Person, Relationship, Attachment, MemberRole } from "@/lib/types";
 
 type Params = { params: Promise<{ treeId: string; personId: string }> };
@@ -71,7 +71,7 @@ export default async function BranchPage({ params }: Params) {
             Ветка: {shortName(person)}
           </h1>
           <span className="shrink-0 rounded-lg bg-mist-100 px-2 py-0.5 text-xs text-ink-500">
-            {branchPersons.length} человек
+            {branchPersons.length} {peopleWord(branchPersons.length)}
           </span>
         </div>
 
@@ -92,6 +92,8 @@ export default async function BranchPage({ params }: Params) {
           relationships={branchRelationships}
           attachments={(attachments ?? []) as Attachment[]}
           persistLayout={false}
+          wholeTreeHref={`/tree/${treeId}`}
+          branchRoot={{ id: personId, hidden: allPersons.length - branchPersons.length }}
         />
       </div>
     </div>

@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getSettings } from "@/lib/settings";
 
 export type AuthState = { error?: string; notice?: string } | null;
 
@@ -38,6 +39,14 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
 
   if (password.length < 8) {
     return { error: "Пароль должен быть не короче 8 символов." };
+  }
+
+  // регистрацию можно закрыть в панели администратора
+  const { allowSignups } = await getSettings();
+  if (!allowSignups) {
+    return {
+      error: "Регистрация закрыта. Попросите администратора открыть её или войдите по приглашению.",
+    };
   }
 
   const supabase = await createClient();

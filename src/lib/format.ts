@@ -20,6 +20,16 @@ export function formatDate(iso: string | null | undefined): string | null {
   return `${m[3]}.${m[2]}.${m[1]}`;
 }
 
+/** «29.09.2026, 14:35» — для списков админки */
+export function formatDateTime(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const date = d.toLocaleDateString("ru-RU");
+  const time = d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  return `${date}, ${time}`;
+}
+
 /** Дата рождения, как её показывать: полная дата, иначе год, иначе null */
 export function birthLabel(p: Pick<Person, "birth_date" | "birth_year">) {
   return formatDate(p.birth_date) ?? (p.birth_year ? String(p.birth_year) : null);
@@ -76,6 +86,13 @@ export function yearsWord(n: number): string {
   if (m10 === 1 && m100 !== 11) return "год";
   if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return "года";
   return "лет";
+}
+
+/** «1 человек», «3 человека», «12 человек» */
+export function peopleWord(n: number): string {
+  const m10 = n % 10;
+  const m100 = n % 100;
+  return m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20) ? "человека" : "человек";
 }
 
 export function initials(p: Pick<Person, "last_name" | "first_name">) {

@@ -1,7 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PROTECTED = ["/dashboard", "/tree", "/profile"];
+// Админку тоже закрываем: анонимного гостя отправляем на вход, а вошедшего
+// не-администратора уже не пустит её собственный layout
+const PROTECTED = ["/dashboard", "/tree", "/profile", "/admin"];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });

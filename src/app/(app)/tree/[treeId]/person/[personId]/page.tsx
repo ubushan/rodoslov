@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PersonPage, type NewRelation } from "@/components/person/PersonPage";
+import { getSettings } from "@/lib/settings";
 import { shortName } from "@/lib/format";
 import type { Person, Relationship, Attachment, MemberRole } from "@/lib/types";
 
@@ -55,8 +56,13 @@ export default async function PersonCardPage({ params, searchParams }: Params & 
   const person = isNew ? null : ((persons ?? []) as Person[]).find((p) => p.id === personId);
   if (!isNew && !person) notFound();
 
-  const relationKinds: NewRelation[] = ["child", "spouse", "father", "mother"];
+  const relationKinds: NewRelation[] = ["child", "spouse", "father", "mother", "brother", "sister"];
   const kind = relationKinds.includes(relation as NewRelation) ? (relation as NewRelation) : null;
+
+  // предел числа людей в древе: задаёт администратор платформы
+  const { maxPersonsPerTree } = await getSettings();
+  const limitReached =
+    isNew && maxPersonsPerTree > 0 && (persons?.length ?? 0) >= maxPersonsPerTree;
 
   return (
     <PersonPage
@@ -69,6 +75,7 @@ export default async function PersonCardPage({ params, searchParams }: Params & 
       attachments={((attachments ?? []) as Attachment[]).filter((a) => a.person_id === person?.id)}
       hasDeathPlace={!deathPlaceError}
       relation={relateTo && kind ? { relateTo, kind } : null}
+      limitReached={limitReached}
     />
   );
 }

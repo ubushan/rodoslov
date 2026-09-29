@@ -2,8 +2,8 @@ import dagre from "dagre";
 import type { Node, Edge } from "@xyflow/react";
 import type { Person } from "./types";
 
-export const CARD_W = 208;
-export const CARD_H = 104;
+export { CARD_W, CARD_H } from "./place";
+import { CARD_W, CARD_H } from "./place";
 
 const NODE_GAP = 46; // между карточками внутри одной семьи
 const BRANCH_GAP = 150; // между ветвями внутри семьи — у каждой своя пирамида

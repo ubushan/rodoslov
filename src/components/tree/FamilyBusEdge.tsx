@@ -4,7 +4,7 @@ import { memo } from "react";
 import { useNodes, useEdges, type EdgeProps } from "@xyflow/react";
 import { primaryParentByChild } from "@/lib/layout";
 
-const FALLBACK_W = 208;
+const FALLBACK_W = 236;
 const FALLBACK_H = 104;
 
 /**
@@ -17,19 +17,12 @@ const FALLBACK_H = 104;
  * сегменты сливаются в одну линию. Позиции берём из хранилища React Flow —
  * при перетаскивании карточек линии пересчитываются на лету.
  */
-function FamilyBusEdgeComponent({ source, target, targetX, targetY }: EdgeProps) {
+function FamilyBusEdgeComponent({ source, targetX, targetY }: EdgeProps) {
   const nodes = useNodes();
   const edges = useEdges();
   const kindOf = (id: string) => (edges.find((e) => e.id === id)?.data as { kind?: string } | undefined)?.kind;
 
   const nodeById = new Map(nodes.map((n) => [n.id, n]));
-  // оба конца в подсвеченной линии по отцу — рисуем жирнее
-  const onPaternalLine = (id: string | null) => {
-    if (!id) return false;
-    const n = nodeById.get(id);
-    return !!n && !!(n.data as { highlighted?: boolean } | undefined)?.highlighted;
-  };
-  const bold = onPaternalLine(source) && onPaternalLine(target);
   const bottom = (id: string) => {
     const n = nodeById.get(id);
     const w = n?.measured?.width ?? FALLBACK_W;
@@ -96,7 +89,7 @@ function FamilyBusEdgeComponent({ source, target, targetX, targetY }: EdgeProps)
       d={`${bracket} ${run}`}
       fill="none"
       stroke="#7a8ca6"
-      strokeWidth={bold ? 3 : 1.5}
+      strokeWidth={1.5}
       strokeLinecap="round"
       strokeLinejoin="round"
     />

@@ -24,7 +24,7 @@ import type { Gender, MemberRole, Person, Relationship, Attachment, RelationKind
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 
 /** Кем приходится новый человек тому, от чьей карточки его добавляют. */
-export type NewRelation = "child" | "spouse" | "father" | "mother";
+export type NewRelation = "child" | "spouse" | "father" | "mother" | "brother" | "sister";
 
 type Props = {
   treeId: string;
@@ -37,6 +37,8 @@ type Props = {
   attachments: Attachment[];
   hasDeathPlace: boolean;
   relation: { relateTo: string; kind: NewRelation } | null;
+  /** в древе достигнут предел числа людей — новую карточку добавить нельзя */
+  limitReached: boolean;
 };
 
 /** Тонкий подзаголовок смыслового блока внутри формы. */
@@ -80,6 +82,7 @@ export function PersonPage({
   attachments,
   hasDeathPlace,
   relation,
+  limitReached,
 }: Props) {
   const router = useRouter();
   const canEdit = role === "owner" || role === "editor";
@@ -106,7 +109,11 @@ export function PersonPage({
         ? "отец"
         : relation.kind === "mother"
           ? "мать"
-          : anchor?.gender === "male"
+          : relation.kind === "brother"
+            ? "брат"
+            : relation.kind === "sister"
+              ? "сестра"
+              : anchor?.gender === "male"
             ? "супруга"
             : anchor?.gender === "female"
               ? "супруг"
@@ -137,6 +144,13 @@ export function PersonPage({
   function applyRelation(fd: FormData) {
     if (!relation) return;
     fd.set("relate_to", relation.relateTo);
+    if (relation.kind === "brother" || relation.kind === "sister") {
+      // отдельного вида связи «брат/сестра» в базе нет: родство считается по
+      // общим родителям, поэтому сервер скопирует родительские связи родственника
+      fd.set("relate_kind", "sibling");
+      fd.set("gender", relation.kind === "brother" ? "male" : "female");
+      return;
+    }
     if (relation.kind === "spouse") {
       fd.set("relate_kind", "spouse");
       const chosen = String(fd.get("gender") ?? "unknown");
@@ -386,7 +400,8 @@ export function PersonPage({
               type="submit"
               form="person-form"
               size="sm"
-              disabled={pending || (!isNew && false)}
+              disabled={pending || limitReached}
+              title={limitReached ? "В древе достигнут предел числа людей" : undefined}
             >
               {pending ? "Сохраняем…" : isNew ? "Добавить в древо" : "Сохранить"}
             </Button>
@@ -397,6 +412,13 @@ export function PersonPage({
       {!canEdit && (
         <p className="mt-4 rounded-xl border border-mist-200 bg-white px-4 py-3 text-sm text-ink-500">
           У вас роль зрителя — карточку можно только смотреть.
+        </p>
+      )}
+
+      {limitReached && (
+        <p className="mt-4 rounded-xl border border-[#e4c3bd] bg-[#fdf4f2] px-4 py-3 text-sm text-[#8c4438]">
+          В этом древе достигнут предел числа людей, установленный администратором платформы.
+          Новую карточку добавить нельзя — попросите поднять предел в панели администратора.
         </p>
       )}
 

@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import type { Gender, RelationKind } from "@/lib/types";
+import { placeNewPerson, type NewRelative } from "@/lib/place";
+import { getSettings } from "@/lib/settings";
+import type { Gender, Person, Relationship, RelationKind } from "@/lib/types";
 
 function num(v: FormDataEntryValue | null) {
   const s = String(v ?? "").trim();
@@ -50,37 +52,134 @@ export async function createPerson(treeId: string, formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const payload = personPayload(formData);
+  const gender = String(payload.gender ?? "unknown");
+
+  // Связь с уже существующим человеком: кем новый человек ему приходится
+  const relTo = str(formData.get("relate_to"));
+  const relKind = str(formData.get("relate_kind")); // parent | spouse | sibling
+  const relDirection = str(formData.get("relate_direction")); // parent_of | child_of
+
+  const relation: NewRelative | null =
+    !relTo || !relKind
+      ? null
+      : relKind === "spouse"
+        ? "spouse"
+        : relKind === "sibling"
+          ? gender === "female"
+            ? "sister"
+            : "brother"
+          : relKind !== "parent"
+            ? null
+            : relDirection === "child_of"
+              ? "child"
+              : gender === "female"
+                ? "mother"
+                : "father";
+
+  const [{ data: personsData }, { data: relsData }] = await Promise.all([
+    supabase.from("persons").select("*").eq("tree_id", treeId),
+    supabase.from("relationships").select("*").eq("tree_id", treeId),
+  ]);
+  const persons = (personsData ?? []) as Person[];
+  const relationships = (relsData ?? []) as Relationship[];
+  const anchor = persons.find((p) => p.id === relTo) ?? null;
+
+  // предел числа людей в древе задаёт администратор платформы
+  const { maxPersonsPerTree } = await getSettings();
+  if (maxPersonsPerTree > 0 && persons.length >= maxPersonsPerTree) {
+    throw new Error("В древе достигнут предел числа людей");
+  }
+
+  // Позицию считаем на сервере: карточка сразу встаёт рядом с родственником,
+  // а без связи — сверху по центру древа.
+  const explicitX = num(formData.get("pos_x"));
+  const explicitY = num(formData.get("pos_y"));
+  const pos =
+    explicitX != null && explicitY != null
+      ? { x: explicitX, y: explicitY }
+      : placeNewPerson({ persons, relationships, anchor, relation, gender });
+
   const { data, error } = await supabase
     .from("persons")
     .insert({
-      ...personPayload(formData),
+      ...payload,
       tree_id: treeId,
       created_by: user.id,
-      pos_x: num(formData.get("pos_x")) ?? 0,
-      pos_y: num(formData.get("pos_y")) ?? 0,
+      pos_x: pos.x,
+      pos_y: pos.y,
     })
     .select("id")
     .single();
 
   if (error) throw new Error("Не удалось добавить человека");
 
-  // Необязательная связь с уже существующим человеком
-  const relTo = str(formData.get("relate_to"));
-  const relKind = str(formData.get("relate_kind")) as RelationKind | null;
-  const relDirection = str(formData.get("relate_direction")); // parent_of | child_of
+  const rows: {
+    tree_id: string;
+    kind: RelationKind;
+    from_person_id: string;
+    to_person_id: string;
+  }[] = [];
+  if (data && anchor && relation) {
+    const link = (kind: RelationKind, from: string, to: string) =>
+      rows.push({ tree_id: treeId, kind, from_person_id: from, to_person_id: to });
 
-  if (relTo && relKind && data) {
-    const isParentOf = relKind === "parent" && relDirection === "parent_of";
-    await supabase.from("relationships").insert({
-      tree_id: treeId,
-      kind: relKind,
-      from_person_id: relKind === "spouse" ? relTo : isParentOf ? data.id : relTo,
-      to_person_id: relKind === "spouse" ? data.id : isParentOf ? relTo : data.id,
-    });
+    if (relation === "spouse") {
+      link("spouse", anchor.id, data.id);
+    } else if (relation === "child") {
+      // ребёнок, добавленный от карточки одного из супругов, сразу получает
+      // и второго родителя — иначе он повис бы на одной линии
+      link("parent", anchor.id, data.id);
+      const second = secondParentOf(anchor.id, relationships);
+      if (second) link("parent", second, data.id);
+    } else if (relation === "father" || relation === "mother") {
+      link("parent", data.id, anchor.id);
+    } else {
+      // брат или сестра: отдельного вида связи для них нет — родство считается
+      // по общим родителям, поэтому переносим родительские связи родственника
+      for (const r of relationships) {
+        if (r.kind === "parent" && r.to_person_id === anchor.id) {
+          link("parent", r.from_person_id, data.id);
+        }
+      }
+    }
+  }
+  if (rows.length) {
+    const { error: linkError } = await supabase.from("relationships").insert(rows);
+    // карточка уже создана, поэтому не роняем действие — но связь без записи
+    // в базе не появится, и об этом должно быть видно в логе сервера
+    if (linkError) console.error("Не удалось сохранить связи новой карточки:", linkError.message);
   }
 
   revalidatePath(`/tree/${treeId}`);
   return data?.id as string;
+}
+
+/**
+ * Второй родитель нового ребёнка: единственный супруг(а) того, от чьего имени
+ * добавляют, а при нескольких браках — тот, кто уже родитель его детей.
+ */
+function secondParentOf(anchorId: string, relationships: Relationship[]) {
+  const spouses = relationships
+    .filter(
+      (r) => r.kind === "spouse" && (r.from_person_id === anchorId || r.to_person_id === anchorId)
+    )
+    .map((r) => (r.from_person_id === anchorId ? r.to_person_id : r.from_person_id));
+  if (!spouses.length) return null;
+  if (spouses.length === 1) return spouses[0];
+
+  const kids = new Set(
+    relationships
+      .filter((r) => r.kind === "parent" && r.from_person_id === anchorId)
+      .map((r) => r.to_person_id)
+  );
+  return (
+    spouses.find((s) =>
+      relationships.some(
+        (r) => r.kind === "parent" && r.from_person_id === s && kids.has(r.to_person_id)
+      )
+    ) ?? spouses[0]
+  );
 }
 
 export async function updatePerson(treeId: string, personId: string, formData: FormData) {

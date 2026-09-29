@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { currentAdmin } from "@/lib/admin";
 import { signOut } from "@/app/actions/auth";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -8,11 +9,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name")
-    .eq("id", user.id)
-    .single();
+  const [{ data: profile }, admin] = await Promise.all([
+    supabase.from("profiles").select("full_name").eq("id", user.id).single(),
+    currentAdmin(),
+  ]);
 
   const name = profile?.full_name ?? user.email ?? "Аккаунт";
 
@@ -34,6 +34,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </Link>
 
           <div className="flex items-center gap-1">
+            {admin && (
+              <Link
+                href="/admin"
+                className="rounded-lg px-2.5 py-1.5 text-sm text-brass-400 transition-colors hover:bg-white/10 hover:text-brass-300 sm:px-3"
+              >
+                Админка
+              </Link>
+            )}
             <Link
               href="/profile"
               className="max-w-[38vw] truncate rounded-lg px-2.5 py-1.5 text-sm text-mist-300 transition-colors hover:bg-white/10 hover:text-mist-50 sm:max-w-none sm:px-3"
