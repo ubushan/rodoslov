@@ -45,7 +45,7 @@ export function LoginForm({ next }: { next: string }) {
         </Field>
 
         {state?.error && (
-          <p className="rounded-[10px] border border-[#e4c3bd] bg-[#fdf4f2] px-3 py-2 text-sm text-[#c05a4d]">
+          <p className="rounded-[10px] border border-danger-line bg-danger-soft px-3 py-2 text-sm text-danger">
             {state.error}
           </p>
         )}

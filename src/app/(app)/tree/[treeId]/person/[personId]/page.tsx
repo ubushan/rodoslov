@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PersonPage, type NewRelation } from "@/components/person/PersonPage";
+import type { ChangeRow } from "@/components/person/PersonHistory";
 import { getSettings } from "@/lib/settings";
-import { shortName } from "@/lib/format";
+import { shortName, formatDateTime } from "@/lib/format";
+import { embeddedName } from "@/lib/admin";
 import type { Person, Relationship, Attachment, MemberRole } from "@/lib/types";
 
 type Params = { params: Promise<{ treeId: string; personId: string }> };
@@ -64,6 +66,27 @@ export default async function PersonCardPage({ params, searchParams }: Params & 
   const limitReached =
     isNew && maxPersonsPerTree > 0 && (persons?.length ?? 0) >= maxPersonsPerTree;
 
+  // история изменений: таблица может ещё отсутствовать — тогда покажем подсказку
+  let changes: ChangeRow[] | null = null;
+  if (!isNew && person) {
+    const { data: history, error: historyError } = await supabase
+      .from("person_changes")
+      .select("id, changed_by, before, after, created_at, by:profiles!person_changes_changed_by_fkey(full_name)")
+      .eq("person_id", person.id)
+      .order("created_at", { ascending: false });
+    if (historyError) {
+      changes = null;
+    } else {
+      changes = (history ?? []).map((row) => ({
+        id: row.id as number,
+        author: embeddedName(row.by) ?? "Удалённый пользователь",
+        createdAt: formatDateTime(row.created_at as string) ?? "—",
+        before: row.before as Record<string, unknown> | null,
+        after: row.after as Record<string, unknown>,
+      }));
+    }
+  }
+
   return (
     <PersonPage
       treeId={treeId}
@@ -76,6 +99,7 @@ export default async function PersonCardPage({ params, searchParams }: Params & 
       hasDeathPlace={!deathPlaceError}
       relation={relateTo && kind ? { relateTo, kind } : null}
       limitReached={limitReached}
+      changes={changes}
     />
   );
 }

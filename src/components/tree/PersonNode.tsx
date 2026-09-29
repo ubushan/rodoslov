@@ -88,18 +88,22 @@ function PersonNodeComponent({ data, selected }: NodeProps) {
   const hasParents = hasFather || hasMother;
 
 
-  // цвет карточки: рамка, подсветка выделения и кнопки — всё по полу
+  // цвет карточки: рамка, подсветка выделения и кнопки — всё по полу.
+  // Значения — токены темы, поэтому карточки читаются и в тёмной, и в сепии.
   const accent =
-    person.gender === "male" ? "#7fa6c9" : person.gender === "female" ? "#d1873f" : "#c6cfdd";
+    person.gender === "male"
+      ? "var(--color-male)"
+      : person.gender === "female"
+        ? "var(--color-female)"
+        : "var(--color-plain)";
   // лёгкая заливка карточки в тон рамки
   const accentTint =
-    person.gender === "male" ? "#f3f8fb" : person.gender === "female" ? "#fdf5ef" : "#ffffff";
-  const accentRing =
     person.gender === "male"
-      ? "rgba(127,166,201,.35)"
+      ? "var(--color-male-tint)"
       : person.gender === "female"
-        ? "rgba(209,135,63,.35)"
-        : "rgba(198,207,221,.55)";
+        ? "var(--color-female-tint)"
+        : "var(--color-plain-tint)";
+  const accentRing = `color-mix(in srgb, ${accent} 35%, transparent)`;
 
   const plusRef = useRef<HTMLButtonElement>(null);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
@@ -187,15 +191,7 @@ function PersonNodeComponent({ data, selected }: NodeProps) {
             <span
               aria-hidden="true"
               className="mt-1.5 mb-1 block h-px w-full opacity-60"
-              style={{
-                backgroundImage: `linear-gradient(90deg, ${
-                  person.gender === "male"
-                    ? "#7fa6c9"
-                    : person.gender === "female"
-                      ? "#d1873f"
-                      : "#c6cfdd"
-                }, transparent)`,
-              }}
+              style={{ backgroundImage: `linear-gradient(90deg, ${accent}, transparent)` }}
             />
             <span className="block text-[12px] leading-tight text-ink-500">
             {years}
@@ -212,7 +208,7 @@ function PersonNodeComponent({ data, selected }: NodeProps) {
 
       {/* сколько человек общего древа не попало в открытую ветку */}
       {!!hiddenCount && (
-        <span className="pointer-events-none absolute -top-11 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-mist-200 bg-white/95 px-2.5 py-1 text-[11px] font-medium text-ink-500 shadow-sm">
+        <span className="pointer-events-none absolute -top-11 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-mist-200 bg-surface/95 px-2.5 py-1 text-[11px] font-medium text-ink-500 shadow-sm">
           скрыто {hiddenCount} {peopleWord(hiddenCount)}
         </span>
       )}

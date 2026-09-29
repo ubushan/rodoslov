@@ -46,13 +46,13 @@ export function SignupForm() {
         </Field>
 
         {state?.error && (
-          <p className="rounded-[10px] border border-[#e4c3bd] bg-[#fdf4f2] px-3 py-2 text-sm text-[#c05a4d]">
+          <p className="rounded-[10px] border border-danger-line bg-danger-soft px-3 py-2 text-sm text-danger">
             {state.error}
           </p>
         )}
 
         {state?.notice && (
-          <p className="rounded-[10px] border border-[#cdd9c7] bg-[#f3f7f1] px-3 py-2 text-sm text-[#4a6b3f]">
+          <p className="rounded-[10px] border border-ok-line bg-ok-soft px-3 py-2 text-sm text-ok-ink">
             {state.notice}
           </p>
         )}

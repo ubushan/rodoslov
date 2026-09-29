@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ThemeSwitcher } from "@/components/theme/ThemeSwitcher";
 import { MiniTree } from "@/components/landing/MiniTree";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
@@ -49,19 +50,19 @@ export default async function LandingPage() {
             >
               Р
             </span>
-            <span className="font-display text-[17px] text-mist-50">Родослов</span>
+            <span className="font-display text-[17px] text-album-text">Родослов</span>
           </Link>
 
           <nav className="flex items-center gap-1 sm:gap-2">
             <Link
               href="#how"
-              className="hidden rounded-lg px-3 py-2 text-sm text-mist-300 transition-colors hover:text-mist-50 sm:block"
+              className="hidden rounded-lg px-3 py-2 text-sm text-album-muted transition-colors hover:text-album-text sm:block"
             >
               Как устроено
             </Link>
             <Link
               href="#card"
-              className="hidden rounded-lg px-3 py-2 text-sm text-mist-300 transition-colors hover:text-mist-50 sm:block"
+              className="hidden rounded-lg px-3 py-2 text-sm text-album-muted transition-colors hover:text-album-text sm:block"
             >
               Карточка
             </Link>
@@ -73,7 +74,7 @@ export default async function LandingPage() {
               <>
                 <Link
                   href="/login"
-                  className="rounded-lg px-3 py-2 text-sm text-mist-300 transition-colors hover:text-mist-50"
+                  className="rounded-lg px-3 py-2 text-sm text-album-muted transition-colors hover:text-album-text"
                 >
                   Войти
                 </Link>
@@ -82,6 +83,7 @@ export default async function LandingPage() {
                 </Link>
               </>
             )}
+            <ThemeSwitcher />
           </nav>
         </div>
       </header>
@@ -90,11 +92,11 @@ export default async function LandingPage() {
       <section className="plate grain relative overflow-hidden">
         <div className="mx-auto grid max-w-6xl items-center gap-14 px-5 pb-20 pt-28 lg:grid-cols-[1.05fr_1fr] lg:gap-10 lg:pb-28 lg:pt-36">
           <div className="rise">
-            <h1 className="max-w-[16ch] font-display text-[clamp(2.3rem,6.2vw,4.1rem)] leading-[1.04] text-mist-50">
+            <h1 className="max-w-[16ch] font-display text-[clamp(2.3rem,6.2vw,4.1rem)] leading-[1.04] text-album-text">
               Родословная, которую собирают всей семьёй
             </h1>
 
-            <p className="mt-6 max-w-[54ch] text-[17px] leading-relaxed text-mist-300">
+            <p className="mt-6 max-w-[54ch] text-[17px] leading-relaxed text-album-muted">
               Бабушка помнит имена и деревни, дядя хранит фотографии, двоюродная сестра
               знает, кто на ком женился. Родослов собирает эти кусочки в одно древо —
               открывайте доступ по ссылке и заполняйте его вместе.
@@ -105,13 +107,13 @@ export default async function LandingPage() {
                 <Button size="lg">{user ? "Открыть мои древа" : "Начать древо"}</Button>
               </Link>
               <Link href="#how">
-                <Button size="lg" variant="ghost" className="text-mist-200 hover:bg-white/10 hover:text-mist-50">
+                <Button size="lg" variant="ghost" className="text-album-text hover:bg-white/10 hover:text-album-text">
                   Посмотреть, как устроено
                 </Button>
               </Link>
             </div>
 
-            <p className="mt-6 text-sm text-ink-300">
+            <p className="mt-6 text-sm text-album-muted">
               Бесплатно, без ограничения на число родственников в древе.
             </p>
           </div>
@@ -130,7 +132,7 @@ export default async function LandingPage() {
 
         <ol className="mt-12 grid gap-px overflow-hidden rounded-2xl bg-mist-300 md:grid-cols-3">
           {STEPS.map((s, i) => (
-            <li key={s.title} className="bg-white p-7">
+            <li key={s.title} className="bg-surface p-7">
               <span className="font-display text-[15px] text-brass-600">Шаг {i + 1}</span>
               <h3 className="mt-3 text-[19px] leading-snug text-ink-800">{s.title}</h3>
               <p className="mt-2.5 text-[15px] leading-relaxed text-ink-500">{s.text}</p>
@@ -171,10 +173,10 @@ export default async function LandingPage() {
 
           {/* Реалистичное превью карточки */}
           <div className="relative">
-            <div className="mx-auto max-w-[380px] overflow-hidden rounded-2xl border border-mist-200 bg-white shadow-plate">
+            <div className="mx-auto max-w-[380px] overflow-hidden rounded-2xl border border-mist-200 bg-surface shadow-plate">
               <div className="plate grain relative h-28" />
               <div className="-mt-11 px-6 pb-6">
-                <div className="grid h-20 w-20 place-items-center rounded-2xl border-4 border-white bg-ink-600 font-display text-xl text-brass-400 shadow-lift">
+                <div className="grid h-20 w-20 place-items-center rounded-2xl border-4 border-white bg-album font-display text-xl text-brass-400 shadow-lift">
                   МК
                 </div>
                 <h3 className="mt-4 text-[21px] leading-tight text-ink-800">
@@ -234,7 +236,7 @@ export default async function LandingPage() {
 
           <ul className="space-y-px overflow-hidden rounded-2xl bg-mist-300">
             {ROLES.map((r) => (
-              <li key={r.role} className="flex flex-col gap-1.5 bg-white p-6 sm:flex-row sm:gap-6">
+              <li key={r.role} className="flex flex-col gap-1.5 bg-surface p-6 sm:flex-row sm:gap-6">
                 <span className="w-28 shrink-0 font-display text-[17px] text-ink-800">
                   {r.role}
                 </span>
@@ -246,7 +248,7 @@ export default async function LandingPage() {
       </section>
 
       {/* ---------------- Экспорт ---------------- */}
-      <section className="border-t border-mist-200 bg-white">
+      <section className="border-t border-mist-200 bg-surface">
         <div className="mx-auto grid max-w-6xl gap-10 px-5 py-20 md:grid-cols-2 lg:py-24">
           <div>
             <h2 className="text-[clamp(1.6rem,3vw,2.2rem)] leading-tight text-ink-800">
@@ -274,7 +276,7 @@ export default async function LandingPage() {
       {/* ---------------- Финальный призыв ---------------- */}
       <section className="plate grain relative overflow-hidden">
         <div className="mx-auto max-w-3xl px-5 py-24 text-center">
-          <h2 className="mx-auto max-w-[20ch] font-display text-[clamp(1.9rem,4.4vw,3rem)] leading-tight text-mist-50">
+          <h2 className="mx-auto max-w-[20ch] font-display text-[clamp(1.9rem,4.4vw,3rem)] leading-tight text-album-text">
             Начните с себя — остальных добавят родные
           </h2>
           <div className="mt-9 flex justify-center">
@@ -285,8 +287,8 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      <footer className="bg-ink-900 py-8">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-5 text-sm text-ink-400 sm:flex-row">
+      <footer className="bg-album-2 py-8">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-5 text-sm text-album-muted sm:flex-row">
           <span>Родослов</span>
           <span>Семейный архив, который переживёт нас</span>
         </div>

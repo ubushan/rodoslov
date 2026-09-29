@@ -42,7 +42,7 @@ export default async function DashboardPage() {
       </div>
 
       {rows.length === 0 ? (
-        <div className="mt-10 rounded-2xl border border-dashed border-mist-300 bg-white px-6 py-16 text-center">
+        <div className="mt-10 rounded-2xl border border-dashed border-mist-300 bg-surface px-6 py-16 text-center">
           <h2 className="text-[21px] text-ink-800">Пока ни одного древа</h2>
           <p className="mx-auto mt-2 max-w-[46ch] text-[15px] leading-relaxed text-ink-500">
             Начните с себя: создайте древо, добавьте свою карточку и пришлите ссылку
@@ -55,7 +55,7 @@ export default async function DashboardPage() {
             <li key={r.trees.id}>
               <Link
                 href={`/tree/${r.trees.id}`}
-                className="group flex h-full flex-col rounded-2xl border border-mist-200 bg-white p-5 transition-colors hover:border-ink-300"
+                className="group flex h-full flex-col rounded-2xl border border-mist-200 bg-surface p-5 transition-colors hover:border-ink-300"
               >
                 <div className="flex items-start justify-between gap-3">
                   <h2 className="font-display text-[19px] leading-snug text-ink-800">

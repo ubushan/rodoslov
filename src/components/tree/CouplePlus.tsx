@@ -51,7 +51,7 @@ function CouplePlusComponent({ data }: NodeProps) {
           aria-label="Добавить ребёнка этой паре"
           title="Добавить ребёнка"
           className="grid h-8 w-8 place-items-center rounded-full bg-bond-500 text-[19px] font-bold
-                     leading-none text-ink-900 shadow-[0_1px_0_rgba(255,255,255,0.35)_inset,0_2px_6px_rgba(10,17,32,0.25)]
+                     leading-none text-[#0f1a2e] shadow-[0_1px_0_rgba(255,255,255,0.35)_inset,0_2px_6px_rgba(10,17,32,0.25)]
                      transition-colors hover:bg-bond-400"
         >
           +

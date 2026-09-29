@@ -31,7 +31,7 @@ export default async function InvitePage({
 
   return (
     <div className="plate grain flex min-h-dvh items-center justify-center px-5 py-12">
-      <div className="relative z-10 w-full max-w-md rounded-2xl bg-white p-7 shadow-plate">
+      <div className="relative z-10 w-full max-w-md rounded-2xl bg-surface p-7 shadow-plate">
         <Link href="/" className="mb-6 flex items-center gap-2.5">
           <span
             aria-hidden="true"
@@ -43,7 +43,7 @@ export default async function InvitePage({
         </Link>
 
         {error && (
-          <p className="mb-5 rounded-[10px] border border-[#e4c3bd] bg-[#fdf4f2] px-3 py-2.5 text-sm leading-relaxed text-[#c05a4d]">
+          <p className="mb-5 rounded-[10px] border border-danger-line bg-danger-soft px-3 py-2.5 text-sm leading-relaxed text-danger">
             {ERRORS[error] ?? ERRORS.unknown}
           </p>
         )}

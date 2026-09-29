@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { currentAdmin } from "@/lib/admin";
+import { ThemeSwitcher } from "@/components/theme/ThemeSwitcher";
 import { signOut } from "@/app/actions/auth";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -19,7 +20,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex h-dvh flex-col bg-mist-100">
       <header
-        className="sticky top-0 z-30 border-b border-ink-600 bg-ink-800/95 backdrop-blur"
+        className="sticky top-0 z-30 border-b border-white/12 bg-album/95 backdrop-blur"
         style={{ paddingTop: "env(safe-area-inset-top)" }}
       >
         <div className="mx-auto flex h-14 max-w-[1600px] items-center justify-between gap-4 px-4">
@@ -30,10 +31,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             >
               Р
             </span>
-            <span className="font-display text-[15px] text-mist-50">Родослов</span>
+            <span className="font-display text-[15px] text-album-text">Родослов</span>
           </Link>
 
           <div className="flex items-center gap-1">
+            <ThemeSwitcher />
             {admin && (
               <Link
                 href="/admin"
@@ -44,12 +46,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             )}
             <Link
               href="/profile"
-              className="max-w-[38vw] truncate rounded-lg px-2.5 py-1.5 text-sm text-mist-300 transition-colors hover:bg-white/10 hover:text-mist-50 sm:max-w-none sm:px-3"
+              className="max-w-[38vw] truncate rounded-lg px-2.5 py-1.5 text-sm text-album-muted transition-colors hover:bg-white/10 hover:text-album-text sm:max-w-none sm:px-3"
             >
               {name}
             </Link>
             <form action={signOut}>
-              <button className="rounded-lg px-3 py-1.5 text-sm text-ink-300 transition-colors hover:bg-white/10 hover:text-mist-50">
+              <button className="rounded-lg px-3 py-1.5 text-sm text-album-muted transition-colors hover:bg-white/10 hover:text-album-text">
                 Выйти
               </button>
             </form>

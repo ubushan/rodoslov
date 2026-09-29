@@ -31,7 +31,7 @@ export function MiniTree() {
       {PEOPLE.map((p, idx) => (
         <article
           key={p.id}
-          className="rise absolute flex w-[180px] items-center gap-2.5 rounded-[13px] border border-white/12 bg-white/[0.97] px-3 py-2.5 shadow-plate backdrop-blur"
+          className="rise absolute flex w-[180px] items-center gap-2.5 rounded-[13px] border border-white/12 bg-surface/[0.97] px-3 py-2.5 shadow-plate backdrop-blur"
           style={{
             left: `${(p.x / 376) * 100}%`,
             top: `${(p.y / 364) * 100}%`,
@@ -41,7 +41,7 @@ export function MiniTree() {
         >
           <span
             aria-hidden="true"
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-ink-700 font-display text-[12px] text-brass-400"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-album font-display text-[12px] text-brass-400"
           >
             {p.i}
           </span>

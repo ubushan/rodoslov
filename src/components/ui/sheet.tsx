@@ -35,7 +35,7 @@ export function Sheet({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="relative flex h-full w-full max-w-[420px] flex-col bg-white shadow-plate sm:border-l sm:border-mist-200"
+        className="relative flex h-full w-full max-w-[420px] flex-col bg-surface shadow-plate sm:border-l sm:border-mist-200"
       >
         <header className="flex items-center justify-between border-b border-mist-200 px-5 py-4">
           <h2 className="text-lg text-ink-800">{title}</h2>

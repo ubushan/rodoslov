@@ -1,5 +1,5 @@
 const inputBase =
-  "w-full rounded-[10px] border border-mist-300 bg-white px-3 py-2 text-sm text-ink-800 " +
+  "w-full rounded-[10px] border border-mist-300 bg-surface px-3 py-2 text-sm text-ink-800 " +
   "placeholder:text-ink-300 transition-colors focus:border-brass-500 focus:outline-none " +
   "focus:ring-2 focus:ring-brass-500/20 disabled:bg-mist-100";
 

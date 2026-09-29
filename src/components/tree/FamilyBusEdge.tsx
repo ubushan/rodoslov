@@ -55,9 +55,14 @@ function FamilyBusEdgeComponent({ source, targetX, targetY }: EdgeProps) {
     });
   if (!kids.length) return null;
 
-  const bracketY = Math.max(...parents.map((p) => p.y)) + 12;
+  // воздух между линиями и карточками: скобка опускается на BRACKET_GAP ниже
+  // родителей, шина идёт на BUS_GAP выше детей. Если карточки сдвинули вручную
+  // и ряд сжался, отступы укорачиваем — иначе скобка оказалась бы ниже шины.
+  const free = Math.min(...kids.map((k) => k.top)) - Math.max(...parents.map((p) => p.y));
+  const room = Math.max(0, Math.min(1, (free - 16) / (BRACKET_GAP + BUS_GAP)));
+  const bracketY = Math.max(...parents.map((p) => p.y)) + BRACKET_GAP * room;
   const dropX = (parents[0].x + parents[parents.length - 1].x) / 2;
-  const busY = Math.min(...kids.map((k) => k.top)) - 18;
+  const busY = Math.min(...kids.map((k) => k.top)) - BUS_GAP * room;
 
   // скобка пары (или короткий стояк для одиночного родителя)
   const bracket =
@@ -88,7 +93,7 @@ function FamilyBusEdgeComponent({ source, targetX, targetY }: EdgeProps) {
     <path
       d={`${bracket} ${run}`}
       fill="none"
-      stroke="#7a8ca6"
+      stroke="var(--color-canvas-line)"
       strokeWidth={1.5}
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -97,6 +102,10 @@ function FamilyBusEdgeComponent({ source, targetX, targetY }: EdgeProps) {
 }
 
 const RADIUS = 10;
+/** Отступ скобки от карточек родителей */
+const BRACKET_GAP = 24;
+/** Отступ шины и отводов от карточек детей */
+const BUS_GAP = 36;
 
 /** Ломаная со скруглёнными углами: на каждом изломе — дуга радиусом не больше половины соседних отрезков. */
 function roundedPath(points: { x: number; y: number }[], radius: number): string {

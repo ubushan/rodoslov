@@ -5,50 +5,274 @@
    тёмно-синяя обложка, латунное тиснение, холодный свет архива.
    ===================================================================== */
 
+/* Токены ссылаются на переменные палитры: сами цвета задают темы ниже,
+   поэтому переключение темы меняет и утилиты Tailwind, и SVG-атрибуты. */
 @theme {
-  /* Чернила — основа тёмных поверхностей */
-  --color-ink-900: #0a1120;
-  --color-ink-800: #0f1a2e;
-  --color-ink-700: #131e33;
-  --color-ink-600: #1c2b45;
-  --color-ink-500: #2b3d5c;
-  --color-ink-400: #47597a;
-  --color-ink-300: #7487a5;
+  /* Чернила — текст и тёмные поверхности */
+  --color-ink-900: var(--p-ink-900);
+  --color-ink-800: var(--p-ink-800);
+  --color-ink-700: var(--p-ink-700);
+  --color-ink-600: var(--p-ink-600);
+  --color-ink-500: var(--p-ink-500);
+  --color-ink-400: var(--p-ink-400);
+  --color-ink-300: var(--p-ink-300);
 
-  /* Холодный свет архива */
-  --color-mist-50: #f7f9fc;
-  --color-mist-100: #eef1f6;
-  --color-mist-200: #dfe5ee;
-  --color-mist-300: #c6cfdd;
+  /* Холодный свет архива — фоны страниц и панелей */
+  --color-mist-50: var(--p-mist-50);
+  --color-mist-100: var(--p-mist-100);
+  --color-mist-200: var(--p-mist-200);
+  --color-mist-300: var(--p-mist-300);
 
   /* Латунь — единственный яркий акцент */
-  --color-brass-500: #c9a227;
-  --color-brass-400: #d9b64a;
-  --color-brass-600: #a3821a;
+  --color-brass-500: var(--p-brass-500);
+  --color-brass-400: var(--p-brass-400);
+  --color-brass-600: var(--p-brass-600);
 
   /* Метка женского пола — тёплый глиняный акцент */
-  --color-clay-400: #e0a05f;
-  --color-clay-500: #d1873f;
+  --color-clay-400: var(--p-clay-400);
+  --color-clay-500: var(--p-clay-500);
 
   /* Линия супружества */
-  --color-bond-100: #e7f0f7;
-  --color-bond-200: #c9dcea;
-  --color-bond-400: #7fa6c9;
-  --color-bond-500: #5b87ae;
+  --color-bond-100: var(--p-bond-100);
+  --color-bond-200: var(--p-bond-200);
+  --color-bond-400: var(--p-bond-400);
+  --color-bond-500: var(--p-bond-500);
 
-  --color-danger: #c05a4d;
+  /* Поверхности карточек и панелей */
+  --color-surface: var(--p-surface);
+
+  /* Обложка: шапка и герой остаются тёмными в любой теме */
+  --color-album: var(--p-album);
+  --color-album-2: var(--p-album-2);
+  --color-album-text: var(--p-album-text);
+  --color-album-muted: var(--p-album-muted);
+
+  /* Холст древа */
+  --color-canvas: var(--p-canvas);
+  --color-canvas-dot: var(--p-canvas-dot);
+  --color-canvas-line: var(--p-canvas-line);
+  --color-canvas-minimap: var(--p-canvas-minimap);
+  --color-canvas-mask: var(--p-canvas-mask);
+
+  /* Карточка человека: цвет по полу */
+  --color-male: var(--p-male);
+  --color-male-tint: var(--p-male-tint);
+  --color-female: var(--p-female);
+  --color-female-tint: var(--p-female-tint);
+  --color-plain: var(--p-plain);
+  --color-plain-tint: var(--p-plain-tint);
+
+  --color-danger: var(--p-danger);
+  --color-danger-soft: var(--p-danger-soft);
+  --color-danger-line: var(--p-danger-line);
+  --color-danger-ink: var(--p-danger-ink);
+
+  --color-ok: var(--p-ok);
+  --color-ok-soft: var(--p-ok-soft);
+  --color-ok-line: var(--p-ok-line);
+  --color-ok-ink: var(--p-ok-ink);
 
   --font-display: var(--font-literata), Georgia, serif;
   --font-sans: var(--font-golos), "Segoe UI", system-ui, sans-serif;
 
   --radius-card: 14px;
 
-  --shadow-lift: 0 1px 2px rgba(10, 17, 32, 0.06), 0 12px 32px -12px rgba(10, 17, 32, 0.24);
-  --shadow-plate: 0 2px 0 rgba(10, 17, 32, 0.04), 0 18px 48px -24px rgba(10, 17, 32, 0.4);
+  --shadow-lift: var(--p-shadow-lift);
+  --shadow-plate: var(--p-shadow-plate);
 }
 
-:root {
+/* ---------------------------------------------------------------------
+   Палитры тем. --p-* — исходные цвета, из них собираются токены выше.
+   --------------------------------------------------------------------- */
+
+/* Светлая: холодный свет архива */
+:root,
+[data-theme="light"] {
   color-scheme: light;
+
+  --p-ink-900: #0a1120;
+  --p-ink-800: #0f1a2e;
+  --p-ink-700: #131e33;
+  --p-ink-600: #1c2b45;
+  --p-ink-500: #2b3d5c;
+  --p-ink-400: #47597a;
+  --p-ink-300: #7487a5;
+
+  --p-mist-50: #f7f9fc;
+  --p-mist-100: #eef1f6;
+  --p-mist-200: #dfe5ee;
+  --p-mist-300: #c6cfdd;
+
+  --p-brass-500: #c9a227;
+  --p-brass-400: #d9b64a;
+  --p-brass-600: #a3821a;
+
+  --p-clay-400: #e0a05f;
+  --p-clay-500: #d1873f;
+
+  --p-bond-100: #e7f0f7;
+  --p-bond-200: #c9dcea;
+  --p-bond-400: #7fa6c9;
+  --p-bond-500: #5b87ae;
+
+  --p-surface: #ffffff;
+
+  --p-album: #0f1a2e;
+  --p-album-2: #0a1120;
+  --p-album-text: #f7f9fc;
+  --p-album-muted: #7487a5;
+
+  --p-canvas: #eef1f6;
+  --p-canvas-dot: #c6cfdd;
+  --p-canvas-line: #7a8ca6;
+  --p-canvas-minimap: #2b3d5c;
+  --p-canvas-mask: rgba(238, 241, 246, 0.75);
+
+  --p-male: #7fa6c9;
+  --p-male-tint: #f3f8fb;
+  --p-female: #d1873f;
+  --p-female-tint: #fdf5ef;
+  --p-plain: #c6cfdd;
+  --p-plain-tint: #ffffff;
+
+  --p-danger: #c05a4d;
+  --p-danger-soft: #fdf4f2;
+  --p-danger-line: #e4c3bd;
+  --p-danger-ink: #8c4438;
+
+  --p-ok: #4a6b3f;
+  --p-ok-soft: #f3f7f1;
+  --p-ok-line: #cdd9c7;
+  --p-ok-ink: #3f6b4a;
+
+  --p-shadow-lift: 0 1px 2px rgba(10, 17, 32, 0.06), 0 12px 32px -12px rgba(10, 17, 32, 0.24);
+  --p-shadow-plate: 0 2px 0 rgba(10, 17, 32, 0.04), 0 18px 48px -24px rgba(10, 17, 32, 0.4);
+}
+
+/* Тёмная: тот же архив, но при ночной лампе */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --p-ink-900: #f2f5fa;
+  --p-ink-800: #e4e9f2;
+  --p-ink-700: #cfd7e5;
+  --p-ink-600: #b3bed1;
+  --p-ink-500: #93a0b8;
+  --p-ink-400: #7a879f;
+  --p-ink-300: #64708a;
+
+  --p-mist-50: #151b27;
+  --p-mist-100: #111621;
+  --p-mist-200: #262e3e;
+  --p-mist-300: #364154;
+
+  --p-brass-500: #d3ab35;
+  --p-brass-400: #e0bf5c;
+  --p-brass-600: #b08f22;
+
+  --p-clay-400: #e3a468;
+  --p-clay-500: #cf8b4a;
+
+  --p-bond-100: #1d2836;
+  --p-bond-200: #2b3a4d;
+  --p-bond-400: #6f95b8;
+  --p-bond-500: #4f7799;
+
+  --p-surface: #19202d;
+
+  --p-album: #0d131f;
+  --p-album-2: #070b13;
+  --p-album-text: #f2f5fa;
+  --p-album-muted: #8b98b0;
+
+  --p-canvas: #0f141e;
+  --p-canvas-dot: #2b3446;
+  --p-canvas-line: #5d6b83;
+  --p-canvas-minimap: #8fa2c0;
+  --p-canvas-mask: rgba(15, 20, 30, 0.78);
+
+  --p-male: #6f9cc4;
+  --p-male-tint: #182430;
+  --p-female: #cf8b4a;
+  --p-female-tint: #2a2119;
+  --p-plain: #4a5568;
+  --p-plain-tint: #1b2230;
+
+  --p-danger: #e08379;
+  --p-danger-soft: #2c1d1c;
+  --p-danger-line: #573330;
+  --p-danger-ink: #eda99f;
+
+  --p-ok: #8fbf86;
+  --p-ok-soft: #1b2620;
+  --p-ok-line: #35503a;
+  --p-ok-ink: #9ccb93;
+
+  --p-shadow-lift: 0 1px 2px rgba(0, 0, 0, 0.5), 0 12px 32px -12px rgba(0, 0, 0, 0.7);
+  --p-shadow-plate: 0 2px 0 rgba(0, 0, 0, 0.4), 0 18px 48px -24px rgba(0, 0, 0, 0.8);
+}
+
+/* Сепия: семейный альбом с пожелтевшими страницами */
+[data-theme="sepia"] {
+  color-scheme: light;
+
+  --p-ink-900: #2b2117;
+  --p-ink-800: #3a2e21;
+  --p-ink-700: #4a3b2a;
+  --p-ink-600: #5c4a35;
+  --p-ink-500: #6f5a41;
+  --p-ink-400: #8a7357;
+  --p-ink-300: #a08a6c;
+
+  --p-mist-50: #f6efe2;
+  --p-mist-100: #efe6d5;
+  --p-mist-200: #e2d5be;
+  --p-mist-300: #cdbb9c;
+
+  --p-brass-500: #b08430;
+  --p-brass-400: #c69b45;
+  --p-brass-600: #8f6a1f;
+
+  --p-clay-400: #c98d51;
+  --p-clay-500: #b57338;
+
+  --p-bond-100: #ece0cb;
+  --p-bond-200: #d8c6a8;
+  --p-bond-400: #8d9cad;
+  --p-bond-500: #6d7f8e;
+
+  --p-surface: #fbf6ec;
+
+  --p-album: #3a2e21;
+  --p-album-2: #241b12;
+  --p-album-text: #f7efe1;
+  --p-album-muted: #b9a382;
+
+  --p-canvas: #ede2cd;
+  --p-canvas-dot: #cbb894;
+  --p-canvas-line: #9c8a6d;
+  --p-canvas-minimap: #6f5a41;
+  --p-canvas-mask: rgba(237, 226, 205, 0.75);
+
+  --p-male: #7d94ab;
+  --p-male-tint: #f1ece0;
+  --p-female: #b57338;
+  --p-female-tint: #f8efe0;
+  --p-plain: #c2b096;
+  --p-plain-tint: #fbf6ec;
+
+  --p-danger: #a84f42;
+  --p-danger-soft: #f7ece6;
+  --p-danger-line: #d9b8ab;
+  --p-danger-ink: #7d3b31;
+
+  --p-ok: #4f6b3c;
+  --p-ok-soft: #f1f0e2;
+  --p-ok-line: #c9cbb0;
+  --p-ok-ink: #475c37;
+
+  --p-shadow-lift: 0 1px 2px rgba(58, 46, 33, 0.08), 0 12px 32px -12px rgba(58, 46, 33, 0.28);
+  --p-shadow-plate: 0 2px 0 rgba(58, 46, 33, 0.05), 0 18px 48px -24px rgba(58, 46, 33, 0.45);
 }
 
 html {
@@ -67,7 +291,7 @@ body {
 .plate {
   background-image:
     radial-gradient(120% 90% at 8% -10%, rgba(201, 162, 39, 0.16), transparent 58%),
-    linear-gradient(180deg, var(--color-ink-700), var(--color-ink-900));
+    linear-gradient(180deg, var(--color-album), var(--color-album-2));
 }
 
 .grain::after {
@@ -118,6 +342,33 @@ h1, h2, h3, .display {
   }
 }
 .react-flow__attribution { display: none; }
+
+/* У библиотеки кнопки масштаба и миникарта белые — подстраиваем под тему.
+   Двойной класс, чтобы правило было весомее стилей React Flow. */
+.react-flow .react-flow__controls {
+  overflow: hidden;
+  border: 1px solid var(--color-mist-200);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lift);
+}
+
+.react-flow .react-flow__controls-button {
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-mist-200);
+  color: var(--color-ink-600);
+}
+
+.react-flow .react-flow__controls-button:hover {
+  background: var(--color-mist-100);
+}
+
+.react-flow .react-flow__controls-button svg {
+  fill: currentColor;
+}
+
+.react-flow .react-flow__minimap {
+  background: var(--color-surface);
+}
 
 .react-flow__edge-path {
   stroke-linecap: round;

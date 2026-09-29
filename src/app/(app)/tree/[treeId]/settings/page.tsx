@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea, Select } from "@/components/ui/field";
 import { CopyLink } from "./copy-link";
 import { RoleSelect } from "./role-select";
+import { GedcomPanel } from "@/components/gedcom/GedcomPanel";
 import type { MemberRole } from "@/lib/types";
 
 export const metadata = { title: "Участники и доступ — Родослов" };
@@ -72,7 +73,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ treeI
             return (
               <li
                 key={m.user_id}
-                className="flex flex-wrap items-center justify-between gap-3 bg-white px-5 py-4"
+                className="flex flex-wrap items-center justify-between gap-3 bg-surface px-5 py-4"
               >
                 <div className="min-w-0">
                   <p className="truncate text-[15px] text-ink-800">
@@ -109,6 +110,12 @@ export default async function SettingsPage({ params }: { params: Promise<{ treeI
 
       </section>
 
+      {/* ---------------- Обмен GEDCOM ---------------- */}
+      <section className="mt-12">
+        <h2 className="text-[20px] text-ink-800">Обмен GEDCOM</h2>
+        <GedcomPanel treeId={treeId} canEdit={me.role === "owner" || me.role === "editor"} />
+      </section>
+
       {/* ---------------- Приглашения ---------------- */}
       {isOwner && (
         <section className="mt-12">
@@ -119,7 +126,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ treeI
               "use server";
               await createInvite(treeId, fd);
             }}
-            className="mt-4 grid gap-4 rounded-2xl border border-mist-200 bg-white p-5 sm:grid-cols-3"
+            className="mt-4 grid gap-4 rounded-2xl border border-mist-200 bg-surface p-5 sm:grid-cols-3"
           >
             <Field label="Роль приглашённого">
               <Select name="role" defaultValue="editor">
@@ -152,7 +159,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ treeI
               {invites.map((inv) => (
                 <li
                   key={inv.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-mist-200 bg-white px-4 py-3"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-mist-200 bg-surface px-4 py-3"
                 >
                   <div className="min-w-0">
                     <CopyLink url={`${siteUrl}/invite/${inv.token}`} />
@@ -192,7 +199,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ treeI
               "use server";
               await renameTree(treeId, fd);
             }}
-            className="mt-4 space-y-4 rounded-2xl border border-mist-200 bg-white p-5"
+            className="mt-4 space-y-4 rounded-2xl border border-mist-200 bg-surface p-5"
           >
             <Field label="Название">
               <Input name="title" defaultValue={tree.title} required />
@@ -206,7 +213,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ treeI
       )}
 
       {/* ---------------- Опасная зона ---------------- */}
-      <section className="mt-12 rounded-2xl border border-[#e4c3bd] bg-[#fdf4f2] p-5">
+      <section className="mt-12 rounded-2xl border border-danger-line bg-danger-soft p-5">
         {isOwner ? (
           <>
             <h2 className="text-[18px] text-ink-800">Удалить древо</h2>

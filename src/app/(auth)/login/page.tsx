@@ -18,7 +18,7 @@ export default async function LoginPage({
       </p>
 
       {error && (
-        <p className="mt-5 rounded-[10px] border border-[#e4c3bd] bg-[#fdf4f2] px-3 py-2 text-sm text-[#c05a4d]">
+        <p className="mt-5 rounded-[10px] border border-danger-line bg-danger-soft px-3 py-2 text-sm text-danger">
           Вход через внешний сервис не завершился. Попробуйте ещё раз.
         </p>
       )}

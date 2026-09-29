@@ -55,7 +55,7 @@ export function NodeMenu({
       ref={ref}
       role="menu"
       style={{ left, top: y, width, transform: above ? "translateY(-100%)" : undefined }}
-      className="fixed z-[1000] rounded-xl border border-mist-200 bg-white p-1 shadow-plate"
+      className="fixed z-[1000] rounded-xl border border-mist-200 bg-surface p-1 shadow-plate"
     >
       {children}
     </div>,

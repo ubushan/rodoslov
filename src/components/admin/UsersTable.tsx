@@ -66,7 +66,7 @@ export function UsersTable({ rows }: { rows: UserRow[] }) {
                   const days = value === "none" ? null : Number(value);
                   run(() => setUserBlocked(user.id, days));
                 }}
-                className="h-8 rounded-lg border border-mist-300 bg-white px-2 text-[13px] text-ink-700 focus:border-brass-500 focus:outline-none disabled:opacity-45"
+                className="h-8 rounded-lg border border-mist-300 bg-surface px-2 text-[13px] text-ink-700 focus:border-brass-500 focus:outline-none disabled:opacity-45"
                 aria-label={`Доступ: ${user.email}`}
               >
                 {blocked && <option value="">заблокирован</option>}

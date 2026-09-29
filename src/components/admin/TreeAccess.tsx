@@ -56,7 +56,7 @@ export function MembersList({ treeId, members }: { treeId: string; members: Memb
             value={member.role}
             disabled={pending || member.isOwner}
             onChange={(e) => run(() => setMemberRole(treeId, member.userId, e.target.value))}
-            className="h-8 rounded-lg border border-mist-300 bg-white px-2 text-[13px] text-ink-700 focus:border-brass-500 focus:outline-none disabled:opacity-45"
+            className="h-8 rounded-lg border border-mist-300 bg-surface px-2 text-[13px] text-ink-700 focus:border-brass-500 focus:outline-none disabled:opacity-45"
             aria-label={`Роль: ${member.name}`}
           >
             {ROLE_OPTIONS.map((option) => (

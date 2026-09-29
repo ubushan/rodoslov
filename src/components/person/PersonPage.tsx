@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea, Select } from "@/components/ui/field";
+import { PersonHistory, type ChangeRow } from "./PersonHistory";
 import { createClient } from "@/lib/supabase/client";
 import { publicUrl, shortName, initials, ROLE_LABEL } from "@/lib/format";
 import {
@@ -39,6 +40,8 @@ type Props = {
   relation: { relateTo: string; kind: NewRelation } | null;
   /** в древе достигнут предел числа людей — новую карточку добавить нельзя */
   limitReached: boolean;
+  /** история изменений карточки (null, если таблицы ещё нет) */
+  changes: ChangeRow[] | null;
 };
 
 /** Тонкий подзаголовок смыслового блока внутри формы. */
@@ -56,7 +59,7 @@ function SubSection({ children }: { children: React.ReactNode }) {
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border border-mist-200 bg-white p-5">
+    <section className="rounded-2xl border border-mist-200 bg-surface p-5">
       <h2 className="mb-4 font-display text-[17px] font-medium text-ink-800">{title}</h2>
       {children}
     </section>
@@ -65,7 +68,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 
 function Rail({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border border-mist-200 bg-white p-4">
+    <section className="rounded-2xl border border-mist-200 bg-surface p-4">
       <h2 className="mb-3 font-display text-[15px] font-medium text-ink-800">{title}</h2>
       {children}
     </section>
@@ -83,6 +86,7 @@ export function PersonPage({
   hasDeathPlace,
   relation,
   limitReached,
+  changes,
 }: Props) {
   const router = useRouter();
   const canEdit = role === "owner" || role === "editor";
@@ -410,13 +414,13 @@ export function PersonPage({
       </div>
 
       {!canEdit && (
-        <p className="mt-4 rounded-xl border border-mist-200 bg-white px-4 py-3 text-sm text-ink-500">
+        <p className="mt-4 rounded-xl border border-mist-200 bg-surface px-4 py-3 text-sm text-ink-500">
           У вас роль зрителя — карточку можно только смотреть.
         </p>
       )}
 
       {limitReached && (
-        <p className="mt-4 rounded-xl border border-[#e4c3bd] bg-[#fdf4f2] px-4 py-3 text-sm text-[#8c4438]">
+        <p className="mt-4 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-ink">
           В этом древе достигнут предел числа людей, установленный администратором платформы.
           Новую карточку добавить нельзя — попросите поднять предел в панели администратора.
         </p>
@@ -445,7 +449,7 @@ export function PersonPage({
                       className={`inline-flex items-center gap-2.5 rounded-[10px] border px-3.5 py-2 text-sm transition-colors ${
                         gender === g
                           ? "border-brass-500 bg-mist-50 text-ink-800"
-                          : "border-mist-300 bg-white text-ink-700 hover:border-ink-300"
+                          : "border-mist-300 bg-surface text-ink-700 hover:border-ink-300"
                       } disabled:opacity-60`}
                     >
                       <span
@@ -527,13 +531,13 @@ export function PersonPage({
                   </Field>
                 </div>
 
-                <label className="flex items-center gap-2.5 rounded-[10px] border border-mist-300 bg-white px-3 py-2.5 sm:col-span-2">
+                <label className="flex items-center gap-2.5 rounded-[10px] border border-mist-300 bg-surface px-3 py-2.5 sm:col-span-2">
                   <input
                     type="checkbox"
                     name="is_living"
                     defaultChecked={isLiving}
                     onChange={(e) => setIsLiving(e.target.checked)}
-                    className="h-4 w-4 accent-[#c9a227]"
+                    className="h-4 w-4 accent-brass-500"
                   />
                   <span className="text-sm text-ink-700">Человек жив</span>
                 </label>
@@ -674,7 +678,7 @@ export function PersonPage({
                       {canEdit && (
                         <button
                           type="button"
-                          className="shrink-0 rounded-lg px-2 py-1 text-[12px] text-ink-400 hover:bg-mist-100 hover:text-[#c05a4d]"
+                          className="shrink-0 rounded-lg px-2 py-1 text-[12px] text-ink-400 hover:bg-mist-100 hover:text-danger"
                           onClick={() =>
                             startTransition(async () => {
                               await deleteAttachment(treeId, a.id, a.storage_path);
@@ -750,7 +754,7 @@ export function PersonPage({
                       {canEdit && row.edgeId && (
                         <button
                           type="button"
-                          className="shrink-0 rounded-lg px-2 py-0.5 text-[12px] text-ink-400 hover:bg-mist-100 hover:text-[#c05a4d]"
+                          className="shrink-0 rounded-lg px-2 py-0.5 text-[12px] text-ink-400 hover:bg-mist-100 hover:text-danger"
                           onClick={() =>
                             startTransition(async () => {
                               await deleteRelationship(treeId, row.edgeId!);
@@ -803,6 +807,21 @@ export function PersonPage({
               </>
             )}
           </Rail>
+
+          {!isNew && (
+            <Rail title="История">
+              {changes === null ? (
+                <p className="text-[13px] leading-relaxed text-ink-400">
+                  История появится после выполнения{" "}
+                  <code className="font-mono">supabase/person-history.sql</code> в Supabase.
+                </p>
+              ) : changes.length === 0 ? (
+                <p className="text-[13px] text-ink-400">Правок пока не было.</p>
+              ) : (
+                <PersonHistory treeId={treeId} personId={person.id} canEdit={canEdit} changes={changes} />
+              )}
+            </Rail>
+          )}
         </aside>
       </form>
 

@@ -36,6 +36,17 @@ export type Relationship = {
   note: string | null;
 };
 
+export type PersonChange = {
+  id: number;
+  tree_id: string;
+  person_id: string;
+  changed_by: string | null;
+  /** снимок полей карточки до правки; null у записи о создании */
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown>;
+  created_at: string;
+};
+
 export type Attachment = {
   id: string;
   tree_id: string;

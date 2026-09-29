@@ -175,8 +175,8 @@ function Canvas({
         data: { kind: r.kind },
         style:
           r.kind === "spouse"
-            ? { stroke: "#7fa6c9", strokeDasharray: "6 5" }
-            : { stroke: "#7a8ca6", strokeWidth: 1.5 },
+            ? { stroke: "var(--color-bond-400)", strokeDasharray: "6 5" }
+            : { stroke: "var(--color-canvas-line)", strokeWidth: 1.5 },
       })),
     [relationships]
   );
@@ -380,8 +380,15 @@ function Canvas({
       const height = Math.ceil(bounds.height + pad * 2 + 90); // место под подпись
       const tf = getViewportForBounds(bounds, width, height, 0.4, 2, 0.06);
 
+      // цвета картинки берём из текущей темы, иначе экспорт в тёмной теме
+      // остался бы светлым
+      const theme = getComputedStyle(document.documentElement);
+      const themeColor = (name: string, fallback: string) =>
+        theme.getPropertyValue(name).trim() || fallback;
+      const canvasBg = themeColor("--color-canvas", "#eef1f6");
+
       const dataUrl = await toPng(viewport, {
-        backgroundColor: "#eef1f6",
+        backgroundColor: canvasBg,
         width,
         height,
         pixelRatio: 2,
@@ -394,7 +401,11 @@ function Canvas({
       });
 
       // Подпись древа снизу картинки
-      const final = await withCaption(dataUrl, width, height, treeTitle);
+      const final = await withCaption(dataUrl, width, height, treeTitle, {
+        background: canvasBg,
+        title: themeColor("--color-ink-800", "#131e33"),
+        note: themeColor("--color-ink-300", "#7487a5"),
+      });
 
       const a = document.createElement("a");
       a.href = final;
@@ -409,7 +420,7 @@ function Canvas({
   }
 
   return (
-    <div className={`relative h-full w-full ${exporting ? "exporting" : ""}`}>
+    <div className={`relative h-full w-full bg-canvas ${exporting ? "exporting" : ""}`}>
       <ReactFlow
         nodes={[...nodes, ...plateNodes]}
         edges={edges}
@@ -432,21 +443,21 @@ function Canvas({
         maxZoom={2}
         proOptions={{ hideAttribution: true }}
       >
-        <Background variant={BackgroundVariant.Dots} gap={22} size={1.4} color="#c6cfdd" />
+        <Background variant={BackgroundVariant.Dots} gap={22} size={1.4} color="var(--color-canvas-dot)" />
         <Controls showInteractive={false} position="bottom-right" />
         <MiniMap
           pannable
           zoomable
           position="bottom-left"
-          nodeColor="#2b3d5c"
-          maskColor="rgba(238,241,246,0.75)"
+          nodeColor="var(--color-canvas-minimap)"
+          maskColor="var(--color-canvas-mask)"
           className="!rounded-xl !border !border-mist-200"
         />
       </ReactFlow>
 
       {/* Панель действий */}
       <div className="pointer-events-none absolute left-3 top-3 flex flex-col">
-        <div className="pointer-events-auto flex flex-col gap-2.5 rounded-2xl border border-mist-200 bg-white/95 p-2.5 shadow-lift backdrop-blur">
+        <div className="pointer-events-auto flex flex-col gap-2.5 rounded-2xl border border-mist-200 bg-surface/95 p-2.5 shadow-lift backdrop-blur">
           {wholeTreeHref && (
             <button
               type="button"
@@ -499,9 +510,9 @@ function Canvas({
       </div>
 
       {/* Легенда */}
-      <div className="pointer-events-none absolute right-3 top-3 hidden rounded-xl border border-mist-200 bg-white/95 px-3 py-2.5 text-[12px] text-ink-500 shadow-sm sm:block">
+      <div className="pointer-events-none absolute right-3 top-3 hidden rounded-xl border border-mist-200 bg-surface/95 px-3 py-2.5 text-[12px] text-ink-500 shadow-sm sm:block">
         <span className="flex items-center gap-2">
-          <span className="h-0.5 w-6 rounded bg-[#7a8ca6]" /> родитель — ребёнок
+          <span className="h-0.5 w-6 rounded bg-canvas-line" /> родитель — ребёнок
         </span>
         <span className="mt-1.5 flex items-center gap-2">
           <span className="h-0.5 w-6 rounded border-t-2 border-dashed border-bond-400" /> супруги
@@ -513,7 +524,13 @@ function Canvas({
 }
 
 /** Дорисовывает название древа и дату под картинкой */
-function withCaption(dataUrl: string, w: number, h: number, title: string): Promise<string> {
+function withCaption(
+  dataUrl: string,
+  w: number,
+  h: number,
+  title: string,
+  colors: { background: string; title: string; note: string }
+): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
@@ -523,16 +540,16 @@ function withCaption(dataUrl: string, w: number, h: number, title: string): Prom
       const ctx = canvas.getContext("2d");
       if (!ctx) return resolve(dataUrl);
 
-      ctx.fillStyle = "#eef1f6";
+      ctx.fillStyle = colors.background;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-      ctx.fillStyle = "#131e33";
+      ctx.fillStyle = colors.title;
       ctx.font = "500 40px Georgia, serif";
       ctx.textAlign = "center";
       ctx.fillText(title, canvas.width / 2, canvas.height - 96);
 
-      ctx.fillStyle = "#7487a5";
+      ctx.fillStyle = colors.note;
       ctx.font = "400 26px system-ui, sans-serif";
       ctx.fillText(
         `Составлено в Родослове · ${new Date().toLocaleDateString("ru-RU")}`,

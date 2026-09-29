@@ -11,9 +11,9 @@ const variants: Record<Variant, string> = {
   primary:
     "bg-brass-500 text-ink-900 hover:bg-brass-400 shadow-[0_1px_0_rgba(255,255,255,0.35)_inset]",
   secondary:
-    "bg-white text-ink-800 border border-mist-300 hover:border-ink-300 hover:bg-mist-50",
+    "bg-surface text-ink-800 border border-mist-300 hover:border-ink-300 hover:bg-mist-50",
   ghost: "text-ink-600 hover:bg-mist-200",
-  danger: "bg-white text-[#c05a4d] border border-[#e4c3bd] hover:bg-[#fdf4f2]",
+  danger: "bg-surface text-danger border border-danger-line hover:bg-danger-soft",
 };
 
 const sizes: Record<Size, string> = {

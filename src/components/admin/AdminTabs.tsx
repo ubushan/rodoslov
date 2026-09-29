@@ -14,7 +14,7 @@ export function AdminTabs() {
   const path = usePathname();
 
   return (
-    <nav className="mt-5 flex flex-wrap gap-1 rounded-xl border border-mist-200 bg-white p-1">
+    <nav className="mt-5 flex flex-wrap gap-1 rounded-xl border border-mist-200 bg-surface p-1">
       {TABS.map((tab) => {
         const active = tab.href === "/admin" ? path === "/admin" : path.startsWith(tab.href);
         return (

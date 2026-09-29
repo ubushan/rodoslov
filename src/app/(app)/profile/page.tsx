@@ -20,7 +20,7 @@ export default async function ProfilePage() {
         Это имя видят родственники в списке участников древа.
       </p>
 
-      <div className="mt-8 rounded-2xl border border-mist-200 bg-white p-6">
+      <div className="mt-8 rounded-2xl border border-mist-200 bg-surface p-6">
         <ProfileForm fullName={profile?.full_name ?? ""} email={user!.email ?? ""} />
       </div>
     </div>

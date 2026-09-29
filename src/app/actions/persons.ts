@@ -193,6 +193,49 @@ export async function updatePerson(treeId: string, personId: string, formData: F
   revalidatePath(`/tree/${treeId}`);
 }
 
+/** Откат карточки к состоянию до выбранной правки. */
+export async function rollbackPerson(
+  treeId: string,
+  personId: string,
+  changeId: number
+): Promise<{ error?: string; ok?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Нужно войти" };
+
+  const { data: membership } = await supabase
+    .from("tree_members")
+    .select("role")
+    .eq("tree_id", treeId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!membership || (membership.role !== "owner" && membership.role !== "editor")) {
+    return { error: "Откатывать правки могут владелец и редакторы" };
+  }
+
+  const { data: change, error } = await supabase
+    .from("person_changes")
+    .select("id, before")
+    .eq("id", changeId)
+    .eq("person_id", personId)
+    .maybeSingle();
+  if (error) return { error: "История недоступна — выполните supabase/person-history.sql" };
+  if (!change) return { error: "Запись истории не найдена" };
+  if (!change.before) return { error: "Это создание карточки — откатывать нечего" };
+
+  // before — снимок всех полей карточки до правки; триггер запишет и сам откат
+  const { error: updateError } = await supabase
+    .from("persons")
+    .update(change.before as Record<string, unknown>)
+    .eq("id", personId);
+  if (updateError) return { error: "Не удалось откатить правку" };
+
+  revalidatePath(`/tree/${treeId}`);
+  return { ok: "Карточка возвращена к прежнему состоянию" };
+}
+
 export async function deletePerson(treeId: string, personId: string) {
   const supabase = await createClient();
   await supabase.from("persons").delete().eq("id", personId);
