@@ -39,18 +39,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             {admin && (
               <Link
                 href="/admin"
-                className="rounded-lg px-2.5 py-1.5 text-sm text-brass-400 transition-colors hover:bg-white/10 hover:text-brass-300 sm:px-3"
+                className="hidden rounded-lg px-2.5 py-1.5 text-sm text-brass-400 transition-colors hover:bg-white/10 hover:text-brass-300 sm:block"
               >
                 Админка
               </Link>
             )}
             <Link
               href="/profile"
-              className="max-w-[38vw] truncate rounded-lg px-2.5 py-1.5 text-sm text-album-muted transition-colors hover:bg-white/10 hover:text-album-text sm:max-w-none sm:px-3"
+              className="hidden truncate rounded-lg px-2.5 py-1.5 text-sm text-album-muted transition-colors hover:bg-white/10 hover:text-album-text sm:block"
             >
               {name}
             </Link>
-            <form action={signOut}>
+            <form action={signOut} className="hidden sm:block">
               <button className="rounded-lg px-3 py-1.5 text-sm text-album-muted transition-colors hover:bg-white/10 hover:text-album-text">
                 Выйти
               </button>

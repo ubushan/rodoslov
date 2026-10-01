@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { signOut } from "@/app/actions/auth";
+import { Button } from "@/components/ui/button";
 import { ProfileForm } from "./form";
 
 export const metadata = { title: "Профиль — Родослов" };
@@ -23,6 +25,10 @@ export default async function ProfilePage() {
       <div className="mt-8 rounded-2xl border border-mist-200 bg-surface p-6">
         <ProfileForm fullName={profile?.full_name ?? ""} email={user!.email ?? ""} />
       </div>
+
+      <form action={signOut} className="mt-8">
+        <Button variant="secondary">Выйти из аккаунта</Button>
+      </form>
     </div>
   );
 }

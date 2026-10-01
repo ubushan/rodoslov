@@ -370,6 +370,24 @@ h1, h2, h3, .display {
   background: var(--color-surface);
 }
 
+/* На телефоне кнопки масштаба — в ряд и крупнее, чтобы попадать пальцем */
+@media (max-width: 640px) {
+  .react-flow .react-flow__controls {
+    flex-direction: row;
+  }
+
+  .react-flow .react-flow__controls-button {
+    width: 40px;
+    height: 40px;
+    border-bottom: none;
+    border-right: 1px solid var(--color-mist-200);
+  }
+
+  .react-flow .react-flow__controls-button:last-child {
+    border-right: none;
+  }
+}
+
 .react-flow__edge-path {
   stroke-linecap: round;
 }

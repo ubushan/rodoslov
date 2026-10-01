@@ -61,9 +61,22 @@ export default async function TreePage({ params }: { params: Promise<{ treeId: s
           </span>
           <Link
             href={`/tree/${treeId}/settings`}
-            className="rounded-lg border border-mist-300 px-3 py-1.5 text-sm text-ink-700 transition-colors hover:border-ink-300"
+            className="hidden items-center rounded-lg border border-mist-300 px-3 py-1.5 text-sm text-ink-700 transition-colors hover:border-ink-300 sm:flex"
           >
             Участники и доступ
+          </Link>
+          {/* на телефоне — компактная кнопка с иконкой, чтобы панель не росла вниз */}
+          <Link
+            href={`/tree/${treeId}/settings`}
+            aria-label="Участники и доступ"
+            title="Участники и доступ"
+            className="grid h-9 w-9 place-items-center rounded-lg border border-mist-300 text-ink-600 transition-colors hover:border-ink-300 sm:hidden"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+              <circle cx="6.8" cy="6.4" r="2.2" />
+              <path d="M2.6 13.8c.4-2.2 2.1-3.5 4.2-3.5s3.8 1.3 4.2 3.5" />
+              <path d="M12.6 5.6c1.4.3 2.3 1.4 2.3 2.7 0 1.2-.7 2.2-1.8 2.6M11.9 11.4c1.9.4 3 1.7 3.3 3.4" />
+            </svg>
           </Link>
         </div>
       </div>
