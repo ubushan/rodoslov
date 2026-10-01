@@ -26,6 +26,7 @@ import { PersonNode, type NewRelative } from "./PersonNode";
 import { CouplePlate } from "./CouplePlate";
 import { CouplePlus } from "./CouplePlus";
 import { FamilyBusEdge } from "./FamilyBusEdge";
+import { NodeMenu, MenuItem } from "./NodeMenu";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { publicUrl } from "@/lib/format";
@@ -66,10 +67,20 @@ function IconDownload() {
 }
 
 /** Стрелки наружу — кнопка раскрывает всё древо вместо ветки */
-function IconExpand() {
-  return (
+function IconExpand() {  return (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
       <path d="M10.8 3.5h3.7v3.7M14.5 3.5 9.8 8.2M7.2 14.5H3.5V10.8M3.5 14.5l4.7-4.7" />
+    </svg>
+  );
+}
+
+/** Ползунки — свёрнутая панель действий на телефоне */
+function IconTools() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+      <path d="M3 5.5h12M3 12.5h12" />
+      <circle cx="7" cy="5.5" r="1.9" style={{ fill: "var(--color-surface)" }} />
+      <circle cx="12" cy="12.5" r="1.9" style={{ fill: "var(--color-surface)" }} />
     </svg>
   );
 }
@@ -105,6 +116,9 @@ function Canvas({
   const { getNodes, fitView } = useReactFlow();
 
   const [exporting, setExporting] = useState(false);
+  // меню свёрнутой панели действий на телефоне
+  const [tools, setTools] = useState<{ x: number; y: number } | null>(null);
+  const toolsRef = useRef<HTMLButtonElement>(null);
   // карточка под курсором — по ней показываем «+» на линии её пары
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -332,8 +346,14 @@ function Canvas({
   );
 
   // ---- Автоматическая раскладка по поколениям ----
-  function arrange() {
-    // Размеры карточек берём из DOM: измерение React Flow приходит с задержкой
+  // на телефоне панель свёрнута в одну кнопку — меню раскрывается под ней
+  function openTools() {
+    const rect = toolsRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setTools({ x: Math.round(rect.left), y: Math.round(rect.bottom + 8) });
+  }
+
+  function arrange() {    // Размеры карточек берём из DOM: измерение React Flow приходит с задержкой
     // (шрифты в dev-режиме), а раскладка с дефолтными 208×104 съезжает.
     const vp = document.querySelector(".react-flow__viewport") as HTMLElement | null;
     const zoom = vp ? new DOMMatrix(getComputedStyle(vp).transform).a || 1 : 1;
@@ -455,9 +475,65 @@ function Canvas({
         />
       </ReactFlow>
 
-      {/* Панель действий */}
+      {/* Панель действий: на телефоне — одна кнопка с меню, на компьютере — колонка */}
       <div className="pointer-events-none absolute left-3 top-3 flex flex-col">
-        <div className="pointer-events-auto flex flex-col gap-2.5 rounded-2xl border border-mist-200 bg-surface/95 p-2.5 shadow-lift backdrop-blur">
+        <div className="pointer-events-auto sm:hidden">
+          <button
+            ref={toolsRef}
+            type="button"
+            onClick={openTools}
+            aria-label="Действия с древом"
+            aria-haspopup="menu"
+            aria-expanded={!!tools}
+            title="Действия с древом"
+            className="grid h-10 w-10 place-items-center rounded-xl border border-mist-200 bg-surface/95 text-ink-600 shadow-lift backdrop-blur"
+          >
+            <IconTools />
+          </button>
+
+          {tools && (
+            <NodeMenu x={tools.x} y={tools.y} onClose={() => setTools(null)}>
+              {wholeTreeHref && (
+                <MenuItem
+                  label="Раскрыть всё древо"
+                  onClick={() => {
+                    setTools(null);
+                    router.push(wholeTreeHref);
+                  }}
+                />
+              )}
+              {canEdit && (
+                <MenuItem
+                  label="Добавить человека"
+                  disabled={pending}
+                  onClick={() => {
+                    setTools(null);
+                    router.push(`/tree/${treeId}/person/new`);
+                  }}
+                />
+              )}
+              {canEdit && (
+                <MenuItem
+                  label="Выстроить по поколениям"
+                  onClick={() => {
+                    setTools(null);
+                    arrange();
+                  }}
+                />
+              )}
+              <MenuItem
+                label={exporting ? "Собираем картинку…" : "Скачать картинку"}
+                disabled={exporting}
+                onClick={() => {
+                  setTools(null);
+                  exportPng();
+                }}
+              />
+            </NodeMenu>
+          )}
+        </div>
+
+        <div className="pointer-events-auto hidden flex-col gap-2.5 rounded-2xl border border-mist-200 bg-surface/95 p-2.5 shadow-lift backdrop-blur sm:flex">
           {wholeTreeHref && (
             <button
               type="button"

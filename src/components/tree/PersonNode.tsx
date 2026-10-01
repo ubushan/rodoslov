@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { shortName, lifespan, ageYears, yearsWord, peopleWord } from "@/lib/format";
 import type { Gender, Person } from "@/lib/types";
@@ -106,7 +106,20 @@ function PersonNodeComponent({ data, selected }: NodeProps) {
   const accentRing = `color-mix(in srgb, ${accent} 35%, transparent)`;
 
   const plusRef = useRef<HTMLButtonElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  // на тач-экране наведения нет — кнопки показываем по нажатию на карточку
+  const [actionsOpen, setActionsOpen] = useState(false);
+
+  useEffect(() => {
+    if (!actionsOpen) return;
+    // capture: React Flow гасит всплытие у кликов по холсту
+    const close = (event: MouseEvent) => {
+      if (!cardRef.current?.contains(event.target as Node)) setActionsOpen(false);
+    };
+    document.addEventListener("mousedown", close, true);
+    return () => document.removeEventListener("mousedown", close, true);
+  }, [actionsOpen]);
 
   // порядок по иерархии: отец, мать, брат, сестра, супруг(а), ребёнок.
   // Занятый родительский слот не предлагаем повторно.
@@ -128,6 +141,7 @@ function PersonNodeComponent({ data, selected }: NodeProps) {
 
   return (
     <div
+      ref={cardRef}
       style={{
         backgroundColor: accentTint,
         borderColor: accent,
@@ -141,6 +155,10 @@ function PersonNodeComponent({ data, selected }: NodeProps) {
                  rounded-[13px] border-[1.5px] px-3 py-3 shadow-lift transition-colors"
       onMouseEnter={() => onHover?.(person.id, true)}
       onMouseLeave={() => onHover?.(person.id, false)}
+      onClick={() => {
+        // на устройствах без наведения кнопки открывает одно нажатие на карточку
+        if (window.matchMedia("(hover: none)").matches) setActionsOpen((open) => !open);
+      }}
       onDoubleClick={() => onOpen(person.id)}
       role="button"
       tabIndex={0}
@@ -214,7 +232,11 @@ function PersonNodeComponent({ data, selected }: NodeProps) {
       )}
 
       {/* кнопки на верхней грани, слева: добавить, редактировать, открыть ветку */}
-      <span className="card-actions absolute -top-4 left-3 hidden gap-1.5 group-hover:flex">
+      <span
+        className={`card-actions absolute -top-4 left-3 gap-1.5 ${
+          actionsOpen ? "flex" : "hidden group-hover:flex"
+        }`}
+      >
         {canEdit && (
           <button
             ref={plusRef}
