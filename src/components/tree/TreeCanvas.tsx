@@ -29,8 +29,9 @@ import { FamilyBusEdge } from "./FamilyBusEdge";
 import { NodeMenu, MenuItem } from "./NodeMenu";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
-import { publicUrl } from "@/lib/format";
+import { peopleWord, publicUrl } from "@/lib/format";
 import { autoLayout, CARD_W, CARD_H } from "@/lib/layout";
+import { maleLineIds } from "@/lib/maleLine";
 import { savePositions, deleteRelationship } from "@/app/actions/persons";
 import type { Gender, Person, Relationship, Attachment, MemberRole } from "@/lib/types";
 
@@ -70,6 +71,16 @@ function IconDownload() {
 function IconExpand() {  return (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
       <path d="M10.8 3.5h3.7v3.7M14.5 3.5 9.8 8.2M7.2 14.5H3.5V10.8M3.5 14.5l4.7-4.7" />
+    </svg>
+  );
+}
+
+/** Мужской знак — фильтр мужской линии */
+function IconMaleLine() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="7.4" cy="10.6" r="4" />
+      <path d="M10.3 7.7 14.8 3.2M14.8 3.2h-3.7M14.8 3.2v3.7" />
     </svg>
   );
 }
@@ -116,6 +127,10 @@ function Canvas({
   const { getNodes, fitView } = useReactFlow();
 
   const [exporting, setExporting] = useState(false);
+  // фильтр мужской линии: только мужчины по крови от старшего предка
+  const [maleLineOnly, setMaleLineOnly] = useState(false);
+  // раскладка отфильтрованного древа — только на экране, в базу её не пишем
+  const [linePositions, setLinePositions] = useState<Record<string, { x: number; y: number }> | null>(null);
   // меню свёрнутой панели действий на телефоне
   const [tools, setTools] = useState<{ x: number; y: number } | null>(null);
   const toolsRef = useRef<HTMLButtonElement>(null);
@@ -151,12 +166,31 @@ function Canvas({
     return ids;
   }, [relationships]);
 
+  // фильтр мужской линии: набор карточек, которые остаются на холсте
+  const lineIds = useMemo(
+    () => (maleLineOnly ? maleLineIds(persons, relationships) : null),
+    [maleLineOnly, persons, relationships]
+  );
+  const shownPersons = useMemo(
+    () => (lineIds ? persons.filter((person) => lineIds.has(person.id)) : persons),
+    [lineIds, persons]
+  );
+  const shownRelationships = useMemo(
+    // связи, у которых оба конца в линии: иначе тянулись бы к скрытым карточкам
+    () =>
+      lineIds
+        ? relationships.filter((rel) => lineIds.has(rel.from_person_id) && lineIds.has(rel.to_person_id))
+        : relationships,
+    [lineIds, relationships]
+  );
+
   const initialNodes = useMemo<Node[]>(
     () =>
-      persons.map((p) => ({
+      shownPersons.map((p) => ({
         id: p.id,
         type: "person",
-        position: { x: p.pos_x, y: p.pos_y },
+        // при включённом фильтре берём позиции его раскладки, иначе — сохранённые
+        position: linePositions?.[p.id] ?? { x: p.pos_x, y: p.pos_y },
         draggable: canEdit,
         data: {
           person: p,
@@ -173,12 +207,12 @@ function Canvas({
             router.push(`/tree/${treeId}/person/new?relateTo=${id}&relation=${relation}`),
         },
       })),
-    [persons, canEdit, parentGendersByChild, branchable, branchRoot, router, treeId]
+    [shownPersons, linePositions, canEdit, parentGendersByChild, branchable, branchRoot, router, treeId]
   );
 
   const initialEdges = useMemo<Edge[]>(
     () =>
-      relationships.map((r) => ({
+      shownRelationships.map((r) => ({
         id: r.id,
         source: r.from_person_id,
         target: r.to_person_id,
@@ -192,7 +226,7 @@ function Canvas({
             ? { stroke: "var(--color-bond-400)", strokeDasharray: "6 5" }
             : { stroke: "var(--color-canvas-line)", strokeWidth: 1.5 },
       })),
-    [relationships]
+    [shownRelationships]
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -337,12 +371,14 @@ function Canvas({
         .filter((n) => finished.some((c) => c.id === n.id))
         .map((n) => ({ id: n.id, x: n.position.x, y: n.position.y }));
 
-      if (!persistLayout) return;
+      // на странице ветки и при включённом фильтре позиции не пишем:
+      // иначе в базу уехала бы раскладка отфильтрованного древа
+      if (!persistLayout || maleLineOnly) return;
       startTransition(() => {
         savePositions(treeId, moved);
       });
     },
-    [onNodesChange, getNodes, canEdit, treeId, persistLayout]
+    [onNodesChange, getNodes, canEdit, treeId, persistLayout, maleLineOnly]
   );
 
   // ---- Автоматическая раскладка по поколениям ----
@@ -353,11 +389,13 @@ function Canvas({
     setTools({ x: Math.round(rect.left), y: Math.round(rect.bottom + 8) });
   }
 
-  function arrange() {    // Размеры карточек берём из DOM: измерение React Flow приходит с задержкой
-    // (шрифты в dev-режиме), а раскладка с дефолтными 208×104 съезжает.
+  /** Раскладка переданных карточек: размеры берём из DOM, ничего не сохраняя. */
+  function computeLayout(list: Node[], forEdges: Edge[]) {
+    // Измерение React Flow приходит с задержкой (шрифты в dev-режиме),
+    // поэтому читаем размеры карточек прямо из DOM.
     const vp = document.querySelector(".react-flow__viewport") as HTMLElement | null;
     const zoom = vp ? new DOMMatrix(getComputedStyle(vp).transform).a || 1 : 1;
-    const withSizes = personNodes().map((n) => {
+    const withSizes = list.map((n) => {
       if (n.measured) return n;
       const card = document
         .querySelector(`[data-id="${n.id}"]`)
@@ -368,7 +406,44 @@ function Canvas({
         measured: { width: card.offsetWidth / zoom, height: card.offsetHeight / zoom },
       };
     });
-    const laid = autoLayout(withSizes, edges);
+    return autoLayout(withSizes, forEdges);
+  }
+
+  /** Мужская линия: включаем фильтр и сразу выстраиваем то, что осталось. */
+  function toggleMaleLine() {
+    const next = !maleLineOnly;
+    setMaleLineOnly(next);
+
+    if (!next) {
+      setLinePositions(null);
+      setTimeout(() => fitView({ padding: 0.2, duration: 400 }), 60);
+      toast.success("Показаны все родственники");
+      return;
+    }
+
+    const ids = maleLineIds(persons, relationships);
+    const nodes = persons
+      .filter((person) => ids.has(person.id))
+      .map((person) => ({
+        id: person.id,
+        type: "person",
+        position: { x: person.pos_x, y: person.pos_y },
+      })) as Node[];
+    const forEdges = initialEdges.filter((e) => ids.has(e.source) && ids.has(e.target));
+
+    setTimeout(() => {
+      const laid = computeLayout(nodes, forEdges);
+      const positions: Record<string, { x: number; y: number }> = {};
+      for (const node of laid) positions[node.id] = node.position;
+      setLinePositions(positions);
+      setTimeout(() => fitView({ padding: 0.2, duration: 400 }), 60);
+      if (!nodes.length) toast.error("В этом древе не нашлось мужской линии");
+      else toast.success(`Мужская линия: ${nodes.length} ${peopleWord(nodes.length)}`);
+    }, 80);
+  }
+
+  function arrange() {
+    const laid = computeLayout(personNodes(), edges);
     setNodes(laid);
     startTransition(async () => {
       // на странице ветки позиции не пишем — иначе сдвинем общее древо
@@ -512,6 +587,13 @@ function Canvas({
                   }}
                 />
               )}
+              <MenuItem
+                label={maleLineOnly ? "Показать всех родственников" : "Только мужская линия"}
+                onClick={() => {
+                  setTools(null);
+                  toggleMaleLine();
+                }}
+              />
               {canEdit && (
                 <MenuItem
                   label="Выстроить по поколениям"
@@ -573,6 +655,20 @@ function Canvas({
           )}
           <button
             type="button"
+            onClick={toggleMaleLine}
+            aria-pressed={maleLineOnly}
+            aria-label={maleLineOnly ? "Показать всех родственников" : "Показать мужскую линию"}
+            title={maleLineOnly ? "Показать всех родственников" : "Только мужская линия"}
+            className={`grid h-10 w-10 place-items-center rounded-xl transition-colors ${
+              maleLineOnly
+                ? "bg-brass-500 text-ink-900"
+                : "text-ink-600 hover:bg-mist-100 hover:text-ink-900"
+            }`}
+          >
+            <IconMaleLine />
+          </button>
+          <button
+            type="button"
             onClick={exportPng}
             disabled={exporting}
             aria-label="Скачать картинку"
@@ -584,6 +680,19 @@ function Canvas({
           </button>
         </div>
       </div>
+
+      {/* Включённый фильтр: видно, что показано, и легко вернуть всех */}
+      {maleLineOnly && (
+        <button
+          type="button"
+          onClick={toggleMaleLine}
+          className="absolute left-1/2 top-3 flex -translate-x-1/2 items-center gap-2 rounded-full border border-brass-500/50 bg-brass-500/15 px-3 py-1.5 text-[13px] text-ink-700 shadow-sm backdrop-blur"
+        >
+          <IconMaleLine />
+          Мужская линия: {shownPersons.length} {peopleWord(shownPersons.length)}
+          <span className="text-ink-400">· показать всех</span>
+        </button>
+      )}
 
       {/* Легенда */}
       <div className="pointer-events-none absolute right-3 top-3 hidden rounded-xl border border-mist-200 bg-surface/95 px-3 py-2.5 text-[12px] text-ink-500 shadow-sm sm:block">
