@@ -195,12 +195,12 @@ function PersonNodeComponent({ data, selected }: NodeProps) {
 
       <span className="min-w-0 flex-1">
         <span
-          className="block font-display text-[15px] font-semibold leading-tight text-ink-800"
+          className="block font-display text-[16px] font-semibold leading-tight text-ink-800"
         >
           {shortName(person)}
         </span>
         {person.middle_name && (
-          <span className="block text-[12px] leading-tight text-ink-400">
+          <span className="block text-[13px] leading-tight text-ink-400">
             {person.middle_name}
           </span>
         )}
@@ -211,7 +211,7 @@ function PersonNodeComponent({ data, selected }: NodeProps) {
               className="mt-1.5 mb-1 block h-px w-full opacity-60"
               style={{ backgroundImage: `linear-gradient(90deg, ${accent}, transparent)` }}
             />
-            <span className="block text-[12px] leading-tight text-ink-500">
+            <span className="block text-[13px] leading-tight text-ink-500">
             {years}
             {age != null && (
               <span className="text-ink-400">

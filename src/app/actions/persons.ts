@@ -238,6 +238,12 @@ export async function rollbackPerson(
 
 export async function deletePerson(treeId: string, personId: string) {
   const supabase = await createClient();
+  // связи убираем сами, до карточки: иначе каскад удалит их после того, как
+  // строка человека исчезнет, и в истории не останется имён
+  await supabase
+    .from("relationships")
+    .delete()
+    .or(`from_person_id.eq.${personId},to_person_id.eq.${personId}`);
   await supabase.from("persons").delete().eq("id", personId);
   revalidatePath(`/tree/${treeId}`);
 }

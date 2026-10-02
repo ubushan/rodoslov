@@ -60,12 +60,29 @@ export default async function TreePage({ params }: { params: Promise<{ treeId: s
             {persons?.length ?? 0} карточек
           </span>
           <Link
+            href={`/tree/${treeId}/history`}
+            className="hidden items-center rounded-lg border border-mist-300 px-3 py-1.5 text-sm text-ink-700 transition-colors hover:border-ink-300 sm:flex"
+          >
+            История
+          </Link>
+          <Link
             href={`/tree/${treeId}/settings`}
             className="hidden items-center rounded-lg border border-mist-300 px-3 py-1.5 text-sm text-ink-700 transition-colors hover:border-ink-300 sm:flex"
           >
             Участники и доступ
           </Link>
-          {/* на телефоне — компактная кнопка с иконкой, чтобы панель не росла вниз */}
+          {/* на телефоне — компактные кнопки с иконками, чтобы панель не росла вниз */}
+          <Link
+            href={`/tree/${treeId}/history`}
+            aria-label="История изменений"
+            title="История изменений"
+            className="grid h-9 w-9 place-items-center rounded-lg border border-mist-300 text-ink-600 transition-colors hover:border-ink-300 sm:hidden"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 4.6V9l2.8 1.8" />
+              <path d="M4.3 13.9a6.5 6.5 0 1 1 9.4 0" />
+            </svg>
+          </Link>
           <Link
             href={`/tree/${treeId}/settings`}
             aria-label="Участники и доступ"

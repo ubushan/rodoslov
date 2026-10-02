@@ -36,6 +36,16 @@ export type Relationship = {
   note: string | null;
 };
 
+export type TreeEvent = {
+  id: number;
+  tree_id: string;
+  actor: string | null;
+  kind: string;
+  summary: string;
+  details: Record<string, unknown> | null;
+  created_at: string;
+};
+
 export type PersonChange = {
   id: number;
   tree_id: string;

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { rollbackPerson } from "@/app/actions/persons";
-import { formatDate } from "@/lib/format";
+import { describeChange } from "@/lib/changes";
 
 export type ChangeRow = {
   id: number;
@@ -13,49 +13,6 @@ export type ChangeRow = {
   before: Record<string, unknown> | null;
   after: Record<string, unknown>;
 };
-
-/** Подписи полей карточки — в том порядке, в каком их показываем в истории. */
-const FIELDS: [string, string][] = [
-  ["last_name", "Фамилия"],
-  ["first_name", "Имя"],
-  ["middle_name", "Отчество"],
-  ["maiden_name", "Девичья фамилия"],
-  ["other_names", "Другие имена"],
-  ["gender", "Пол"],
-  ["birth_year", "Год рождения"],
-  ["birth_date", "Дата рождения"],
-  ["birth_place", "Место рождения"],
-  ["residence", "Проживание"],
-  ["is_living", "Жив"],
-  ["death_year", "Год смерти"],
-  ["death_date", "Дата смерти"],
-  ["death_place", "Место смерти"],
-  ["bio", "Биография"],
-];
-
-function valueOf(key: string, value: unknown): string {
-  if (value === null || value === undefined || value === "") return "—";
-  if (key === "gender") {
-    return value === "male" ? "мужской" : value === "female" ? "женский" : "не указан";
-  }
-  if (key === "is_living") return value ? "жив" : "умер";
-  if (key === "birth_date" || key === "death_date") return formatDate(String(value)) ?? String(value);
-  return String(value);
-}
-
-/** Короткое описание правки: «Имя: Анна → Мария, Год рождения: 1938 → 1939». */
-function describeChange(before: Record<string, unknown> | null, after: Record<string, unknown>): string[] {
-  if (!before) {
-    const name = [after.first_name, after.last_name].filter(Boolean).join(" ") || "без имени";
-    return [`создал(а) карточку «${name}»`];
-  }
-  const parts: string[] = [];
-  for (const [key, label] of FIELDS) {
-    if (before[key] === after[key]) continue;
-    parts.push(`${label}: ${valueOf(key, before[key])} → ${valueOf(key, after[key])}`);
-  }
-  return parts.length ? parts : ["без видимых изменений"];
-}
 
 export function PersonHistory({
   treeId,

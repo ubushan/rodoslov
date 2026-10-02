@@ -129,9 +129,9 @@
   --p-canvas-mask: rgba(238, 241, 246, 0.75);
 
   --p-male: #7fa6c9;
-  --p-male-tint: #f3f8fb;
+  --p-male-tint: #e6f1fa;
   --p-female: #d1873f;
-  --p-female-tint: #fdf5ef;
+  --p-female-tint: #fbe8d7;
   --p-plain: #c6cfdd;
   --p-plain-tint: #ffffff;
 
@@ -192,9 +192,9 @@
   --p-canvas-mask: rgba(15, 20, 30, 0.78);
 
   --p-male: #6f9cc4;
-  --p-male-tint: #182430;
+  --p-male-tint: #1d2d3e;
   --p-female: #cf8b4a;
-  --p-female-tint: #2a2119;
+  --p-female-tint: #35271a;
   --p-plain: #4a5568;
   --p-plain-tint: #1b2230;
 
@@ -255,9 +255,9 @@
   --p-canvas-mask: rgba(237, 226, 205, 0.75);
 
   --p-male: #7d94ab;
-  --p-male-tint: #f1ece0;
+  --p-male-tint: #e9e0cc;
   --p-female: #b57338;
-  --p-female-tint: #f8efe0;
+  --p-female-tint: #f7e6ca;
   --p-plain: #c2b096;
   --p-plain-tint: #fbf6ec;
 
@@ -444,6 +444,11 @@ h1, h2, h3, .display {
 .exporting .react-flow__controls,
 .exporting .react-flow__minimap,
 .exporting .react-flow__background { display: none !important; }
+
+/* html-to-image неточно переносит тени с отрицательным spread — справа от
+   карточки остаётся полоса. В картинке тени не нужны: форму держит рамка. */
+.exporting .react-flow__node,
+.exporting .react-flow__node * { box-shadow: none !important; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

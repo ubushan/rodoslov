@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { currentAdmin } from "@/lib/admin";
 import { ThemeSwitcher } from "@/components/theme/ThemeSwitcher";
+import { AccountMenu } from "@/components/account/AccountMenu";
 import { signOut } from "@/app/actions/auth";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -36,6 +37,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
           <div className="flex items-center gap-1">
             <ThemeSwitcher />
+            <AccountMenu name={name} isAdmin={!!admin} />
             {admin && (
               <Link
                 href="/admin"

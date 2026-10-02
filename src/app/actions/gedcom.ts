@@ -167,6 +167,15 @@ export async function importGedcom(treeId: string, text: string): Promise<Gedcom
   }
 
   revalidatePath(`/tree/${treeId}`);
+
+  // сводка импорта в историю древа; отдельные карточки туда пишет триггер
+  const { error: logError } = await supabase.rpc("log_tree_event", {
+    p_tree: treeId,
+    p_kind: "import",
+    p_summary: `Импортировал GEDCOM: ${parsed.persons.length} человек, ${unique.length} связей`,
+  });
+  if (logError) console.error("Не удалось записать импорт в историю:", logError.message);
+
   return {
     ok: `Импортировано: ${parsed.persons.length} человек, ${unique.length} связей`,
   };

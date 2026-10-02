@@ -9,15 +9,24 @@ export default async function DashboardPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
+  // только своё членство: политика RLS пускает участника к строкам всех
+  // участников древа, поэтому без фильтра древо дублировалось по числу родни
   const { data: memberships } = await supabase
     .from("tree_members")
     .select("role, tree_id, trees(id, title, description, updated_at, owner_id)")
+    .eq("user_id", user!.id)
     .order("created_at", { ascending: false });
 
-  const rows = (memberships ?? []).filter((m) => m.trees) as unknown as Array<{
+  const seen = new Set<string>();
+  const rows = ((memberships ?? []).filter((m) => m.trees) as unknown as Array<{
     role: string;
+    tree_id: string;
     trees: { id: string; title: string; description: string | null; updated_at: string; owner_id: string };
-  }>;
+  }>).filter((row) => {
+    if (seen.has(row.tree_id)) return false;
+    seen.add(row.tree_id);
+    return true;
+  });
 
   const counts = await Promise.all(
     rows.map(async (r) => {
