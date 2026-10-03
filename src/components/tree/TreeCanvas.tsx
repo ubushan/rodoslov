@@ -7,54 +7,59 @@ import {
   ReactFlowProvider,
   Background,
   BackgroundVariant,
-  Controls,
-  MiniMap,
   useNodesState,
   useEdgesState,
   useReactFlow,
+  useStore,
   getNodesBounds,
   getViewportForBounds,
   type Node,
   type Edge,
-  type NodeChange,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { toPng } from "html-to-image";
 import { toast } from "sonner";
 
-import { PersonNode, type NewRelative } from "./PersonNode";
+import { PersonNode } from "./PersonNode";
 import { CouplePlate } from "./CouplePlate";
-import { CouplePlus } from "./CouplePlus";
 import { FamilyBusEdge } from "./FamilyBusEdge";
-import { NodeMenu, MenuItem } from "./NodeMenu";
-import { Button } from "@/components/ui/button";
+import { StudioMinimap } from "./StudioMinimap";
+import { StudioZoom } from "./StudioZoom";
+import { Inspector, type InspectorChange } from "./Inspector";
+import { CommandPalette, type PaletteAction } from "./CommandPalette";
 import { createClient } from "@/lib/supabase/client";
-import { peopleWord, publicUrl } from "@/lib/format";
+import { peopleWord, publicUrl, shortName } from "@/lib/format";
 import { autoLayout, CARD_W, CARD_H } from "@/lib/layout";
+import type { NewRelative } from "@/lib/place";
 import { maleLineIds } from "@/lib/maleLine";
-import { savePositions, deleteRelationship } from "@/app/actions/persons";
-import type { Gender, Person, Relationship, Attachment, MemberRole } from "@/lib/types";
+import { DEFAULT_THEME, THEMES, THEME_COOKIE, type ThemeKey } from "@/lib/theme";
+import { deleteRelationship } from "@/app/actions/persons";
+import { exportTree } from "@/app/actions/gedcom";
+import type { Person, Relationship, Attachment, MemberRole } from "@/lib/types";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const nodeTypes = { person: PersonNode, couplePlate: CouplePlate, couplePlus: CouplePlus };
+const nodeTypes = { person: PersonNode, couplePlate: CouplePlate };
 const edgeTypes = { family: FamilyBusEdge };
+
+/**
+ * Сколько места справа занимает парящий инспектор (панель 320px + поля).
+ * Учитывается только в «уместить»: холст при этом на всю ширину окна,
+ * никакой подложки под панелью нет.
+ */
+const INSPECTOR_RESERVE = 344;
+
+/* Кнопка дока действий: иконка и подпись столбиком, как в студийном доке.
+   До 640px — пилюля телефона: шире в высоту, круглее, мельче подпись. */
+const DOCK_BTN =
+  "flex h-[46px] w-[62px] flex-col items-center justify-center gap-px rounded-full border border-transparent text-[9.5px] leading-tight text-ink-600 transition-colors hover:bg-[var(--p-hover-bg)] hover:text-ink-800 disabled:pointer-events-none disabled:opacity-45 max-[420px]:w-[56px] max-[420px]:text-[9px] sm:h-auto sm:w-[68px] sm:gap-0.5 sm:rounded-xl sm:py-1.5 sm:text-[10.5px]";
+/* Включённый фильтр — латунная заливка с тёмным текстом */
+const DOCK_BTN_ON = "border-[var(--p-acc-line)] bg-[var(--p-acc-bg)] text-brass-ink";
 
 /* Иконки панели: тонкие штрихи, размер 18, цвет наследуется от кнопки */
 function IconAdd() {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
       <path d="M9 3.5v11M3.5 9h11" />
-    </svg>
-  );
-}
-
-function IconLayout() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
-      <rect x="2.5" y="2.5" width="5" height="4" rx="1" />
-      <rect x="10.5" y="2.5" width="5" height="4" rx="1" />
-      <rect x="6.5" y="11.5" width="5" height="4" rx="1" />
-      <path d="M5 6.5v2.5h8V6.5" strokeLinecap="round" />
     </svg>
   );
 }
@@ -75,7 +80,7 @@ function IconExpand() {  return (
   );
 }
 
-/** Мужской знак — фильтр мужской линии */
+/** Мужской знак — чип «Мужская линия» */
 function IconMaleLine() {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -85,13 +90,42 @@ function IconMaleLine() {
   );
 }
 
-/** Ползунки — свёрнутая панель действий на телефоне */
-function IconTools() {
+/** Воронка — кнопка «Фильтр» в доке, как в прототипе */
+function IconFilter() {
   return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
-      <path d="M3 5.5h12M3 12.5h12" />
-      <circle cx="7" cy="5.5" r="1.9" style={{ fill: "var(--color-surface)" }} />
-      <circle cx="12" cy="12.5" r="1.9" style={{ fill: "var(--color-surface)" }} />
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 4.6h12M5.5 9h7M7.5 13.4h3" />
+    </svg>
+  );
+}
+
+/** Скрыть с холста — глаз перечёркнут */
+function IconEyeOff() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2.6 6.3C4.3 4.6 6.6 3.6 9 3.6s4.7 1 6.4 2.7M3.9 12.4C5.1 13.6 6.9 14.4 9 14.4s3.9-.8 5.1-2" />
+      <path d="M3 3l12 12" />
+    </svg>
+  );
+}
+
+/** Снять выделение */
+function IconClose() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
+      <path d="M5.5 5.5l7 7M12.5 5.5l-7 7" />
+    </svg>
+  );
+}
+
+/** Ветвь: карточка и её семья */
+function IconBranch() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="6.5" y="2.5" width="5" height="4" rx="1" />
+      <rect x="2.5" y="11.5" width="5" height="4" rx="1" />
+      <rect x="10.5" y="11.5" width="5" height="4" rx="1" />
+      <path d="M9 6.5v2.5M5 11.5V9h8v2.5" />
     </svg>
   );
 }
@@ -103,7 +137,12 @@ type Props = {
   persons: Person[];
   relationships: Relationship[];
   attachments: Attachment[];
-  /** на странице ветки раскладку не сохраняем в базу, чтобы не сдвигать общее древо */
+  /** последние правки карточек древа — раздел «История» в инспекторе */
+  changes?: InspectorChange[] | null;
+  /**
+   * Оставлен для страницы ветки (чужой файл): раскладка теперь всегда
+   * автоматическая и в базу не пишется, поэтому значение ни на что не влияет.
+   */
   persistLayout?: boolean;
   /** на странице ветки — ссылка на всё древо: кнопка с расходящимися стрелками */
   wholeTreeHref?: string;
@@ -118,41 +157,30 @@ function Canvas({
   persons,
   relationships,
   attachments,
-  persistLayout = true,
+  changes = null,
   wholeTreeHref,
   branchRoot,
 }: Props) {
   const router = useRouter();
   const canEdit = role === "owner" || role === "editor";
-  const { getNodes, fitView } = useReactFlow();
+  const { getNodes, getNode, fitView, setCenter, setViewport } = useReactFlow();
+  // размеры области холста: по ним считаем «уместить» с запасом под инспектор
+  const containerW = useStore((state) => state.width);
+  const containerH = useStore((state) => state.height);
 
   const [exporting, setExporting] = useState(false);
   // фильтр мужской линии: только мужчины по крови от старшего предка
   const [maleLineOnly, setMaleLineOnly] = useState(false);
-  // раскладка отфильтрованного древа — только на экране, в базу её не пишем
-  const [linePositions, setLinePositions] = useState<Record<string, { x: number; y: number }> | null>(null);
-  // меню свёрнутой панели действий на телефоне
-  const [tools, setTools] = useState<{ x: number; y: number } | null>(null);
-  const toolsRef = useRef<HTMLButtonElement>(null);
-  // карточка под курсором — по ней показываем «+» на линии её пары
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  // выделение на холсте: один или несколько человек (Shift + клик)
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  // «Скрыть на холсте» — только отображение, в базу ничего не пишется
+  const [hiddenIds, setHiddenIds] = useState<string[]>([]);
+  // командная палитра: ⌘K, событие из шапки или ?palette=1
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  // Пол родителей каждого человека — чтобы в меню не предлагать
-  // завести второго отца или вторую мать
-  const parentGendersByChild = useMemo(() => {
-    const genderById = new Map(persons.map((p) => [p.id, p.gender]));
-    const out = new Map<string, Gender[]>();
-    for (const r of relationships) {
-      if (r.kind !== "parent") continue;
-      const g = genderById.get(r.from_person_id) ?? "unknown";
-      out.set(r.to_person_id, [...(out.get(r.to_person_id) ?? []), g]);
-    }
-    return out;
-  }, [persons, relationships]);
-
   // Кому есть что показывать на отдельной странице ветки: у кого есть супруги
-  // или дети. У остальных кнопка ветки неактивна.
+  // или дети. У остальных кнопка ветки в панели деталей неактивна.
   const branchable = useMemo(() => {
     const ids = new Set<string>();
     for (const r of relationships) {
@@ -171,6 +199,11 @@ function Canvas({
     () => (maleLineOnly ? maleLineIds(persons, relationships) : null),
     [maleLineOnly, persons, relationships]
   );
+  // счётчик для значка на кнопке «Фильтр» — как в прототипе
+  const maleLineCount = useMemo(
+    () => maleLineIds(persons, relationships).size,
+    [persons, relationships]
+  );
   const shownPersons = useMemo(
     () => (lineIds ? persons.filter((person) => lineIds.has(person.id)) : persons),
     [lineIds, persons]
@@ -184,35 +217,24 @@ function Canvas({
     [lineIds, relationships]
   );
 
-  const initialNodes = useMemo<Node[]>(
+  // «Скрыть на холсте»: карточки убираются только с экрана
+  const hiddenSet = useMemo(() => new Set(hiddenIds), [hiddenIds]);
+  const visiblePersons = useMemo(
+    () => shownPersons.filter((person) => !hiddenSet.has(person.id)),
+    [shownPersons, hiddenSet]
+  );
+  const visibleIds = useMemo(() => new Set(visiblePersons.map((person) => person.id)), [visiblePersons]);
+  const visibleRelationships = useMemo(
     () =>
-      shownPersons.map((p) => ({
-        id: p.id,
-        type: "person",
-        // при включённом фильтре берём позиции его раскладки, иначе — сохранённые
-        position: linePositions?.[p.id] ?? { x: p.pos_x, y: p.pos_y },
-        draggable: canEdit,
-        data: {
-          person: p,
-          photoUrl: publicUrl(SUPABASE_URL, "photos", p.photo_path),
-          canEdit,
-          parentGenders: parentGendersByChild.get(p.id) ?? [],
-          canOpenBranch: branchable.has(p.id),
-          hiddenCount: branchRoot?.id === p.id ? branchRoot.hidden : undefined,
-          onBranch: (id: string) => router.push(`/tree/${treeId}/branch/${id}`),
-          onHover: (id: string, over: boolean) =>
-            setHoveredId((cur) => (over ? id : cur === id ? null : cur)),
-          onOpen: (id: string) => router.push(`/tree/${treeId}/person/${id}`),
-          onAdd: (id: string, relation: NewRelative) =>
-            router.push(`/tree/${treeId}/person/new?relateTo=${id}&relation=${relation}`),
-        },
-      })),
-    [shownPersons, linePositions, canEdit, parentGendersByChild, branchable, branchRoot, router, treeId]
+      shownRelationships.filter(
+        (rel) => visibleIds.has(rel.from_person_id) && visibleIds.has(rel.to_person_id)
+      ),
+    [shownRelationships, visibleIds]
   );
 
   const initialEdges = useMemo<Edge[]>(
     () =>
-      shownRelationships.map((r) => ({
+      visibleRelationships.map((r) => ({
         id: r.id,
         source: r.from_person_id,
         target: r.to_person_id,
@@ -223,10 +245,47 @@ function Canvas({
         data: { kind: r.kind },
         style:
           r.kind === "spouse"
-            ? { stroke: "var(--color-bond-400)", strokeDasharray: "6 5" }
+            ? { stroke: "var(--color-bond-400)", strokeWidth: 1.5, strokeDasharray: "6 5" }
             : { stroke: "var(--color-canvas-line)", strokeWidth: 1.5 },
       })),
-    [shownRelationships]
+    [visibleRelationships]
+  );
+
+  /**
+   * Раскладка по поколениям считается на клиенте для того, что сейчас на холсте:
+   * при каждой загрузке, при включении фильтра и при скрытии карточек. Позиции
+   * нигде не хранятся: карточки не перетаскиваются (nodesDraggable={false}), а в
+   * базу геометрия не пишется. Размер карточки фиксирован (176×100 в PersonNode),
+   * поэтому раскладка по константам совпадает с измеренной.
+   */
+  const layoutPositions = useMemo(() => {
+    const stubs: Node[] = visiblePersons.map((p) => ({
+      id: p.id,
+      type: "person",
+      position: { x: 0, y: 0 },
+      data: { person: p },
+    }));
+    const laid = autoLayout(stubs, initialEdges);
+    return new Map(laid.map((n) => [n.id, n.position]));
+  }, [visiblePersons, initialEdges]);
+
+  const initialNodes = useMemo<Node[]>(
+    () =>
+      visiblePersons.map((p) => ({
+        id: p.id,
+        type: "person",
+        // позиции всегда считает раскладка по поколениям — в базе их нет
+        position: layoutPositions.get(p.id) ?? { x: 0, y: 0 },
+        data: {
+          person: p,
+          photoUrl: publicUrl(SUPABASE_URL, "photos", p.photo_path),
+          hiddenCount: branchRoot?.id === p.id ? branchRoot.hidden : undefined,
+          // Двойной клик по карточке открывает её страницу; одиночный клик —
+          // выделение, по нему открывается панель деталей с действиями
+          onOpen: (id: string) => router.push(`/tree/${treeId}/person/${id}`),
+        },
+      })),
+    [visiblePersons, layoutPositions, branchRoot, router, treeId]
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -247,7 +306,7 @@ function Canvas({
           p.position.x === n.position.x &&
           p.position.y === n.position.y &&
           p.measured === n.measured;
-        return same ? p : { ...n, measured: p.measured };
+        return same ? p : { ...n, measured: p.measured, selected: p.selected };
       });
       const unchanged = next.length === prev.length && next.every((n, i) => n === prev[i]);
       return unchanged ? prev : next;
@@ -255,22 +314,132 @@ function Canvas({
   }, [initialNodes, setNodes]);
   useEffect(() => setEdges(initialEdges), [initialEdges, setEdges]);
 
-  // Ветка открывается уже разложенной; в базу эти позиции не пишем
-  const arrangedOnce = useRef(false);
+  /* ---- Выделение на холсте ----
+     Источник правды — сам React Flow: клик выделяет одного, Shift + клик
+     добавляет к выделению (multiSelectionKeyCode). Здесь только читаем набор
+     и умеем задавать его программно — из инспектора и палитры. */
+  const applySelection = useCallback(
+    (ids: string[]) => {
+      setSelectedIds(ids);
+      setNodes((prev) => {
+        let changed = false;
+        const next = prev.map((node) => {
+          if (node.type !== "person") return node;
+          const selected = ids.includes(node.id);
+          if (!!node.selected === selected) return node;
+          changed = true;
+          return { ...node, selected };
+        });
+        return changed ? next : prev;
+      });
+    },
+    [setNodes]
+  );
+
+  /** Выделить одного и показать его в центре холста */
+  const selectOnly = useCallback(
+    (id: string) => {
+      applySelection([id]);
+      const centerOnNode = () => {
+        const node = getNode(id);
+        if (!node) return;
+        const width = node.measured?.width ?? CARD_W;
+        const height = node.measured?.height ?? CARD_H;
+        setCenter(node.position.x + width / 2, node.position.y + height / 2, {
+          zoom: 1,
+          duration: 400,
+        });
+      };
+      // человека могли до этого скрыть с холста — тогда сначала возвращаем его
+      if (getNode(id)) {
+        setTimeout(centerOnNode, 30);
+        return;
+      }
+      setHiddenIds((prev) => (prev.includes(id) ? prev.filter((hidden) => hidden !== id) : prev));
+      setTimeout(centerOnNode, 220);
+    },
+    [applySelection, getNode, setCenter]
+  );
+
+  // если выделенный человек ушёл с холста (фильтр или «Скрыть»), снимаем выделение
   useEffect(() => {
-    if (persistLayout || arrangedOnce.current) return;
-    const t = setTimeout(() => {
-      arrangedOnce.current = true;
-      arrange();
-    }, 900);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [persistLayout]);
+    setSelectedIds((prev) => {
+      const next = prev.filter((id) => visibleIds.has(id));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [visibleIds]);
+
+  const clearSelection = useCallback(() => applySelection([]), [applySelection]);
+
+  function hideSelected() {
+    if (!selectedIds.length) return;
+    const ids = selectedIds;
+    setHiddenIds((prev) => [...new Set([...prev, ...ids])]);
+    clearSelection();
+    toast.success(
+      `Скрыто на холсте: ${ids.length} ${peopleWord(ids.length)}`,
+      { description: "Данные не меняются — вернуть можно чипом справа." }
+    );
+  }
+
+  function restoreHidden() {
+    setHiddenIds([]);
+  }
+
+  /** Показать всех, кто связан с этим местом: выделяем их на холсте */
+  function selectPlace(place: string) {
+    const key = place.trim().toLowerCase();
+    const ids = visiblePersons
+      .filter((person) =>
+        [person.birth_place, person.residence, person.death_place].some(
+          (value) => value?.trim().toLowerCase() === key
+        )
+      )
+      .map((person) => person.id);
+    if (!ids.length) {
+      toast.error("В этом месте пока никто не записан");
+      return;
+    }
+    applySelection(ids);
+    setTimeout(() => fitView({ nodes: ids.map((id) => ({ id })), padding: 0.3, duration: 400, maxZoom: 1 }), 40);
+    toast.success(`Выбрано: ${ids.length} ${peopleWord(ids.length)} — ${place}`);
+  }
 
   // Только карточки людей (без служебных узлов-рамок)
   const personNodes = useCallback(() => getNodes().filter((n) => n.type === "person"), [getNodes]);
 
-  // Мягкая рамка вокруг пары супругов — когда они рядом
+  /**
+   * «Уместить древо в окне». Холст занимает всю ширину окна, а инспектор парит
+   * поверх него справа, поэтому место под панель резервируется только здесь:
+   * вписываем карточки в область левее панели, фоном ничего не подкладывая.
+   */
+  const fitAll = useCallback(
+    ({ padding = 0.2, duration = 400 }: { padding?: number; duration?: number } = {}) => {
+      const list = personNodes();
+      if (!list.length || !containerW || !containerH) return;
+      // до 640px инспектор — нижний лист и места сбоку не занимает
+      const reserve = containerW >= 640 ? INSPECTOR_RESERVE : 0;
+      const availW = Math.max(180, containerW - reserve);
+      const bounds = getNodesBounds(list);
+      setViewport(getViewportForBounds(bounds, availW, containerH, 0.15, 2, padding), { duration });
+    },
+    [personNodes, containerW, containerH, setViewport]
+  );
+
+  // Первый показ: сразу показываем древо целиком, с местом под будущую панель
+  const fittedOnce = useRef(false);
+  useEffect(() => {
+    if (fittedOnce.current || !containerW || !containerH || !visiblePersons.length) return;
+    const t = setTimeout(() => {
+      fittedOnce.current = true;
+      fitAll({ padding: 0.2, duration: 0 });
+    }, 60);
+    return () => clearTimeout(t);
+  }, [containerW, containerH, visiblePersons.length, fitAll]);
+
+  // Мягкая рамка вокруг пары супругов — когда они рядом.
+  // Кнопок «+» на линии пары больше нет: добавление родственников живёт
+  // в панели деталей (инспекторе) и не всплывает при наведении.
   const plateNodes = useMemo<Node[]>(() => {
     const out: Node[] = [];
     const byId = new Map(nodes.map((n) => [n.id, n]));
@@ -288,13 +457,6 @@ function Canvas({
       if (gap > 120) continue;
       const left = Math.min(a.position.x, b.position.x) - 10;
       const top = Math.min(a.position.y, b.position.y) - 10;
-      // центр просвета между карточками — туда встанет «+» добавления ребёнка
-      const [l, r] = a.position.x <= b.position.x ? [a, b] : [b, a];
-      const lw = l === a ? aw : bw;
-      const gapLeft = l.position.x + lw;
-      const gapW = Math.max(24, r.position.x - gapLeft);
-      const gapH = Math.max(ah, bh);
-      const centerY = (a.position.y + ah / 2 + (b.position.y + bh / 2)) / 2;
       out.push({
         id: `plate-${e.id}`,
         type: "couplePlate",
@@ -309,31 +471,9 @@ function Canvas({
         focusable: false,
         connectable: false,
       });
-
-      // «+» по центру просвета — отдельным узлом поверх линий, иначе линия связи
-      // перехватывает клик. Показывается, когда курсор на любой карточке пары.
-      out.push({
-        id: `plus-${e.id}`,
-        type: "couplePlus",
-        position: { x: gapLeft, y: centerY - gapH / 2 },
-        data: {
-          w: gapW,
-          h: gapH,
-          canEdit,
-          open: hoveredId === a.id || hoveredId === b.id,
-          anchorId: e.source,
-          onAddChild: (id: string) =>
-            router.push(`/tree/${treeId}/person/new?relateTo=${id}&relation=child`),
-        },
-        zIndex: 2,
-        draggable: false,
-        selectable: false,
-        focusable: false,
-        connectable: false,
-      });
     }
     return out;
-  }, [nodes, edges, canEdit, hoveredId, router, treeId]);
+  }, [nodes, edges]);
 
   // ---- Правки родственников приходят без перезагрузки страницы ----
   useEffect(() => {
@@ -357,105 +497,172 @@ function Canvas({
     };
   }, [treeId, router]);
 
-  // ---- Перетаскивание карточек ----
-  const handleNodesChange = useCallback(
-    (changes: NodeChange[]) => {
-      onNodesChange(changes);
-      const finished = changes.filter(
-        (c): c is NodeChange & { type: "position"; dragging: boolean; id: string } =>
-          c.type === "position" && c.dragging === false
-      );
-      if (!finished.length || !canEdit) return;
+  // ---- Командная палитра: ⌘K, событие из шапки и ?palette=1 ----
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey)) return;
+      if (event.key === "k" || event.key === "K" || event.key === "л" || event.key === "Л") {
+        event.preventDefault();
+        setPaletteOpen((open) => !open);
+      }
+    };
+    // контракт с шапкой: кнопка поиска только шлёт событие
+    const onPalette = () => setPaletteOpen(true);
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("studio:palette", onPalette);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("studio:palette", onPalette);
+    };
+  }, []);
 
-      const moved = getNodes()
-        .filter((n) => finished.some((c) => c.id === n.id))
-        .map((n) => ({ id: n.id, x: n.position.x, y: n.position.y }));
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("palette") === "1") setPaletteOpen(true);
+  }, []);
 
-      // на странице ветки и при включённом фильтре позиции не пишем:
-      // иначе в базу уехала бы раскладка отфильтрованного древа
-      if (!persistLayout || maleLineOnly) return;
-      startTransition(() => {
-        savePositions(treeId, moved);
-      });
-    },
-    [onNodesChange, getNodes, canEdit, treeId, persistLayout, maleLineOnly]
-  );
+  /** Закрыть палитру и убрать ?palette=1, чтобы она не открывалась снова */
+  const closePalette = useCallback(() => {
+    setPaletteOpen(false);
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("palette") !== "1") return;
+    url.searchParams.delete("palette");
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+  }, []);
 
-  // ---- Автоматическая раскладка по поколениям ----
-  // на телефоне панель свёрнута в одну кнопку — меню раскрывается под ней
-  function openTools() {
-    const rect = toolsRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    setTools({ x: Math.round(rect.left), y: Math.round(rect.bottom + 8) });
-  }
+  // ---- Смена темы: та же кука и data-theme, что у переключателя в шапке ----
+  const cycleTheme = useCallback(() => {
+    const match = document.cookie.match(new RegExp(`(?:^|; )${THEME_COOKIE}=([^;]*)`));
+    const current = (match ? decodeURIComponent(match[1]) : DEFAULT_THEME) as ThemeKey;
+    const keys = THEMES.map((theme) => theme.key);
+    const next = keys[(Math.max(0, keys.indexOf(current)) + 1) % keys.length];
+    document.cookie = `${THEME_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
+    document.documentElement.dataset.theme =
+      next === "auto"
+        ? window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light"
+        : next;
+    toast.success(`Тема: ${(THEMES.find((theme) => theme.key === next)?.label ?? next).toLowerCase()}`);
+  }, []);
 
-  /** Раскладка переданных карточек: размеры берём из DOM, ничего не сохраняя. */
-  function computeLayout(list: Node[], forEdges: Edge[]) {
-    // Измерение React Flow приходит с задержкой (шрифты в dev-режиме),
-    // поэтому читаем размеры карточек прямо из DOM.
-    const vp = document.querySelector(".react-flow__viewport") as HTMLElement | null;
-    const zoom = vp ? new DOMMatrix(getComputedStyle(vp).transform).a || 1 : 1;
-    const withSizes = list.map((n) => {
-      if (n.measured) return n;
-      const card = document
-        .querySelector(`[data-id="${n.id}"]`)
-        ?.querySelector(".person-card") as HTMLElement | null;
-      if (!card) return n;
-      return {
-        ...n,
-        measured: { width: card.offsetWidth / zoom, height: card.offsetHeight / zoom },
-      };
+  // ---- Экспорт GEDCOM: то же действие, что в настройках древа ----
+  function exportGedcom() {
+    startTransition(async () => {
+      const result = await exportTree(treeId);
+      if ("error" in result) {
+        toast.error(result.error);
+        return;
+      }
+      const blob = new Blob([result.content], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = result.filename;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast.success("Файл GEDCOM скачан");
     });
-    return autoLayout(withSizes, forEdges);
   }
 
-  /** Мужская линия: включаем фильтр и сразу выстраиваем то, что осталось. */
+  /** Действия палитры: только то, что холст уже умеет */
+  const paletteActions = useMemo<PaletteAction[]>(() => {
+    const list: PaletteAction[] = [];
+    if (canEdit) {
+      list.push({
+        id: "add",
+        title: "Добавить человека",
+        hint: "Новая карточка в этом древе",
+        icon: "plus",
+        run: () => router.push(`/tree/${treeId}/person/new`),
+      });
+    }
+    list.push({
+      id: "male",
+      title: "Мужская линия",
+      hint: maleLineOnly ? "Снять фильтр — показать всех" : "Только мужчины по крови",
+      kbd: "F",
+      icon: "filter",
+      run: () => toggleMaleLine(),
+    });
+    list.push({
+      id: "fit",
+      title: "Уместить холст",
+      hint: "Показать всё древо в окне",
+      kbd: "0",
+      icon: "fit",
+      run: () => fitAll({ padding: 0.2 }),
+    });
+    list.push({
+      id: "png",
+      title: "Экспорт картинки",
+      hint: "PNG со всеми карточками и подписью",
+      icon: "image",
+      run: () => void exportPng(),
+    });
+    list.push({
+      id: "gedcom",
+      title: "Экспорт GEDCOM",
+      hint: "Файл для других генеалогических программ",
+      icon: "file",
+      run: exportGedcom,
+    });
+    list.push({
+      id: "theme",
+      title: "Переключить тему",
+      hint: "Светлая → тёмная → сепия → как в системе",
+      kbd: "T",
+      icon: "theme",
+      run: cycleTheme,
+    });
+    return list;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canEdit, maleLineOnly, treeId, router, fitAll, cycleTheme]);
+
+  // Слушатель горячих клавиш ставим один раз, а свежие обработчики берём из ref:
+  // иначе после реалтайм-обновления клавиша дёргала бы устаревший фильтр.
+  const shortcutRef = useRef({ male: toggleMaleLine });
+  useEffect(() => {
+    shortcutRef.current = { male: toggleMaleLine };
+  });
+
+  useEffect(() => {
+    if (paletteOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const inField =
+        !!target && (/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName) || target.isContentEditable);
+      if (inField || event.metaKey || event.ctrlKey || event.altKey) return;
+
+      if (event.code === "Digit0" || event.code === "Numpad0") {
+        event.preventDefault();
+        fitAll({ padding: 0.2 });
+        return;
+      }
+      if (event.code === "KeyF") {
+        event.preventDefault();
+        shortcutRef.current.male();
+        return;
+      }
+      if (event.code === "KeyT") {
+        event.preventDefault();
+        cycleTheme();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [paletteOpen, cycleTheme, fitAll]);
+
+  /** Мужская линия: включаем фильтр — раскладка оставшихся считается сама. */
   function toggleMaleLine() {
     const next = !maleLineOnly;
     setMaleLineOnly(next);
-
+    setTimeout(() => fitAll({ padding: 0.2 }), 80);
     if (!next) {
-      setLinePositions(null);
-      setTimeout(() => fitView({ padding: 0.2, duration: 400 }), 60);
       toast.success("Показаны все родственники");
       return;
     }
-
-    const ids = maleLineIds(persons, relationships);
-    const nodes = persons
-      .filter((person) => ids.has(person.id))
-      .map((person) => ({
-        id: person.id,
-        type: "person",
-        position: { x: person.pos_x, y: person.pos_y },
-      })) as Node[];
-    const forEdges = initialEdges.filter((e) => ids.has(e.source) && ids.has(e.target));
-
-    setTimeout(() => {
-      const laid = computeLayout(nodes, forEdges);
-      const positions: Record<string, { x: number; y: number }> = {};
-      for (const node of laid) positions[node.id] = node.position;
-      setLinePositions(positions);
-      setTimeout(() => fitView({ padding: 0.2, duration: 400 }), 60);
-      if (!nodes.length) toast.error("В этом древе не нашлось мужской линии");
-      else toast.success(`Мужская линия: ${nodes.length} ${peopleWord(nodes.length)}`);
-    }, 80);
-  }
-
-  function arrange() {
-    const laid = computeLayout(personNodes(), edges);
-    setNodes(laid);
-    startTransition(async () => {
-      // на странице ветки позиции не пишем — иначе сдвинем общее древо
-      if (persistLayout) {
-        await savePositions(
-          treeId,
-          laid.map((n) => ({ id: n.id, x: n.position.x, y: n.position.y }))
-        );
-      }
-      setTimeout(() => fitView({ padding: 0.15, duration: 400 }), 30);
-      toast.success("Древо выстроено по поколениям");
-    });
+    if (!maleLineCount) toast.error("В этом древе не нашлось мужской линии");
+    else toast.success(`Мужская линия: ${maleLineCount} ${peopleWord(maleLineCount)}`);
   }
 
   // ---- Экспорт в картинку ----
@@ -516,118 +723,107 @@ function Canvas({
 
   return (
     <div className={`relative h-full w-full bg-canvas ${exporting ? "exporting" : ""}`}>
-      <ReactFlow
-        nodes={[...nodes, ...plateNodes]}
-        edges={edges}
-        nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
-        onNodesChange={handleNodesChange}
-        onEdgesChange={onEdgesChange}
-        onEdgeDoubleClick={(_, edge) => {
-          if (!canEdit) return;
-          if (!confirm("Разорвать эту связь?")) return;
-          startTransition(async () => {
-            await deleteRelationship(treeId, edge.id);
-            router.refresh();
-          });
-        }}
-        elementsSelectable
-        fitView
-        fitViewOptions={{ padding: 0.2, minZoom: 0.45 }}
-        minZoom={0.15}
-        maxZoom={2}
-        proOptions={{ hideAttribution: true }}
-      >
-        <Background variant={BackgroundVariant.Dots} gap={22} size={1.4} color="var(--color-canvas-dot)" />
-        <Controls showInteractive={false} position="bottom-right" />
-        <MiniMap
-          pannable
-          zoomable
-          position="bottom-left"
-          nodeColor="var(--color-canvas-minimap)"
-          maskColor="var(--color-canvas-mask)"
-          className="!rounded-xl !border !border-mist-200"
-        />
-      </ReactFlow>
+      {/* Холст — на всю ширину окна, без сужения и без отдельного слоя точек
+          под панелью: инспектор парит поверх холста, а место под него
+          резервирует только «уместить» (см. fitAll) */}
+      <div className="h-full w-full">
+        <ReactFlow
+          nodes={[...nodes, ...plateNodes]}
+          edges={edges}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onEdgeDoubleClick={(_, edge) => {
+            if (!canEdit) return;
+            if (!confirm("Разорвать эту связь?")) return;
+            startTransition(async () => {
+              await deleteRelationship(treeId, edge.id);
+              router.refresh();
+            });
+          }}
+          onSelectionChange={({ nodes: selected }) =>
+            setSelectedIds((prev) => {
+              const next = selected.filter((n) => n.type === "person").map((n) => n.id);
+              return next.length === prev.length && next.every((id, i) => id === prev[i]) ? prev : next;
+            })
+          }
+          elementsSelectable
+          /* выделение: клик — один, Shift + клик — добавить к выделению */
+          multiSelectionKeyCode="Shift"
+          selectionKeyCode={null}
+          /* карточки не перетаскиваются: раскладка всегда автоматическая */
+          nodesDraggable={false}
+          minZoom={0.15}
+          maxZoom={2}
+          proOptions={{ hideAttribution: true }}
+        >
+          {/* холст в точку: шаг тот же, что у .canvas-dots */}
+          <Background variant={BackgroundVariant.Dots} gap={26} size={1.4} color="var(--color-canvas-dot)" />
+        </ReactFlow>
+      </div>
 
-      {/* Панель действий: на телефоне — одна кнопка с меню, на компьютере — колонка */}
-      <div className="pointer-events-none absolute left-3 top-3 flex flex-col">
-        <div className="pointer-events-auto sm:hidden">
+      {/* Панели холста — свои, студийные: у библиотечных MiniMap и Controls
+          серая подложка и системная рамка. Стоят в левом нижнем углу:
+          масштаб — прямо над миникартой, как в прототипе. Миникарту показываем
+          только там, где под неё есть место: на узких экранах её перекрыла бы
+          пилюля «Выбрано» — в прототипе она тоже скрыта до широкого окна. */}
+      <StudioZoom
+        className="absolute bottom-3 left-3 z-10 lg:bottom-[152px] lg:left-6"
+        onFit={() => fitAll({ padding: 0.2 })}
+      />
+      <StudioMinimap className="absolute bottom-5 left-6 z-10 hidden lg:block" />
+
+      {/* Левая колонка холста: возврат ко всему древу (страница ветки), легенда
+          связей и возврат скрытых карточек. Инспектор парит справа, поэтому
+          подписи живут слева. На телефоне колонки нет: её роль берёт нижняя
+          панель действий. */}
+      <div className="pointer-events-none absolute left-3 top-3 z-10 hidden flex-col items-start gap-1.5 sm:flex">
+        {wholeTreeHref && (
           <button
-            ref={toolsRef}
             type="button"
-            onClick={openTools}
-            aria-label="Действия с древом"
-            aria-haspopup="menu"
-            aria-expanded={!!tools}
-            title="Действия с древом"
-            className="grid h-10 w-10 place-items-center rounded-xl border border-mist-200 bg-surface/95 text-ink-600 shadow-lift backdrop-blur"
+            onClick={() => router.push(wholeTreeHref)}
+            aria-label="Раскрыть всё древо"
+            title="Раскрыть всё древо"
+            className="glass pointer-events-auto flex items-center gap-2 px-3 py-2 text-[12.5px] text-ink-600 transition-colors hover:text-ink-800"
           >
-            <IconTools />
+            <IconExpand />
+            <span>Всё древо</span>
           </button>
+        )}
+        <span className="studio-chip">
+          <span aria-hidden="true" className="h-0.5 w-6 rounded-[2px] bg-canvas-line" />
+          родитель — ребёнок
+        </span>
+        <span className="studio-chip">
+          <span aria-hidden="true" className="h-0 w-6 border-t-2 border-dashed border-bond-400" />
+          супруги
+        </span>
+        {hiddenIds.length > 0 && (
+          <button
+            type="button"
+            onClick={restoreHidden}
+            title="Вернуть скрытые карточки на холст"
+            className="studio-chip pointer-events-auto"
+          >
+            Скрыто: {hiddenIds.length} · вернуть
+          </button>
+        )}
+      </div>
 
-          {tools && (
-            <NodeMenu x={tools.x} y={tools.y} onClose={() => setTools(null)}>
-              {wholeTreeHref && (
-                <MenuItem
-                  label="Раскрыть всё древо"
-                  onClick={() => {
-                    setTools(null);
-                    router.push(wholeTreeHref);
-                  }}
-                />
-              )}
-              {canEdit && (
-                <MenuItem
-                  label="Добавить человека"
-                  disabled={pending}
-                  onClick={() => {
-                    setTools(null);
-                    router.push(`/tree/${treeId}/person/new`);
-                  }}
-                />
-              )}
-              <MenuItem
-                label={maleLineOnly ? "Показать всех родственников" : "Только мужская линия"}
-                onClick={() => {
-                  setTools(null);
-                  toggleMaleLine();
-                }}
-              />
-              {canEdit && (
-                <MenuItem
-                  label="Выстроить по поколениям"
-                  onClick={() => {
-                    setTools(null);
-                    arrange();
-                  }}
-                />
-              )}
-              <MenuItem
-                label={exporting ? "Собираем картинку…" : "Скачать картинку"}
-                disabled={exporting}
-                onClick={() => {
-                  setTools(null);
-                  exportPng();
-                }}
-              />
-            </NodeMenu>
-          )}
-        </div>
-
-        <div className="pointer-events-auto hidden flex-col gap-2.5 rounded-2xl border border-mist-200 bg-surface/95 p-2.5 shadow-lift backdrop-blur sm:flex">
-          {wholeTreeHref && (
-            <button
-              type="button"
-              onClick={() => router.push(wholeTreeHref)}
-              aria-label="Раскрыть всё древо"
-              title="Раскрыть всё древо"
-              className="grid h-10 w-10 place-items-center rounded-xl text-ink-600 transition-colors
-                         hover:bg-mist-100 hover:text-ink-900"
-            >
-              <IconExpand />
-            </button>
-          )}
+      {/* Док действий: стеклянная панель снизу по центру, как в студии.
+          Состав — «Добавить · Фильтр · Экспорт»: раскладка автоматическая,
+          отдельной кнопки у неё нет. На телефоне это та же панель-пилюля
+          (см. .studio-dock и DOCK_BTN) вместо прежней свёрнутой кнопки.
+          Узкому десктопу (640–899px) панель мешала бы парящему инспектору,
+          поэтому там док центрируется в свободной части холста; от 900px —
+          по центру окна, как в прототипе. */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-[calc(12px+env(safe-area-inset-bottom))] z-10 flex justify-center sm:bottom-3 sm:pr-[344px] min-[900px]:pr-0">
+        <div
+          className="studio-dock pointer-events-auto max-sm:h-[58px] max-sm:gap-0.5 max-sm:rounded-full max-sm:p-1.5"
+          role="toolbar"
+          aria-label="Действия с древом"
+        >
           {canEdit && (
             <button
               type="button"
@@ -635,37 +831,31 @@ function Canvas({
               disabled={pending}
               aria-label="Добавить человека"
               title="Добавить человека"
-              className="grid h-10 w-10 place-items-center rounded-xl text-ink-600 transition-colors
-                         hover:bg-mist-100 hover:text-ink-900 disabled:pointer-events-none disabled:opacity-45"
+              className={DOCK_BTN}
             >
               <IconAdd />
-            </button>
-          )}
-          {canEdit && (
-            <button
-              type="button"
-              onClick={arrange}
-              aria-label="Выстроить по поколениям"
-              title="Выстроить по поколениям"
-              className="grid h-10 w-10 place-items-center rounded-xl text-ink-600 transition-colors
-                         hover:bg-mist-100 hover:text-ink-900"
-            >
-              <IconLayout />
+              <span>Добавить</span>
             </button>
           )}
           <button
             type="button"
             onClick={toggleMaleLine}
             aria-pressed={maleLineOnly}
-            aria-label={maleLineOnly ? "Показать всех родственников" : "Показать мужскую линию"}
-            title={maleLineOnly ? "Показать всех родственников" : "Только мужская линия"}
-            className={`grid h-10 w-10 place-items-center rounded-xl transition-colors ${
-              maleLineOnly
-                ? "bg-brass-500 text-ink-900"
-                : "text-ink-600 hover:bg-mist-100 hover:text-ink-900"
-            }`}
+            aria-label={maleLineOnly ? "Показать всех родственников" : "Фильтр: мужская линия"}
+            title={maleLineOnly ? "Показать всех родственников" : "Фильтр: только мужская линия"}
+            className={`${DOCK_BTN} ${maleLineOnly ? DOCK_BTN_ON : ""}`}
           >
-            <IconMaleLine />
+            <span className="relative block">
+              <IconFilter />
+              <i
+                aria-hidden="true"
+                className="absolute -right-3 -top-2 min-w-[16px] rounded-full px-1 text-[10px] font-semibold not-italic leading-4"
+                style={{ background: "var(--p-fill)", color: "var(--p-on-fill)" }}
+              >
+                {maleLineCount}
+              </i>
+            </span>
+            <span>Фильтр</span>
           </button>
           <button
             type="button"
@@ -673,20 +863,82 @@ function Canvas({
             disabled={exporting}
             aria-label="Скачать картинку"
             title={exporting ? "Собираем картинку…" : "Скачать картинку"}
-            className="grid h-10 w-10 place-items-center rounded-xl text-ink-600 transition-colors
-                       hover:bg-mist-100 hover:text-ink-900 disabled:pointer-events-none disabled:opacity-45"
+            className={DOCK_BTN}
           >
             <IconDownload />
+            <span>Экспорт</span>
           </button>
         </div>
       </div>
 
-      {/* Включённый фильтр: видно, что показано, и легко вернуть всех */}
+      {/* Мультивыделение: сколько выбрано и что с этим можно сделать.
+          Только отображение — данные не меняются. Пилюля центрируется в
+          свободной части холста: справа парит инспектор, под него не заезжаем.
+          На телефоне пилюля скрыта: её перекрывает нижний лист инспектора,
+          а те же три действия лежат внутри листа (см. Inspector). */}
+      {selectedIds.length > 1 && (
+        <div className="absolute bottom-[152px] left-1/2 z-20 hidden max-w-[calc(100%-24px)] -translate-x-1/2 items-center gap-1.5 rounded-[14px] border border-[var(--p-line)] bg-[var(--p-glass)] px-3 py-1.5 shadow-[var(--shadow-lift)] backdrop-blur-[14px] sm:flex sm:max-w-[calc(100%-368px)] sm:left-[calc((100%-344px)/2)] sm:gap-2 lg:bottom-[86px] lg:left-[calc(240px+(100%-584px)/2)] lg:max-w-[calc(100%-608px)]">
+          <b className="whitespace-nowrap text-[13px] font-medium text-brass-ink">
+            Выбрано: {selectedIds.length}
+          </b>
+          <span className="hidden max-w-[200px] truncate text-[12px] text-ink-400 sm:block">
+            {selectedIds
+              .map((id) => {
+                const person = persons.find((p) => p.id === id);
+                return person ? shortName(person) : "";
+              })
+              .filter(Boolean)
+              .join(", ")}
+          </span>
+          <button
+            type="button"
+            onClick={() => router.push(`/tree/${treeId}/branch/${selectedIds[0]}`)}
+            disabled={!branchable.has(selectedIds[0])}
+            title={
+              branchable.has(selectedIds[0])
+                ? "Показать ветвь первого выбранного"
+                : "У первого выбранного нет супругов и детей"
+            }
+            className="flex h-8 items-center gap-1.5 rounded-[10px] border border-[var(--p-line)] bg-[var(--p-field-bg)] px-2.5 text-[12.5px] text-ink-600 transition-colors hover:bg-[var(--p-hover-bg)] hover:text-ink-800 disabled:opacity-45"
+          >
+            <IconBranch />
+            <span className="hidden sm:inline">Показать ветвь</span>
+          </button>
+          <button
+            type="button"
+            onClick={hideSelected}
+            title="Скрыть на холсте — только отображение"
+            className="flex h-8 items-center gap-1.5 rounded-[10px] border border-[var(--p-line)] bg-[var(--p-field-bg)] px-2.5 text-[12.5px] text-ink-600 transition-colors hover:bg-[var(--p-hover-bg)] hover:text-ink-800"
+          >
+            <IconEyeOff />
+            <span className="hidden sm:inline">Скрыть на холсте</span>
+          </button>
+          <button
+            type="button"
+            onClick={clearSelection}
+            title="Снять выделение"
+            aria-label="Снять выделение"
+            className="flex h-8 items-center gap-1.5 rounded-[10px] border border-[var(--p-line)] bg-[var(--p-field-bg)] px-2.5 text-[12.5px] text-ink-600 transition-colors hover:bg-[var(--p-hover-bg)] hover:text-ink-800"
+          >
+            <IconClose />
+            <span className="hidden sm:inline">Снять</span>
+          </button>
+        </div>
+      )}
+
+      {/* Включённый фильтр: чип «Мужская линия» рядом с холстом — видно, что
+          показано, и легко вернуть всех */}
       {maleLineOnly && (
         <button
           type="button"
           onClick={toggleMaleLine}
-          className="absolute left-1/2 top-3 flex -translate-x-1/2 items-center gap-2 rounded-full border border-brass-500/50 bg-brass-500/15 px-3 py-1.5 text-[13px] text-ink-700 shadow-sm backdrop-blur"
+          title="Показать всех родственников"
+          style={{
+            borderColor: "var(--p-acc-line)",
+            background: "var(--p-acc-bg)",
+            color: "var(--p-brass-ink)",
+          }}
+          className="studio-chip absolute left-1/2 top-3 z-10 -translate-x-1/2 shadow-[var(--shadow-lift)]"
         >
           <IconMaleLine />
           Мужская линия: {shownPersons.length} {peopleWord(shownPersons.length)}
@@ -694,16 +946,45 @@ function Canvas({
         </button>
       )}
 
-      {/* Легенда */}
-      <div className="pointer-events-none absolute right-3 top-3 hidden rounded-xl border border-mist-200 bg-surface/95 px-3 py-2.5 text-[12px] text-ink-500 shadow-sm sm:block">
-        <span className="flex items-center gap-2">
-          <span className="h-0.5 w-6 rounded bg-canvas-line" /> родитель — ребёнок
-        </span>
-        <span className="mt-1.5 flex items-center gap-2">
-          <span className="h-0.5 w-6 rounded border-t-2 border-dashed border-bond-400" /> супруги
-        </span>
-      </div>
+      {/* Инспектор выделенного человека: панель справа или нижний лист.
+          Пока никто не выбран, панели нет вовсе. */}
+      <Inspector
+        persons={persons}
+        relationships={relationships}
+        selectedIds={selectedIds}
+        changes={changes}
+        canEdit={canEdit}
+        photoUrlFor={(person) => publicUrl(SUPABASE_URL, "photos", person.photo_path)}
+        branchable={branchable}
+        onSelect={selectOnly}
+        onOpenCard={(id) => router.push(`/tree/${treeId}/person/${id}`)}
+        onEditCard={(id) => router.push(`/tree/${treeId}/person/${id}#person-form`)}
+        onBranch={(id) => router.push(`/tree/${treeId}/branch/${id}`)}
+        onAddRelative={(id: string, relation: NewRelative, gender?: "male" | "female") =>
+          // пол передаём только для «Сын»/«Дочь»: без него ссылка та же, что была
+          router.push(
+            `/tree/${treeId}/person/new?relateTo=${id}&relation=${relation}` +
+              (gender ? `&gender=${gender}` : "")
+          )
+        }
+        onHide={(ids) => {
+          setHiddenIds((prev) => [...new Set([...prev, ...ids])]);
+          applySelection([]);
+          toast.success(`Скрыто на холсте: ${ids.length}`);
+        }}
+        onClear={clearSelection}
+      />
 
+      {/* Командная палитра: ⌘K, кнопка поиска в шапке, ?palette=1 */}
+      <CommandPalette
+        open={paletteOpen}
+        onClose={closePalette}
+        persons={visiblePersons}
+        relationshipsCount={visibleRelationships.length}
+        actions={paletteActions}
+        onPickPerson={selectOnly}
+        onPickPlace={selectPlace}
+      />
     </div>
   );
 }
@@ -737,7 +1018,7 @@ function withCaption(
       ctx.fillStyle = colors.note;
       ctx.font = "400 26px system-ui, sans-serif";
       ctx.fillText(
-        `Составлено в Родослове · ${new Date().toLocaleDateString("ru-RU")}`,
+        `Составлено в Torlmud · ${new Date().toLocaleDateString("ru-RU")}`,
         canvas.width / 2,
         canvas.height - 52
       );

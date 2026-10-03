@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Torlmood — Холст-студия: лончер прототипа</title>
+<style>
+/* =====================================================================
+   Лончер прототипа «Холст-студия». Один файл, свои стили, без библиотек.
+   Цвета совпадают с палитрами studio.html — светлой и тёмной.
+   Блоки: 01 токены · 02 каркас · 03 секции · 04 карточки состояний ·
+          05 горячие клавиши · 06 адаптив
+   ===================================================================== */
+
+/* 01. Токены */
+:root, :root[data-theme="dark"] {
+  --canvas: #0d131f;
+  --surface: #19202d;
+  --glass: rgba(25, 32, 45, .72);
+  --line: rgba(226, 235, 250, .12);
+  --line-2: rgba(226, 235, 250, .07);
+  --text: #e9eef8;
+  --text-2: #a8b5cc;
+  --text-3: #7f8da6;
+  --brass: #d3ab35;
+  --brass-ink: #e7cd75;
+  --acc-bg: rgba(211, 171, 53, .16);
+  --acc-line: rgba(211, 171, 53, .55);
+  --male: #6f9cc4;
+  --female: #cf8b4a;
+  --row: rgba(255, 255, 255, .04);
+  --shadow: 0 26px 60px -34px rgba(0, 0, 0, .9);
+  color-scheme: dark;
+}
+:root[data-theme="light"] {
+  --canvas: #f1f3f5;
+  --surface: #ffffff;
+  --glass: rgba(255, 255, 255, .78);
+  --line: rgba(15, 23, 42, .10);
+  --line-2: rgba(15, 23, 42, .06);
+  --text: #0f172a;
+  --text-2: #475569;
+  --text-3: #64748b;
+  --brass: #a16207;
+  --brass-ink: #a16207;
+  --acc-bg: rgba(245, 197, 66, .30);
+  --acc-line: rgba(161, 98, 7, .55);
+  --male: #3b82f6;
+  --female: #ea8c33;
+  --row: rgba(15, 23, 42, .03);
+  --shadow: 0 10px 26px -14px rgba(15, 23, 42, .22);
+  color-scheme: light;
+}
+
+/* 02. Каркас */
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100%;
+  background:
+    radial-gradient(90% 60% at 8% -12%, color-mix(in srgb, var(--male) 14%, transparent), transparent 62%),
+    radial-gradient(70% 50% at 100% 0, color-mix(in srgb, var(--brass) 12%, transparent), transparent 60%),
+    var(--canvas);
+  color: var(--text);
+  font-family: "Golos Text", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1080px; margin: 0 auto; padding: 28px 20px 72px; }
+a { color: var(--brass-ink); }
+a:hover { color: var(--text); }
+h1, h2, h3, p, ul { margin: 0; }
+ul { padding: 0; list-style: none; }
+
+.top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--glass);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: var(--shadow);
+}
+.mark {
+  display: grid;
+  place-items: center;
+  width: 30px; height: 30px;
+  flex: none;
+  border: 1px solid var(--acc-line);
+  border-radius: 9px;
+  background: var(--acc-bg);
+  color: var(--brass-ink);
+  font-family: "Literata", ui-serif, Georgia, serif;
+  font-size: 14px;
+}
+.top__t { flex: 1; min-width: 0; font-size: 14px; overflow: hidden; }
+.top__t b { font-weight: 500; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.top__s { display: block; font-size: 11.5px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 12px;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--row);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease;
+}
+.btn:hover { background: var(--acc-bg); border-color: var(--acc-line); }
+.btn:focus-visible, a:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; border-radius: 8px; }
+
+/* 03. Секции */
+header.doc { margin: 30px 0 26px; }
+.eyebrow {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--brass-ink);
+}
+h1 {
+  margin: 8px 0 10px;
+  font-family: "Literata", ui-serif, Georgia, serif;
+  font-weight: 500;
+  font-size: clamp(26px, 4.4vw, 40px);
+  line-height: 1.1;
+  letter-spacing: -.02em;
+}
+.lead { max-width: 74ch; color: var(--text-2); }
+.lead + .lead { margin-top: 10px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--row);
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.chip b { color: var(--text); font-weight: 500; }
+
+section { margin-top: 34px; }
+h2 {
+  font-family: "Literata", ui-serif, Georgia, serif;
+  font-weight: 500;
+  font-size: 21px;
+  letter-spacing: -.01em;
+  margin-bottom: 6px;
+}
+.sub { color: var(--text-3); font-size: 13.5px; margin-bottom: 16px; }
+
+/* 04. Карточки состояний */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--glass);
+  box-shadow: var(--shadow);
+}
+.card__n {
+  font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.card h3 {
+  font-family: "Literata", ui-serif, Georgia, serif;
+  font-weight: 500;
+  font-size: 16.5px;
+}
+.card p { font-size: 13px; color: var(--text-2); }
+.card__acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--acc-line);
+  border-radius: 999px;
+  background: var(--acc-bg);
+  color: var(--brass-ink);
+  font-size: 12.5px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.pill:hover { background: var(--acc-bg); color: var(--text); text-decoration: none; }
+.pill--ghost { border-color: var(--line); background: var(--row); color: var(--text-2); }
+.pill--ghost:hover { border-color: var(--acc-line); color: var(--text); }
+code, .mono {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+}
+code {
+  padding: 1px 6px;
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  background: var(--row);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+/* 05. Горячие клавиши */
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th, td { padding: 9px 10px; text-align: left; border-bottom: 1px solid var(--line-2); vertical-align: top; }
+th { font-size: 10.5px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--text-3); }
+tr:last-child td { border-bottom: 0; }
+.keys { display: flex; flex-wrap: wrap; gap: 6px; }
+kbd {
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  background: var(--row);
+  font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+.panel {
+  padding: 4px 16px 8px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--glass);
+  box-shadow: var(--shadow);
+  overflow-x: auto;
+}
+.notes { display: grid; gap: 10px; }
+.note {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  background: var(--row);
+  font-size: 13.5px;
+  color: var(--text-2);
+}
+.note b { color: var(--text); font-weight: 500; }
+.note i { font-style: normal; color: var(--brass-ink); }
+footer.doc { margin-top: 40px; font-size: 12.5px; color: var(--text-3); }
+
+/* 06. Адаптив */
+@media (max-width: 700px) {
+  .wrap { padding: 18px 14px 56px; }
+  .top { flex-wrap: wrap; gap: 8px 10px; }
+  .top__t { flex: 1 1 auto; }
+  .top__t b { white-space: normal; }
+  .top__s { display: none; }
+  .top .btn { flex: 1 1 auto; justify-content: center; height: 32px; font-size: 12.5px; }
+  .grid { grid-template-columns: 1fr; }
+  th:nth-child(1), td:nth-child(1) { width: 40%; }
+  h1 { font-size: 26px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ================= ШАПКА ЛОНЧЕРА ================= -->
+  <div class="top">
+    <span class="mark" aria-hidden="true">T</span>
+    <span class="top__t"><b>Torlmood · Холст-студия</b><span class="top__s">Живой прототип интерфейса · ui-variants/proto</span></span>
+    <button class="btn" type="button" id="themeBtn">Тема: тёмная</button>
+    <a class="btn" href="studio.html?theme=dark&amp;view=canvas">Открыть прототип</a>
+  </div>
+
+  <!-- ================= ЧТО ЭТО ================= -->
+  <header class="doc">
+    <p class="eyebrow">Направление B · живой прототип</p>
+    <h1>Холст-студия: кликабельный прототип</h1>
+    <p class="lead">
+      Это рабочая тестовая страница, а не статичный макет: холст можно таскать, карточки —
+      выбирать, тему — переключать, а командная палитра ⌘K ищет людей и выполняет действия.
+      Данные взяты из <code>SPEC.md</code>, раздел 3 — 15 человек семьи Ковалёвых–Соколовых.
+    </p>
+    <p class="lead">
+      Всё живёт в одном файле <a href="studio.html">studio.html</a>: HTML, CSS и ванильный JS,
+      без библиотек, сборки и растровых картинок. Открывается двойным кликом по файлу —
+      сервер не нужен, интернет тоже.
+    </p>
+    <div class="chips">
+      <span class="chip"><b>Смена темы</b> светлая · тёмная · как в системе</span>
+      <span class="chip"><b>Холст</b> таскать, зум 25–150%, уместить</span>
+      <span class="chip"><b>Выделение</b> клик, Shift + клик, Tab</span>
+      <span class="chip"><b>Инспектор</b> факты, семья, история</span>
+      <span class="chip"><b>Палитра ⌘K</b> люди, места, действия</span>
+      <span class="chip"><b>Док</b> добавить, связь, фильтр, экспорт</span>
+    </div>
+  </header>
+
+  <!-- ================= СОСТОЯНИЯ ================= -->
+  <section id="states">
+    <h2>Состояния прототипа</h2>
+    <p class="sub">
+      Каждое состояние — обычная ссылка с параметрами в адресе. Их можно открывать и снимать
+      скриншотами; состояние всегда пишется в адрес через <code>history.replaceState</code>.
+    </p>
+    <div class="grid">
+
+      <article class="card">
+        <span class="card__n">01 · холст</span>
+        <h3>Тёмный холст</h3>
+        <p>Древо из 15 человек, связи шиной и скобкой, кромка по полу, док, инспектор пуст.</p>
+        <div class="card__acts">
+          <a class="pill" href="studio.html?theme=dark&amp;view=canvas">Открыть</a>
+          <a class="pill pill--ghost" href="studio.html?theme=dark&amp;view=canvas&amp;male=1">С мужской линией</a>
+        </div>
+      </article>
+
+      <article class="card">
+        <span class="card__n">02 · холст</span>
+        <h3>Светлый холст</h3>
+        <p>Белые поверхности, стекло на тени и границе, тёмный янтарь вместо латуни.</p>
+        <div class="card__acts">
+          <a class="pill" href="studio.html?theme=light&amp;view=canvas">Открыть</a>
+          <a class="pill pill--ghost" href="studio.html?theme=system&amp;view=canvas">Как в системе</a>
+        </div>
+      </article>
+
+      <article class="card">
+        <span class="card__n">03 · выделение</span>
+        <h3>Выбранный человек</h3>
+        <p>Янтарное кольцо, инспектор справа: факты, семья, история. На телефоне — нижний лист.</p>
+        <div class="card__acts">
+          <a class="pill" href="studio.html?theme=light&amp;view=canvas&amp;person=arkady">Аркадий Петрович</a>
+          <a class="pill pill--ghost" href="studio.html?theme=dark&amp;view=canvas&amp;person=nina">Нина Борисовна</a>
+        </div>
+      </article>
+
+      <article class="card">
+        <span class="card__n">04 · палитра</span>
+        <h3>Командная палитра ⌘K</h3>
+        <p>Группы «Люди · Места · Действия», нечёткий поиск, стрелки и Enter, Esc закрывает.</p>
+        <div class="card__acts">
+          <a class="pill" href="studio.html?theme=dark&amp;view=canvas&amp;palette=1">Открыть в тёмной</a>
+          <a class="pill pill--ghost" href="studio.html?theme=light&amp;view=canvas&amp;palette=1">В светлой</a>
+        </div>
+      </article>
+
+      <article class="card">
+        <span class="card__n">05 · список</span>
+        <h3>Люди</h3>
+        <p>15 человек: имя, годы, поколение, место. Поиск по имени и месту, фильтры «Мужчины», «Женщины», «Без даты».</p>
+        <div class="card__acts">
+          <a class="pill" href="studio.html?theme=light&amp;view=people">Открыть</a>
+        </div>
+      </article>
+
+      <article class="card">
+        <span class="card__n">06 · лента</span>
+        <h3>История рода</h3>
+        <p>12 событий: карточки, связи, участники, приглашения, импорт GEDCOM. Фильтры по типу.</p>
+        <div class="card__acts">
+          <a class="pill" href="studio.html?theme=dark&amp;view=history">Открыть</a>
+        </div>
+      </article>
+
+      <article class="card">
+        <span class="card__n">07 · дашборд</span>
+        <h3>Древа</h3>
+        <p>Плитка древа с миниатюрой, приглашение «3 из 10 переходов», ближайшие даты, недавние изменения.</p>
+        <div class="card__acts">
+          <a class="pill" href="studio.html?theme=light&amp;view=dashboard">В светлой</a>
+          <a class="pill pill--ghost" href="studio.html?theme=dark&amp;view=dashboard">В тёмной</a>
+        </div>
+      </article>
+
+      <article class="card">
+        <span class="card__n">08 · связка</span>
+        <h3>Всё сразу</h3>
+        <p>Светлая тема, список людей, выбранная Нина Борисовна и включённая мужская линия — проверка того, что параметры не мешают друг другу.</p>
+        <div class="card__acts">
+          <a class="pill" href="studio.html?theme=light&amp;view=people&amp;person=nina&amp;male=1">Открыть</a>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ================= ЧТО ПОКЛИКАТЬ ================= -->
+  <section id="actions">
+    <h2>Что можно покликать</h2>
+    <p class="sub">Короткий маршрут, чтобы за минуту увидеть всё живое в прототипе.</p>
+    <div class="notes">
+      <p class="note"><i>1</i><span><b>Подвигайте холст.</b> Тяните мышью или пальцем, крутите колесо, жмите «+ / − / Уместить». Зум ограничен 25–150%.</span></p>
+      <p class="note"><i>2</i><span><b>Выберите человека.</b> Клик — янтарное кольцо и инспектор. Shift + клик — ещё одного, появится «Выбрано: N» с массовыми действиями. Двойной клик — карточка человека.</span></p>
+      <p class="note"><i>3</i><span><b>Смените тему.</b> Сегмент «Светлая · Тёмная · Как в системе» в шапке или клавиша T. Выбранный человек, вид и зум сохранятся; тема запишется в localStorage.</span></p>
+      <p class="note"><i>4</i><span><b>Откройте палитру.</b> ⌘K, Ctrl + K или клик по поиску: «сокол», «Рязань», «экспорт», «тему» — стрелки, Enter, Esc.</span></p>
+      <p class="note"><i>5</i><span><b>Включите мужскую линию.</b> Кнопка «Фильтр» в доке или клавиша F: остаются Григорий → Пётр → Аркадий → Илья → Тимур, связи подсвечиваются латунью.</span></p>
+      <p class="note"><i>6</i><span><b>Добавьте человека или связь.</b> «Добавить» в доке — форма имени, годов и пола: карточка встанет рядом с выделенным и попадёт в историю. «Связь» — выберите двоих, тип переключается на «супруги»; Esc отменяет.</span></p>
+      <p class="note"><i>7</i><span><b>Проверьте адаптив.</b> Сузьте окно до 390px: панели станут нижними листами, док — пилюлей, горизонтальной прокрутки не появится.</span></p>
+    </div>
+  </section>
+
+  <!-- ================= КЛАВИШИ ================= -->
+  <section id="keys">
+    <h2>Горячие клавиши</h2>
+    <p class="sub">Работают, когда фокус не в поле ввода. Esc снимает текущий режим по шагам.</p>
+    <div class="panel">
+      <table>
+        <thead>
+          <tr><th>Клавиши</th><th>Что делают</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span class="keys"><kbd>⌘K</kbd><kbd>Ctrl K</kbd></span></td><td>Командная палитра: люди, места, действия</td></tr>
+          <tr><td><span class="keys"><kbd>↑</kbd><kbd>↓</kbd><kbd>↵</kbd></span></td><td>Выбор и открытие строки в палитре</td></tr>
+          <tr><td><span class="keys"><kbd>T</kbd></span></td><td>Тема по кругу: светлая → тёмная → как в системе</td></tr>
+          <tr><td><span class="keys"><kbd>F</kbd></span></td><td>Фильтр «Мужская линия»</td></tr>
+          <tr><td><span class="keys"><kbd>N</kbd></span></td><td>Форма «Добавить человека»</td></tr>
+          <tr><td><span class="keys"><kbd>E</kbd></span></td><td>Уведомление об экспорте GEDCOM</td></tr>
+          <tr><td><span class="keys"><kbd>0</kbd></span></td><td>Уместить древо в окне</td></tr>
+          <tr><td><span class="keys"><kbd>+</kbd><kbd>−</kbd></span></td><td>Зум холста</td></tr>
+          <tr><td><span class="keys"><kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd></span></td><td>Сдвинуть холст (со Shift — крупнее)</td></tr>
+          <tr><td><span class="keys"><kbd>Tab</kbd><kbd>↵</kbd></span></td><td>Обход карточек холста с клавиатуры и выбор</td></tr>
+          <tr><td><span class="keys"><kbd>Shift</kbd> + клик</span></td><td>Добавить человека к выделению</td></tr>
+          <tr><td><span class="keys"><kbd>Esc</kbd></span></td><td>Карточка → режим связи → форма → выделение</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ================= ПАРАМЕТРЫ АДРЕСА ================= -->
+  <section id="url">
+    <h2>Параметры адреса</h2>
+    <p class="sub">
+      Порядок не важен, неизвестные значения игнорируются, битые не ломают страницу.
+      Пример: <code>studio.html?theme=light&amp;view=canvas&amp;person=arkady&amp;male=1</code>
+    </p>
+    <div class="panel">
+      <table>
+        <thead>
+          <tr><th>Параметр</th><th>Значения</th><th>Что делает</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>theme</code></td><td><code>light</code> · <code>dark</code> · <code>system</code></td><td>Тема оформления; <code>system</code> следит за <code>prefers-color-scheme</code></td></tr>
+          <tr><td><code>view</code></td><td><code>dashboard</code> · <code>canvas</code> · <code>people</code> · <code>history</code></td><td>Активный экран</td></tr>
+          <tr><td><code>person</code></td><td>id человека: <code>arkady</code>, <code>nina</code>, <code>ilya</code>…</td><td>Выделяет человека и подводит к нему холст</td></tr>
+          <tr><td><code>palette</code></td><td><code>1</code></td><td>Открывает командную палитру ⌘K</td></tr>
+          <tr><td><code>male</code></td><td><code>1</code></td><td>Включает фильтр «Мужская линия»</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ================= ОГРАНИЧЕНИЯ ================= -->
+  <section id="limits">
+    <h2>Честные ограничения</h2>
+    <div class="notes">
+      <p class="note"><i>·</i><span><b>Экспорт ничего не рисует.</b> «Экспорт» и «Экспорт GEDCOM» только показывают уведомление со счётчиком карточек — файла не появляется.</span></p>
+      <p class="note"><i>·</i><span><b>Данные не сохраняются.</b> Новые люди, связи и события живут в памяти страницы: перезагрузка возвращает исходные 15 человек. В localStorage лежит только тема.</span></p>
+      <p class="note"><i>·</i><span><b>Это прототип, а не продукт.</b> Правка карточек, фотографии, слияние дублей и права доступа не реализованы — кнопки отвечают уведомлением.</span></p>
+    </div>
+  </section>
+
+  <footer class="doc">
+    Бренд Torlmood · <span class="mono">torlmood.ru/tree/kovalevy</span> · шрифты Literata, Golos Text и JetBrains Mono
+    подключены по желанию — без интернета прототип работает на системных.
+  </footer>
+</div>
+
+<script>
+/* Лончер: только переключение темы самого лончера (та же пара палитр, что у прототипа). */
+(function () {
+  var KEY = 'torlmood.proto.launcher-theme';
+  var btn = document.getElementById('themeBtn');
+  var order = ['dark', 'light'];
+
+  function apply(t) {
+    document.documentElement.setAttribute('data-theme', t);
+    btn.textContent = 'Тема: ' + (t === 'dark' ? 'тёмная' : 'светлая');
+    try { localStorage.setItem(KEY, t); } catch (e) {}
+  }
+  function read() {
+    try { return localStorage.getItem(KEY); } catch (e) { return null; }
+  }
+  var saved = read();
+  if (saved && order.indexOf(saved) >= 0) apply(saved);
+  else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) apply('light');
+  else apply('dark');
+
+  btn.addEventListener('click', function () {
+    apply(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  });
+})();
+</script>
+</body>
+</html>

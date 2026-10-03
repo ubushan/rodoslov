@@ -1,0 +1,2363 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Torlmood — вариант B, светлая тема: Холст-студия</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Literata:wght@400;500;600&family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="base.css">
+<style>
+/* =====================================================================
+   Вариант B, СВЕТЛАЯ ТЕМА. «Холст-студия» на светлом холсте.
+   Разметка, геометрия и все шесть экранов — один в один как в тёмной
+   версии (b-canvas-studio.html): карточка 176×100, внутри пары 18px,
+   между парами 54px, шаг поколений 122px. Переписан только цветовой
+   слой и то, что от него зависит — тени, стекло, границы, контраст.
+
+   ЧТО ОТЛИЧАЕТСЯ ОТ ТЁМНОЙ ВЕРСИИ:
+   01 — холст #F1F3F5 вместо #0d131f; точки сетки тёмные на светлом;
+   02 — стекло белое rgba(255,255,255,.72): на светлом высоту держат
+        тень и граница, свечения нет вовсе;
+   03 — вместо латуни тёмный янтарь #A16207 (текст и иконки), заливки
+        #F5C542/#EAB308 всегда с тёмным текстом #0F172A внутри;
+   04 — карточка белая, выделение — кольцо 0 0 0 3px rgba(161,98,7,.18)
+        вместо неонового свечения; кромка по полу #3B82F6 / #EA8C33;
+   05 — связи тёмные полупрозрачные rgba(15,23,42,.28-.38);
+   06-09 — активные состояния: белая пилюля с янтарной границей,
+        затемнение под палитрой мягкое rgba(15,23,42,.28);
+   10 — фоновая ветвь приглушена на 70%, а не на 42% (на белом 42%
+        почти растворяет карточку);
+   11-13 — лист снизу белый, тени короткие и мягкие, ручка тёмная.
+
+   Весь интерфейс приложения — только с префиксом vb-. Классы base.css
+   (.topbar, .wrap, .frame, .screen, .phone, .stage, .shot, .notes,
+   .swatches и т. д.) не переопределяются: они задают светлую «раму»
+   документа, внутри которой живёт интерфейс варианта.
+   ===================================================================== */
+
+/* ---------------------------------------------------------------------
+   01. Каркас экрана: холст, сетка точек, свечение — светлая тема
+   --------------------------------------------------------------------- */
+
+.vb-app {
+  /* Палитра тёмной темы проекта (src/app/globals.css, [data-theme="dark"]) */
+  --vb-canvas: #F1F3F5;
+  --vb-surface: #FFFFFF;
+  --vb-glass: rgba(255, 255, 255, .72);
+  --vb-glass-2: rgba(255, 255, 255, .94);
+  --vb-line: rgba(15, 23, 42, .10);
+  --vb-line-2: rgba(15, 23, 42, .06);
+  --vb-text: #0F172A;
+  --vb-text-2: #64748B;
+  --vb-text-3: #64748B;
+  --vb-brass: #A16207;
+  --vb-brass-2: #CA8A04;
+  --vb-brass-ink: #A16207;
+  --vb-male: #3B82F6;
+  --vb-female: #EA8C33;
+  /* светлая тема: заливки акцента всегда с тёмным текстом внутри */
+  --vb-fill: #F5C542;
+  --vb-fill-2: #EAB308;
+  --vb-on-fill: #0F172A;
+  --vb-line-3: rgba(15, 23, 42, .16);
+  --vb-shadow-1: 0 1px 2px rgba(15, 23, 42, .08);
+  --vb-shadow-2: 0 8px 20px -8px rgba(15, 23, 42, .20);
+  --vb-shadow-glass: 0 10px 26px -14px rgba(15, 23, 42, .22);
+  /* базовая .statusbar берёт цвет из --ink-800: внутри тёмного экрана
+     подменяем переменную только в своём поддереве, base.css не трогаем */
+  --ink-800: #0F172A;
+
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--vb-canvas);
+  color: var(--vb-text);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Ширина фигур: base.css переносит ряды по max-content, а длинная подпись
+   иначе растягивает фигуру и телефоны встают по одному в строку. */
+.vb-shot--desk { width: 1284px; }
+.vb-shot--phone { width: 390px; flex: none; }
+
+.vb-app--dash {
+  background:
+    radial-gradient(90% 60% at 8% -12%, rgba(59, 130, 246, .10), transparent 62%),
+    radial-gradient(70% 50% at 100% 0, rgba(234, 179, 8, .12), transparent 60%),
+    #F1F3F5;
+}
+
+.vb-grid {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background-image: radial-gradient(circle at 1px 1px, rgba(15, 23, 42, .10) 1px, transparent 0);
+  background-size: 26px 26px;
+  /* сдвиг на половину шага: точки не липнут к краям и не читаются линией */
+  background-position: 13px 13px;
+}
+
+.vb-halo {
+  position: absolute;
+  left: 26%;
+  right: -12%;
+  bottom: -26%;
+  height: 460px;
+  z-index: 0;
+  background: radial-gradient(50% 50% at 50% 50%, rgba(234, 179, 8, .12), transparent 70%);
+  filter: blur(26px);
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------------------
+   02. Стекло, кнопки, чипы, бейджи, клавиши
+   --------------------------------------------------------------------- */
+
+.vb-panel {
+  background: var(--vb-glass);
+  border: 1px solid var(--vb-line);
+  border-radius: 14px;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  /* светлая тема: высоту держат тень и граница, свечения нет */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .9),
+    var(--vb-shadow-glass);
+}
+
+.vb-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--vb-line);
+  border-radius: 10px;
+  background: #FFFFFF;
+  box-shadow: var(--vb-shadow-1);
+  color: var(--vb-text);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease;
+}
+.vb-btn:hover { background: #F7F8FA; border-color: rgba(15, 23, 42, .20); }
+.vb-btn--brass {
+  background: linear-gradient(180deg, #F5C542, #EAB308);
+  border-color: #EAB308;
+  color: #0F172A;
+  font-weight: 600;
+}
+.vb-btn--brass:hover { background: linear-gradient(180deg, #F7CE5B, #F0BC1E); border-color: #D9A406; }
+.vb-btn--ghost { background: transparent; }
+.vb-btn--icon { width: 36px; padding: 0; }
+.vb-btn--sm { height: 30px; font-size: 12.5px; padding: 0 10px; }
+
+.vb-icc {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--vb-line);
+  border-radius: 9px;
+  background: #FFFFFF;
+  color: var(--vb-text-2);
+  cursor: pointer;
+}
+.vb-icc:hover { color: var(--vb-text); background: #F7F8FA; }
+
+.vb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--vb-line);
+  border-radius: 999px;
+  background: #FFFFFF;
+  font-size: 12px;
+  color: var(--vb-text-2);
+  white-space: nowrap;
+}
+.vb-chip--on {
+  border-color: rgba(161, 98, 7, .45);
+  background: #FEF7E0;
+  color: var(--vb-brass);
+}
+
+.vb-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border: 1px solid var(--vb-line);
+  border-radius: 999px;
+  font-size: 11px;
+  color: var(--vb-text-2);
+  white-space: nowrap;
+}
+.vb-badge--brass {
+  border-color: rgba(161, 98, 7, .45);
+  background: rgba(234, 179, 8, .16);
+  color: var(--vb-brass-ink);
+}
+.vb-badge--male { border-color: rgba(59, 130, 246, .45); color: #2563EB; }
+.vb-badge--female { border-color: rgba(234, 140, 51, .45); color: #B45309; }
+
+.vb-kbd {
+  padding: 2px 6px;
+  border: 1px solid var(--vb-line);
+  border-radius: 6px;
+  background: #FFFFFF;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--vb-text-2);
+}
+
+.vb-hint { font-size: 11.5px; color: var(--vb-text-3); }
+
+/* ---------------------------------------------------------------------
+   03. Верхняя обвязка: навигация, крошки, участники
+   --------------------------------------------------------------------- */
+
+.vb-top {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  right: 16px;
+  z-index: 12;
+  height: 52px;
+  padding: 0 12px 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.vb-top__l, .vb-top__r { display: flex; align-items: center; gap: 12px; min-width: 0; }
+
+.vb-mark {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border: 1px solid rgba(161, 98, 7, .35);
+  border-radius: 9px;
+  background: radial-gradient(120% 120% at 20% 0, rgba(234, 179, 8, .25), transparent 62%);
+  color: var(--vb-brass-ink);
+  font-family: var(--serif);
+  font-size: 13px;
+}
+
+.vb-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13.5px;
+  color: var(--vb-text-2);
+  white-space: nowrap;
+}
+.vb-crumbs b { color: var(--vb-text); font-weight: 500; }
+.vb-crumb-sep { font-style: normal; color: var(--vb-text-3); }
+
+.vb-nav { display: flex; gap: 4px; }
+.vb-nav__i {
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  font-size: 13px;
+  color: var(--vb-text-2);
+}
+.vb-nav__i--on {
+  border-color: var(--vb-line);
+  background: rgba(15, 23, 42, .05);
+  color: var(--vb-text);
+}
+
+.vb-avs { display: flex; align-items: center; }
+.vb-av {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  margin-left: -8px;
+  border: 2px solid #FFFFFF;
+  border-radius: 50%;
+  color: #0F172A;
+  font-size: 11.5px;
+  font-style: normal;
+  font-weight: 600;
+}
+.vb-av:first-child { margin-left: 0; }
+.vb-av--owner { background: var(--vb-fill); }
+.vb-av--editor { background: #93C5FD; }
+.vb-av--viewer { background: #CBD5E1; }
+.vb-av--more { background: #E2E8F0; color: #475569; font-weight: 500; }
+
+/* ---------------------------------------------------------------------
+   04. Человек на холсте: тёмное стекло, кромка по полу, состояния
+   --------------------------------------------------------------------- */
+
+.vb-board { position: absolute; inset: 0; }
+
+.vb-node {
+  --av: #94A3B8;
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  z-index: 5;
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  grid-template-rows: 26px auto;
+  column-gap: 8px;
+  row-gap: 5px;
+  align-items: center;
+  width: 176px;
+  height: 100px;
+  padding: 8px 10px;
+  overflow: hidden;
+  border: 1px solid var(--vb-line-3);
+  border-radius: 12px;
+  background: #FFFFFF;
+  box-shadow: var(--vb-shadow-1), var(--vb-shadow-2);
+  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+.vb-node--m { --av: var(--vb-male); }
+.vb-node--f { --av: var(--vb-female); }
+
+.vb-node__ph {
+  grid-area: 1 / 1;
+  position: relative;
+  width: 26px;
+  height: 26px;
+  overflow: hidden;
+  border: 1px solid var(--vb-line);
+  border-radius: 50%;
+  background: var(--vb-canvas);
+}
+.vb-node__ph::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--av);
+  transform: translateX(-50%);
+}
+.vb-node__ph::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -1px;
+  width: 16px;
+  height: 9px;
+  border-radius: 8px 8px 0 0;
+  background: var(--av);
+  transform: translateX(-50%);
+}
+
+.vb-node__yr {
+  grid-area: 1 / 2;
+  justify-self: end;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--vb-text-3);
+  font-variant-numeric: tabular-nums;
+}
+.vb-node__nm {
+  grid-area: 2 / 1 / 3 / 3;
+  font-family: var(--serif);
+  font-size: 15px;
+  line-height: 1.06;
+  letter-spacing: -.01em;
+  color: var(--vb-text);
+}
+.vb-node__edge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--av);
+}
+
+.vb-node--hover {
+  border-color: rgba(15, 23, 42, .22);
+  background: #FFFFFF;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .08), 0 18px 34px -14px rgba(15, 23, 42, .30);
+}
+.vb-node--sel {
+  border-color: var(--vb-brass);
+  /* светлая тема: выделение — янтарное кольцо вместо свечения */
+  box-shadow:
+    0 0 0 3px rgba(161, 98, 7, .18),
+    0 1px 2px rgba(15, 23, 42, .06),
+    0 16px 30px -14px rgba(15, 23, 42, .30);
+}
+.vb-node--sel2 { border-color: rgba(161, 98, 7, .55); box-shadow: 0 0 0 2px rgba(161, 98, 7, .14); }
+.vb-node__check {
+  /* галочка мультивыделения — в свободном правом нижнем углу, вне имени и годов */
+  position: absolute;
+  right: 9px;
+  bottom: 7px;
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border: 2px solid #FFFFFF;
+  border-radius: 50%;
+  background: var(--vb-fill-2);
+  color: #0F172A;
+}
+
+/* ---------------------------------------------------------------------
+   05. Связи, миникарта, масштаб
+   --------------------------------------------------------------------- */
+
+.vb-wires { position: absolute; inset: 0; z-index: 2; }
+.vb-wires path {
+  fill: none;
+  stroke: rgba(15, 23, 42, .28);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+.vb-wires .vb-bond { stroke: rgba(15, 23, 42, .38); }
+.vb-wires .vb-glow { stroke: rgba(161, 98, 7, .55); stroke-width: 2; }
+
+.vb-minimap {
+  position: absolute;
+  left: 24px;
+  bottom: 20px;
+  z-index: 8;
+  width: 200px;
+  height: 120px;
+  padding: 10px 12px;
+}
+.vb-mini { display: block; width: 100%; height: 100%; }
+.vb-mini .vb-mini__m { fill: rgba(59, 130, 246, .35); }
+.vb-mini .vb-mini__f { fill: rgba(234, 140, 51, .35); }
+.vb-mini .vb-mini__vp { fill: rgba(234, 179, 8, .10); stroke: rgba(161, 98, 7, .5); stroke-width: 1; stroke-dasharray: 4 4; }
+
+.vb-zoom {
+  position: absolute;
+  left: 24px;
+  bottom: 162px;
+  z-index: 8;
+  width: 44px;
+  padding: 5px;
+  display: grid;
+  gap: 4px;
+}
+.vb-zoom button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--vb-text-2);
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+}
+.vb-zoom button:hover { background: rgba(15, 23, 42, .06); color: var(--vb-text); }
+
+/* ---------------------------------------------------------------------
+   06. Док внизу и счётчик мультивыделения
+   --------------------------------------------------------------------- */
+
+.vb-dock {
+  position: absolute;
+  left: 640px;
+  bottom: 20px;
+  z-index: 14;
+  transform: translateX(-50%);
+  height: 64px;
+  padding: 6px;
+  display: flex;
+  gap: 4px;
+  border-radius: 18px;
+}
+.vb-dock__b {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 64px;
+  height: 52px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: none;
+  color: var(--vb-text-2);
+  font: inherit;
+  font-size: 10.5px;
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.vb-dock__b:hover { background: rgba(15, 23, 42, .06); color: var(--vb-text); }
+.vb-dock__b--on {
+  /* светлая тема: активный пункт — белая пилюля с янтарной границей */
+  border-color: rgba(161, 98, 7, .45);
+  background: #FFFFFF;
+  box-shadow: var(--vb-shadow-1);
+  color: var(--vb-brass);
+}
+.vb-dock__n {
+  position: absolute;
+  top: 5px;
+  right: 12px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--vb-brass);
+  color: #0F172A;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+}
+
+.vb-multi {
+  position: absolute;
+  left: 640px;
+  bottom: 96px;
+  z-index: 14;
+  transform: translateX(-50%);
+  height: 44px;
+  padding: 0 6px 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 14px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.vb-multi b { color: var(--vb-brass-ink); font-weight: 500; }
+.vb-multi__who { color: var(--vb-text-3); font-size: 12px; }
+
+/* ---------------------------------------------------------------------
+   07. Инспектор выделенного человека (320px)
+   --------------------------------------------------------------------- */
+
+.vb-insp {
+  position: absolute;
+  right: 16px;
+  top: 84px;
+  bottom: 16px;
+  z-index: 14;
+  width: 320px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.vb-insp__head { display: flex; gap: 12px; align-items: flex-start; }
+
+.vb-face {
+  --av: #94A3B8;
+  position: relative;
+  flex: none;
+  width: 52px;
+  height: 52px;
+  overflow: hidden;
+  border: 1px solid var(--vb-line);
+  border-radius: 14px;
+  background: linear-gradient(160deg, #F8FAFC, #EEF2F7);
+}
+.vb-face--m { --av: var(--vb-male); }
+.vb-face--f { --av: var(--vb-female); }
+.vb-face::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 11px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--av);
+  transform: translateX(-50%);
+}
+.vb-face::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -2px;
+  width: 34px;
+  height: 20px;
+  border-radius: 12px 12px 0 0;
+  background: var(--av);
+  transform: translateX(-50%);
+}
+.vb-face--lg { width: 64px; height: 64px; border-radius: 16px; }
+.vb-face--lg::before { top: 13px; width: 21px; height: 21px; }
+.vb-face--lg::after { width: 42px; height: 24px; }
+.vb-face--sm { width: 40px; height: 40px; border-radius: 11px; }
+.vb-face--sm::before { top: 8px; width: 13px; height: 13px; }
+.vb-face--sm::after { width: 26px; height: 15px; }
+
+.vb-name {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 18px;
+  line-height: 1.15;
+  letter-spacing: -.015em;
+  color: var(--vb-text);
+}
+.vb-name--lg { font-size: 22px; }
+.vb-years {
+  display: block;
+  margin-top: 3px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--vb-brass-ink);
+  font-variant-numeric: tabular-nums;
+}
+.vb-place { display: block; margin-top: 2px; font-size: 12px; color: var(--vb-text-3); }
+.vb-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+
+.vb-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--vb-line); }
+.vb-tab {
+  margin-bottom: -1px;
+  padding: 8px 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--vb-text-2);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.vb-tab:hover { color: var(--vb-text); }
+.vb-tab[aria-selected="true"] { border-bottom-color: var(--vb-brass); color: var(--vb-text); }
+.vb-tab__n { margin-left: 5px; font-family: var(--mono); font-size: 11px; color: var(--vb-text-3); }
+.vb-tabpanel[hidden] { display: none; }
+
+.vb-dl { margin: 0; }
+.vb-dl__r {
+  display: grid;
+  grid-template-columns: 104px 1fr;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--vb-line-2);
+  font-size: 13px;
+}
+.vb-dl__r:first-child { border-top: 0; }
+.vb-dl__k { font-size: 12.5px; color: var(--vb-text-3); }
+.vb-dl__v { color: var(--vb-text); }
+.vb-dl__v em { font-style: normal; color: var(--vb-text-3); font-size: 12px; }
+
+.vb-sec { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.vb-sec h4 {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--vb-text-3);
+}
+
+.vb-rel { display: flex; flex-direction: column; gap: 6px; }
+.vb-rel__r {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border: 1px solid var(--vb-line);
+  border-radius: 10px;
+  background: #FFFFFF;
+  font-size: 13px;
+}
+.vb-rel__k { width: 68px; flex: none; font-size: 12px; color: var(--vb-text-3); }
+.vb-rel__r b { font-weight: 500; }
+.vb-rel__y { font-family: var(--mono); font-size: 11.5px; color: var(--vb-text-3); }
+
+.vb-tl { margin: 0; padding: 0; list-style: none; }
+.vb-tl__i { position: relative; padding: 0 0 12px 22px; font-size: 13px; }
+.vb-tl__i::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 5px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--vb-brass);
+}
+.vb-tl__i::after {
+  content: "";
+  position: absolute;
+  left: 9px;
+  top: 17px;
+  bottom: 3px;
+  width: 1px;
+  background: var(--vb-line);
+}
+.vb-tl__i:last-child { padding-bottom: 0; }
+.vb-tl__i:last-child::after { display: none; }
+.vb-tl__d { display: block; font-family: var(--mono); font-size: 11.5px; color: var(--vb-brass-ink); }
+.vb-tl__t { color: var(--vb-text-2); }
+.vb-tl__t b { color: var(--vb-text); font-weight: 500; }
+
+.vb-hist { display: flex; flex-direction: column; gap: 8px; }
+.vb-hist__r {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--vb-line);
+  border-radius: 10px;
+  background: #FFFFFF;
+  font-size: 12.5px;
+}
+.vb-hist__w { color: var(--vb-text); }
+.vb-hist__m { font-family: var(--mono); font-size: 11px; color: var(--vb-text-3); text-align: right; }
+.vb-hist__d { grid-column: 1 / 3; color: var(--vb-text-3); font-size: 12px; }
+
+/* ---------------------------------------------------------------------
+   08. Командная палитра ⌘K
+   --------------------------------------------------------------------- */
+
+.vb-palette { position: absolute; inset: 0; z-index: 30; }
+.vb-palette__scrim {
+  /* светлая тема: затемнение светлое и мягкое, иначе дашборд уходит в серое пятно */
+  position: absolute;
+  inset: 0;
+  background: rgba(241, 243, 245, .38);
+  backdrop-filter: blur(1.5px);
+  -webkit-backdrop-filter: blur(1.5px);
+}
+.vb-palette__box {
+  position: absolute;
+  /* выровнена по 2-й и 3-й плитке: плитка древа со счётчиками и «недавние» остаются видны */
+  left: 640px;
+  top: 128px;
+  width: 600px;
+  overflow: hidden;
+  border: 1px solid rgba(15, 23, 42, .12);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .96);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 24px 60px -24px rgba(15, 23, 42, .35), 0 1px 2px rgba(15, 23, 42, .10);
+}
+.vb-palette__field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 56px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--vb-line);
+  color: var(--vb-text-3);
+}
+.vb-palette__q { flex: 1; font-size: 15px; color: var(--vb-text); }
+.vb-caret {
+  display: inline-block;
+  width: 1.5px;
+  height: 16px;
+  margin-left: 2px;
+  vertical-align: -3px;
+  background: var(--vb-brass);
+  animation: vb-blink 1.1s steps(1) infinite;
+}
+@keyframes vb-blink { 50% { opacity: 0; } }
+.vb-palette__body { padding: 4px 0 8px; }
+.vb-palette__grp {
+  margin: 8px 0 2px;
+  padding: 0 20px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--vb-text-3);
+}
+.vb-palette__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 42px;
+  margin: 0 8px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  color: var(--vb-text);
+}
+.vb-palette__row span { min-width: 0; }
+.vb-palette__row b { font-weight: 500; }
+.vb-palette__row em { font-style: normal; color: var(--vb-text-3); font-size: 12.5px; }
+.vb-palette__row--on { background: rgba(234, 179, 8, .16); box-shadow: inset 2px 0 0 var(--vb-brass); }
+.vb-palette__lead { flex: 1; }
+.vb-palette__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-top: 1px solid var(--vb-line);
+  font-size: 11.5px;
+  color: var(--vb-text-3);
+}
+
+/* ---------------------------------------------------------------------
+   09. Дашборд: плитки с миниатюрой, недавние
+   --------------------------------------------------------------------- */
+
+.vb-dash {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  top: 84px;
+  height: 720px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.vb-hello { height: 56px; }
+.vb-h2 {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 26px;
+  letter-spacing: -.02em;
+  color: var(--vb-text);
+}
+.vb-sub { margin: 5px 0 0; font-size: 12.5px; color: var(--vb-text-2); }
+
+.vb-tiles { display: grid; grid-template-columns: 600px 300px 300px; gap: 24px; height: 320px; }
+.vb-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 18px;
+  overflow: hidden;
+  border: 1px solid var(--vb-line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .9);
+  box-shadow: var(--vb-shadow-1), var(--vb-shadow-2);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.vb-tile--hero { background: linear-gradient(160deg, #FFFFFF, #F7F8FA); }
+.vb-tile__h { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.vb-tile__k {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 17px;
+  color: var(--vb-text);
+}
+.vb-tile__m { margin: 4px 0 0; font-size: 12.5px; color: var(--vb-text-3); }
+.vb-thumb { flex: 1; min-height: 0; }
+.vb-thumb svg { display: block; width: 100%; height: 100%; }
+.vb-thumb .vb-mini__m { fill: rgba(59, 130, 246, .12); stroke: rgba(59, 130, 246, .75); }
+.vb-thumb .vb-mini__f { fill: rgba(234, 140, 51, .14); stroke: rgba(234, 140, 51, .85); }
+.vb-thumb .vb-mini__b { fill: rgba(234, 179, 8, .20); stroke: var(--vb-brass); }
+.vb-thumb .vb-tl-line { fill: none; stroke: rgba(15, 23, 42, .22); stroke-width: 1.2; }
+
+.vb-stats { display: flex; gap: 20px; }
+.vb-stat { font-size: 11.5px; color: var(--vb-text-3); }
+.vb-stat b {
+  display: block;
+  font-family: var(--mono);
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--vb-text);
+  font-variant-numeric: tabular-nums;
+}
+.vb-tile__f { display: flex; align-items: center; gap: 10px; }
+
+.vb-big {
+  font-family: var(--mono);
+  font-size: 32px;
+  color: var(--vb-text);
+  font-variant-numeric: tabular-nums;
+}
+.vb-big span { margin-left: 8px; font-family: var(--sans); font-size: 12.5px; color: var(--vb-text-3); }
+.vb-progress { height: 6px; overflow: hidden; border-radius: 999px; background: rgba(15, 23, 42, .08); }
+.vb-progress i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #CA8A04, #F5C542); }
+.vb-linkpill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--vb-line);
+  border-radius: 10px;
+  background: #FFFFFF;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--vb-text-2);
+}
+.vb-dates { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.vb-dates li {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--vb-line);
+  border-radius: 12px;
+  background: #FFFFFF;
+}
+.vb-dates b { font-size: 12.5px; font-weight: 500; color: var(--vb-brass-ink); }
+.vb-dates span { font-size: 13px; color: var(--vb-text); }
+
+.vb-recent {
+  display: flex;
+  flex-direction: column;
+  height: 304px;
+  padding: 10px 18px 12px;
+  border: 1px solid var(--vb-line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .9);
+  box-shadow: var(--vb-shadow-1), var(--vb-shadow-2);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.vb-recent__h { display: flex; align-items: center; justify-content: space-between; height: 48px; }
+.vb-list { flex: 1; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.vb-ev {
+  display: grid;
+  grid-template-columns: 10px 1fr 150px 110px;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+  border-top: 1px solid var(--vb-line-2);
+  font-size: 13.5px;
+}
+.vb-ev__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--vb-male); }
+.vb-ev__dot--brass { background: var(--vb-brass); }
+.vb-ev__dot--female { background: var(--vb-female); }
+.vb-ev__dot--muted { background: #94A3B8; }
+.vb-ev__t { color: var(--vb-text); }
+.vb-ev__w { font-size: 12px; color: var(--vb-text-3); }
+.vb-ev__m { font-family: var(--mono); font-size: 11.5px; color: var(--vb-text-3); text-align: right; }
+
+/* ---------------------------------------------------------------------
+   10. Экран карточки человека: раскрытая панель + вкладки
+   --------------------------------------------------------------------- */
+
+/* светлая тема: 42% на белом почти растворяет карточку — приглушаем мягче */
+.vb-app--focus .vb-node { opacity: .70; }
+.vb-app--focus .vb-node--sel { opacity: 1; }
+.vb-app--focus .vb-wires path { opacity: .45; }
+
+.vb-cardpanel {
+  position: absolute;
+  right: 16px;
+  top: 84px;
+  bottom: 16px;
+  z-index: 14;
+  width: 560px;
+  padding: 18px 20px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.vb-cp__head { display: flex; gap: 16px; align-items: flex-start; }
+.vb-cp__acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.vb-cp__body { flex: 1; min-height: 0; overflow: hidden; }
+.vb-cp__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--vb-line);
+}
+
+/* ---------------------------------------------------------------------
+   11. Мобильный холст: пилюля-док, плавающая «+», подсказка
+   --------------------------------------------------------------------- */
+
+.vb-app--phone { font-size: 13px; }
+.vb-sb__t { font-family: var(--mono); font-size: 12px; }
+
+.vb-mtop {
+  position: absolute;
+  top: 44px;
+  left: 12px;
+  right: 12px;
+  z-index: 12;
+  height: 42px;
+  padding: 0 6px 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 13px;
+}
+.vb-mtop__t {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.vb-mtop__s { display: block; font-size: 10.5px; color: var(--vb-text-3); font-weight: 400; }
+.vb-mchips {
+  position: absolute;
+  top: 94px;
+  left: 12px;
+  right: 12px;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.vb-mchip-count {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid rgba(161, 98, 7, .45);
+  border-radius: 999px;
+  background: #FEF7E0;
+  color: var(--vb-brass);
+  font-size: 12px;
+}
+.vb-node--m {
+  width: 158px;
+  height: 96px;
+  padding: 7px 10px;
+  grid-template-columns: 24px 1fr;
+  grid-template-rows: 24px auto;
+  row-gap: 4px;
+}
+.vb-node--m .vb-node__ph { width: 24px; height: 24px; }
+.vb-node--m .vb-node__ph::before { top: 4px; width: 8px; height: 8px; }
+.vb-node--m .vb-node__ph::after { width: 15px; height: 8px; }
+.vb-node--m .vb-node__nm { font-size: 15px; line-height: 1.06; }
+.vb-node--m .vb-node__yr { font-size: 10.5px; }
+
+.vb-fab {
+  position: absolute;
+  right: 18px;
+  bottom: 104px;
+  z-index: 14;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border: 1px solid #EAB308;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #F5C542, #EAB308);
+  color: #0F172A;
+  cursor: pointer;
+  box-shadow: 0 10px 22px -10px rgba(15, 23, 42, .35);
+}
+.vb-pilldock {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  z-index: 13;
+  transform: translateX(-50%);
+  height: 56px;
+  padding: 5px;
+  display: flex;
+  gap: 2px;
+  border-radius: 999px;
+}
+.vb-pilldock__b {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  width: 60px;
+  height: 46px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: none;
+  color: var(--vb-text-2);
+  font: inherit;
+  font-size: 9.5px;
+  cursor: pointer;
+}
+.vb-pilldock__b--on {
+  /* светлая тема: активный пункт — белая пилюля с янтарной границей */
+  border-color: rgba(161, 98, 7, .45);
+  background: #FFFFFF;
+  box-shadow: var(--vb-shadow-1);
+  color: var(--vb-brass);
+}
+.vb-mhint {
+  position: absolute;
+  left: 50%;
+  bottom: 92px;
+  z-index: 12;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: var(--vb-text-3);
+}
+
+/* ---------------------------------------------------------------------
+   12. Мобильный инспектор — лист снизу с ручкой
+   --------------------------------------------------------------------- */
+
+.vb-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  height: 560px;
+  padding: 0 16px;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid rgba(15, 23, 42, .12);
+  border-radius: 22px 22px 0 0;
+  background: linear-gradient(180deg, #FFFFFF, #FBFCFD);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 -18px 44px -20px rgba(15, 23, 42, .28);
+}
+.vb-handle {
+  width: 40px;
+  height: 4px;
+  margin: 10px auto 8px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, .18);
+}
+.vb-sheet__head { display: flex; gap: 12px; align-items: flex-start; }
+.vb-sheet__acts { display: flex; gap: 8px; margin-top: 10px; }
+.vb-sheet__body { flex: 1; min-height: 0; overflow: hidden; padding-top: 10px; }
+.vb-sheet__foot { display: flex; gap: 8px; padding: 10px 0 20px; }
+
+/* ---------------------------------------------------------------------
+   13. Мобильная палитра — полноэкранный поиск
+   --------------------------------------------------------------------- */
+
+.vb-search {
+  position: absolute;
+  top: 44px;
+  left: 12px;
+  right: 12px;
+  z-index: 12;
+  height: 50px;
+  padding: 0 8px 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 14px;
+  color: var(--vb-text-3);
+}
+.vb-search__q { flex: 1; min-width: 0; font-size: 15px; color: var(--vb-text); }
+.vb-mchips--top { top: 106px; }
+.vb-mres {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 148px;
+  bottom: 16px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+}
+.vb-mrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 64px;
+  padding: 0 12px;
+  border-radius: 12px;
+  font-size: 13.5px;
+}
+.vb-mrow--on { background: rgba(234, 179, 8, .16); box-shadow: inset 2px 0 0 var(--vb-brass); }
+.vb-mrow__t { flex: 1; min-width: 0; }
+.vb-mrow__t b { display: block; font-weight: 500; color: var(--vb-text); }
+.vb-mrow__t span { display: block; font-family: var(--mono); font-size: 11.5px; color: var(--vb-text-3); }
+.vb-mrow__k { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--vb-text-2); }
+.vb-mgroup {
+  margin: 12px 0 4px;
+  padding: 0 12px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--vb-text-3);
+}
+.vb-mfoot { margin-top: auto; padding: 12px 4px 0; }
+.vb-mcta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 48px;
+  margin-top: 12px;
+  border: 1px solid #EAB308;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #F5C542, #EAB308);
+  color: #0F172A;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ---------------------------------------------------------------------
+   14. Мелочи: таймлайн событий, доступность, анимации
+   --------------------------------------------------------------------- */
+
+.vb-tl--lg .vb-tl__i { padding-bottom: 14px; font-size: 13.5px; }
+.vb-tl__sub { display: block; color: var(--vb-text-3); font-size: 12px; }
+
+/* Длинные пути к файлам в заметках: переносим, иначе код вылезает за карточку. */
+.vb-path { overflow-wrap: break-word; }
+
+/* ссылка на тёмную версию в шапке страницы (внутри .chips) */
+.vb-chip-link { text-decoration: none; }
+.vb-chip-link:hover { border-color: rgba(15, 23, 42, .28); }
+
+.vb-cp__body .vb-dl__r { padding: 9px 0; }
+.vb-cp__body .vb-rel { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+.vb-app button:focus-visible,
+.vb-app [tabindex]:focus-visible { outline: 2px solid var(--vb-brass); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .vb-app *, .vb-app *::before, .vb-app *::after {
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+  }
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="brand"><i>T</i>Torlmood · варианты интерфейса</span>
+  <nav>
+    <a href="index.html">Обзор</a>
+    <a href="a-quiet-archive.html">A · Тихий архив</a>
+    <a href="b-canvas-studio-light.html" aria-current="page">B · Холст-студия · светлая</a>
+    <a href="c-family-atlas.html">C · Атлас рода</a>
+    <a href="d-card-catalog.html">D · Картотека</a>
+    <a href="e-chronicle.html">E · Хроника</a>
+  </nav>
+</div>
+
+<div class="wrap">
+
+  <header class="doc-head">
+    <p class="eyebrow">Вариант B · светлая тема</p>
+    <h1>Холст-студия — светлая тема</h1>
+    <p class="lead">
+      Та же мастерская, но при дневном свете: светлый холст, белые карточки и стеклянная обвязка,
+      которая держится тенью и границей, а не свечением. Латунь уступает место тёмному янтарю,
+      кромка по полу — синему и глиняному. Экраны, геометрия и поведение — один в один как в тёмной версии;
+      изменился только цветовой слой. Для тех, кому тёмный холст мешает днём и на солнце.
+    </p>
+    <div class="chips">
+      <span class="chip"><b>Холст</b> #F1F3F5 вместо #0d131f</span>
+      <span class="chip"><b>Янтарь</b> #A16207 для текста, #EAB308 для заливок</span>
+      <span class="chip"><b>Стекло белое</b> + тень вместо свечения</span>
+      <span class="chip"><b>Геометрия та же</b> карточка 176×100, пары 18px</span>
+      <a class="chip chip--quiet vb-chip-link" href="b-canvas-studio.html"><b>Тёмная тема</b> b-canvas-studio.html →</a>
+    </div>
+    <div class="rule"></div>
+  </header>
+
+  <!-- ================================================================
+       01. ДЕСКТОП
+       ================================================================ -->
+  <section class="section" id="desktop">
+    <h2><span class="num">01</span>Десктоп</h2>
+    <p>Три экрана 1280×820: дашборд с плитками и открытой палитрой, холст древа с доком и инспектором, карточка человека как раскрытая панель с вкладками.</p>
+
+    <div class="stage">
+      <div class="stage-row">
+
+        <!-- ---------- Дашборд ---------- -->
+        <figure class="shot vb-shot vb-shot--desk">
+          <div class="frame">
+            <div class="browser">
+              <span class="dots"><i></i><i></i><i></i></span>
+              <span class="addr">torlmood.ru/dashboard</span>
+              <span class="tabs">Torlmood</span>
+            </div>
+            <div class="screen">
+              <div class="vb-app vb-app--dash">
+                <div class="vb-grid" aria-hidden="true"></div>
+                <div class="vb-halo" aria-hidden="true"></div>
+
+                <header class="vb-top vb-panel">
+                  <div class="vb-top__l">
+                    <span class="vb-mark" aria-hidden="true">T</span>
+                    <span class="vb-crumbs"><b>Torlmood</b><i class="vb-crumb-sep">/</i>Дашборд</span>
+                    <span class="vb-nav">
+                      <span class="vb-nav__i vb-nav__i--on">Древо</span>
+                      <span class="vb-nav__i">Люди</span>
+                      <span class="vb-nav__i">История</span>
+                    </span>
+                  </div>
+                  <div class="vb-top__r">
+                    <span class="vb-avs" title="4 участника и 2 приглашения">
+                      <i class="vb-av vb-av--owner">И</i>
+                      <i class="vb-av vb-av--editor">О</i>
+                      <i class="vb-av vb-av--editor">Г</i>
+                      <i class="vb-av vb-av--viewer">Д</i>
+                      <i class="vb-av vb-av--more">+2</i>
+                    </span>
+                    <button class="vb-btn vb-btn--brass" type="button">
+                      <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M10 3.5v9M6.6 6.6L10 3.2l3.4 3.4M4.5 13v3.5h11V13"/></svg>
+                      Поделиться
+                    </button>
+                  </div>
+                </header>
+
+                <div class="vb-dash">
+                  <div class="vb-hello">
+                    <h2 class="vb-h2">Добрый вечер, Илья</h2>
+                    <p class="vb-sub">Последнее изменение — 2 часа назад · 148 человек · 4 участника · 2 приглашения</p>
+                  </div>
+
+                  <div class="vb-tiles">
+                    <article class="vb-tile vb-tile--hero">
+                      <div class="vb-tile__h">
+                        <div>
+                          <h3 class="vb-tile__k">Ковалёвы и Соколовы</h3>
+                          <p class="vb-tile__m">Рязань → Ленинград · открывали 2 часа назад</p>
+                        </div>
+                        <span class="vb-badge vb-badge--brass">Владелец</span>
+                      </div>
+                      <div class="vb-thumb">
+                        <svg viewBox="0 0 560 168" role="img" aria-label="Миниатюра древа: пять поколений">
+                          <path class="vb-tl-line" d="M280 30v10M151 40h258M151 40v16M237 40v16M323 40v16M409 40v16"/>
+                          <path class="vb-tl-line" d="M194 76v10M194 86h172M194 86v16M280 86v16M366 86v16"/>
+                          <path class="vb-tl-line" d="M280 122v10M237 132h86M237 132v12M323 132v12"/>
+                          <rect class="vb-mini__m" x="199" y="10" width="76" height="20" rx="5"/>
+                          <rect class="vb-mini__f" x="285" y="10" width="76" height="20" rx="5"/>
+                          <rect class="vb-mini__m" x="113" y="56" width="76" height="20" rx="5"/>
+                          <rect class="vb-mini__f" x="199" y="56" width="76" height="20" rx="5"/>
+                          <rect class="vb-mini__m" x="285" y="56" width="76" height="20" rx="5"/>
+                          <rect class="vb-mini__f" x="371" y="56" width="76" height="20" rx="5"/>
+                          <rect class="vb-mini__b" x="156" y="102" width="76" height="20" rx="5"/>
+                          <rect class="vb-mini__f" x="242" y="102" width="76" height="20" rx="5"/>
+                          <rect class="vb-mini__b" x="328" y="102" width="76" height="20" rx="5"/>
+                          <rect class="vb-mini__b" x="199" y="144" width="76" height="20" rx="5"/>
+                          <rect class="vb-mini__f" x="285" y="144" width="76" height="20" rx="5"/>
+                        </svg>
+                      </div>
+                      <div class="vb-stats">
+                        <span class="vb-stat"><b>148</b>человек</span>
+                        <span class="vb-stat"><b>12</b>событий</span>
+                        <span class="vb-stat"><b>4</b>участника</span>
+                        <span class="vb-stat"><b>2</b>приглашения</span>
+                      </div>
+                      <div class="vb-tile__f">
+                        <button class="vb-btn vb-btn--brass" type="button">Открыть древо</button>
+                        <button class="vb-btn vb-btn--ghost" type="button">Экспорт GEDCOM</button>
+                      </div>
+                    </article>
+
+                    <article class="vb-tile">
+                      <h3 class="vb-tile__k">Приглашение</h3>
+                      <p class="vb-tile__m">Ссылка активна, срок — 14 дней</p>
+                      <div class="vb-big">3<span>из 10 переходов</span></div>
+                      <div class="vb-progress" role="img" aria-label="3 перехода из 10"><i style="width:30%"></i></div>
+                      <div class="vb-linkpill">
+                        <span>torlmood.ru/i/kov-7f3</span>
+                        <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="7" y="7" width="9" height="9" rx="2"/><path d="M13 7V5.5A1.5 1.5 0 0 0 11.5 4h-6A1.5 1.5 0 0 0 4 5.5v6A1.5 1.5 0 0 0 5.5 13H7"/></svg>
+                      </div>
+                      <p class="vb-hint">Открывали: Ольга, Дмитрий и ещё один человек</p>
+                    </article>
+
+                    <article class="vb-tile">
+                      <h3 class="vb-tile__k">Ближайшие даты</h3>
+                      <p class="vb-tile__m">Ближайшие три месяца</p>
+                      <ul class="vb-dates">
+                        <li><b>2 октября</b><span>Нине Борисовне — 75 лет</span></li>
+                        <li><b>В этом году</b><span>Тимуру Ильичу — 20 лет</span></li>
+                      </ul>
+                      <button class="vb-btn vb-btn--ghost vb-btn--sm" type="button">Напомнить в семье</button>
+                    </article>
+                  </div>
+
+                  <section class="vb-recent">
+                    <div class="vb-recent__h">
+                      <h3 class="vb-tile__k">Недавние изменения</h3>
+                      <span class="vb-hint">12 событий в истории · вся лента</span>
+                    </div>
+                    <ul class="vb-list">
+                      <li class="vb-ev">
+                        <i class="vb-ev__dot vb-ev__dot--brass" aria-hidden="true"></i>
+                        <span class="vb-ev__t">Ольга изменила: место рождения Тверь → Рязань</span>
+                        <span class="vb-ev__w">Ольга Ковалёва · редактор</span>
+                        <span class="vb-ev__m">2 часа назад</span>
+                      </li>
+                      <li class="vb-ev">
+                        <i class="vb-ev__dot" aria-hidden="true"></i>
+                        <span class="vb-ev__t">Илья добавил карточку Веры Ильиничны</span>
+                        <span class="vb-ev__w">Илья Ковалёв · владелец</span>
+                        <span class="vb-ev__m">5 часов назад</span>
+                      </li>
+                      <li class="vb-ev">
+                        <i class="vb-ev__dot vb-ev__dot--muted" aria-hidden="true"></i>
+                        <span class="vb-ev__t">Импорт GEDCOM: 34 человека</span>
+                        <span class="vb-ev__w">Галина Прохорова · редактор</span>
+                        <span class="vb-ev__m">3 дня назад</span>
+                      </li>
+                      <li class="vb-ev">
+                        <i class="vb-ev__dot vb-ev__dot--female" aria-hidden="true"></i>
+                        <span class="vb-ev__t">Дмитрий Соколов присоединился к древу</span>
+                        <span class="vb-ev__w">по ссылке-приглашению</span>
+                        <span class="vb-ev__m">3 дня назад</span>
+                      </li>
+                    </ul>
+                  </section>
+                </div>
+
+                <div class="vb-palette" role="dialog" aria-label="Командная палитра">
+                  <div class="vb-palette__scrim"></div>
+                  <div class="vb-palette__box">
+                    <div class="vb-palette__field">
+                      <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="9" cy="9" r="5.2"/><path d="M13 13l4 4"/></svg>
+                      <span class="vb-palette__q">сокол<span class="vb-caret"></span></span>
+                      <span class="vb-kbd">esc</span>
+                    </div>
+                    <div class="vb-palette__body">
+                      <p class="vb-palette__grp">Люди</p>
+                      <div class="vb-palette__row vb-palette__row--on">
+                        <span class="vb-face vb-face--sm vb-face--m" aria-hidden="true"></span>
+                        <span class="vb-palette__lead"><b>Дмитрий Львович Соколов</b></span>
+                        <em>1920–1995 · зритель</em>
+                      </div>
+                      <div class="vb-palette__row">
+                        <span class="vb-face vb-face--sm vb-face--f" aria-hidden="true"></span>
+                        <span class="vb-palette__lead"><b>Валентина Григорьевна Соколова</b></span>
+                        <em>1926–1996</em>
+                      </div>
+                      <p class="vb-palette__grp">Действия</p>
+                      <div class="vb-palette__row">
+                        <span class="vb-icc" aria-hidden="true">
+                          <svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="10" cy="7" r="3"/><path d="M4.6 16.4a5.5 5.5 0 0 1 10.8 0"/></svg>
+                        </span>
+                        <span class="vb-palette__lead">Найти человека на холсте</span>
+                        <span class="vb-kbd">⌘F</span>
+                      </div>
+                      <div class="vb-palette__row">
+                        <span class="vb-icc" aria-hidden="true">
+                          <svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M10 4v12M4 10h12"/></svg>
+                        </span>
+                        <span class="vb-palette__lead">Добавить человека</span>
+                        <span class="vb-kbd">⌘N</span>
+                      </div>
+                      <div class="vb-palette__row">
+                        <span class="vb-icc" aria-hidden="true">
+                          <svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M10 3v9M6.8 6.2L10 3l3.2 3.2M4 13.5V16h12v-2.5"/></svg>
+                        </span>
+                        <span class="vb-palette__lead">Экспорт GEDCOM</span>
+                        <span class="vb-kbd">⌘E</span>
+                      </div>
+                    </div>
+                    <div class="vb-palette__foot">
+                      <span>↑↓ выбрать · ↵ открыть · esc закрыть</span>
+                      <span>Поиск по 148 людям, 4 участникам и 12 событиям</span>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+          <figcaption><b>Дашборд</b> <code>torlmood.ru/dashboard</code> <span>Крупные плитки с миниатюрой древа, приглашение и лента изменений; палитра ⌘K открыта поверх — плитки и «недавние» остаются видны.</span></figcaption>
+        </figure>
+
+        <!-- ---------- Холст древа ---------- -->
+        <figure class="shot vb-shot vb-shot--desk">
+          <div class="frame">
+            <div class="browser">
+              <span class="dots"><i></i><i></i><i></i></span>
+              <span class="addr">torlmood.ru/tree/kovalevy</span>
+              <span class="tabs">Torlmood</span>
+            </div>
+            <div class="screen">
+              <div class="vb-app">
+                <div class="vb-grid" aria-hidden="true"></div>
+
+                <div class="vb-board">
+  <svg class="vb-wires" viewBox="0 0 1280 820" aria-hidden="true" focusable="false">
+    <path class="vb-bond" d="M367 134h18M252 256h18M676 256h18M252 378h18M676 378h18"/>
+    <path d="M376 184v10M164 194h424M164 194v12M588 194v12"/>
+    <path d="M261 306v10M164 316h424M164 316v12M588 316v12"/>
+    <path d="M261 428v10M164 438h194M164 438v12M358 438v12"/>
+    <path d="M685 428v10M588 438h97M588 438v12"/>
+    <path d="M164 550v10M164 560h194M164 560v12M358 560v12"/>
+    <path class="vb-glow" d="M164 316v12M164 438v12"/>
+  </svg>
+<div class="vb-node vb-node--m" style="--x:191px;--y:84px">
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">1889–1954</span>
+    <span class="vb-node__nm">Григорий Ильич Ковалёв</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+<div class="vb-node vb-node--f" style="--x:385px;--y:84px">
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">1894–1971</span>
+    <span class="vb-node__nm">Анна Сергеевна Ковалёва</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+<div class="vb-node vb-node--m vb-node--sel2" style="--x:76px;--y:206px">
+    <span class="vb-node__check" aria-hidden="true"><svg viewBox="0 0 20 20" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 10.6l3.2 3.2L15 7"/></svg></span>
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">1918–1983</span>
+    <span class="vb-node__nm">Пётр Григорьевич Ковалёв</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+<div class="vb-node vb-node--f" style="--x:270px;--y:206px">
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">1922–2004</span>
+    <span class="vb-node__nm">Мария Тимофеевна Ковалёва</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+<div class="vb-node vb-node--f vb-node--hover" style="--x:500px;--y:206px">
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">1926–1996</span>
+    <span class="vb-node__nm">Валентина Григорьевна Соколова</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+<div class="vb-node vb-node--m" style="--x:694px;--y:206px">
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">1920–1995</span>
+    <span class="vb-node__nm">Дмитрий Львович Соколов</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+<div class="vb-node vb-node--m vb-node--sel" style="--x:76px;--y:328px">
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">1947–2011</span>
+    <span class="vb-node__nm">Аркадий Петрович Ковалёв</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+<div class="vb-node vb-node--f" style="--x:270px;--y:328px">
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">1950</span>
+    <span class="vb-node__nm">Нина Борисовна Ковалёва</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+<div class="vb-node vb-node--f" style="--x:500px;--y:328px">
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">1952</span>
+    <span class="vb-node__nm">Галина Петровна Ковалёва</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+<div class="vb-node vb-node--m" style="--x:694px;--y:328px">
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">1949</span>
+    <span class="vb-node__nm">Юрий Андреевич Прохоров</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+<div class="vb-node vb-node--m vb-node--sel2" style="--x:76px;--y:450px">
+    <span class="vb-node__check" aria-hidden="true"><svg viewBox="0 0 20 20" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 10.6l3.2 3.2L15 7"/></svg></span>
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">1974</span>
+    <span class="vb-node__nm">Илья Аркадьевич Ковалёв</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+<div class="vb-node vb-node--f" style="--x:270px;--y:450px">
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">1978</span>
+    <span class="vb-node__nm">Ольга Аркадьевна Ковалёва</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+<div class="vb-node vb-node--m" style="--x:500px;--y:450px">
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">1980</span>
+    <span class="vb-node__nm">Антон Юрьевич Прохоров</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+<div class="vb-node vb-node--m" style="--x:76px;--y:572px">
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">2005</span>
+    <span class="vb-node__nm">Тимур Ильич Ковалёв</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+<div class="vb-node vb-node--f" style="--x:270px;--y:572px">
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">2009</span>
+    <span class="vb-node__nm">Вера Ильинична Ковалёва</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+                </div>
+
+                <header class="vb-top vb-panel">
+                  <div class="vb-top__l">
+                    <span class="vb-mark" aria-hidden="true">T</span>
+                    <span class="vb-crumbs"><b>Ковалёвы и Соколовы</b><i class="vb-crumb-sep">/</i>Холст</span>
+                    <span class="vb-chip">148 человек · 5 поколений</span>
+                  </div>
+                  <div class="vb-top__r">
+                    <span class="vb-avs" title="4 участника">
+                      <i class="vb-av vb-av--owner">И</i>
+                      <i class="vb-av vb-av--editor">О</i>
+                      <i class="vb-av vb-av--editor">Г</i>
+                      <i class="vb-av vb-av--viewer">Д</i>
+                    </span>
+                    <button class="vb-btn vb-btn--brass" type="button">
+                      <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M10 3.5v9M6.6 6.6L10 3.2l3.4 3.4M4.5 13v3.5h11V13"/></svg>
+                      Поделиться
+                    </button>
+                  </div>
+                </header>
+
+                <div class="vb-zoom vb-panel">
+                  <button type="button" aria-label="Приблизить">+</button>
+                  <button type="button" aria-label="Отдалить">−</button>
+                  <button type="button" aria-label="Показать всё древо">
+                    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 8V4h4M16 12v4h-4M16 8V4h-4M4 12v4h4"/></svg>
+                  </button>
+                </div>
+
+                <div class="vb-minimap vb-panel">
+                  <svg class="vb-mini" viewBox="0 0 176 110" role="img" aria-label="Миникарта древа, видно всю рамку">
+                    <rect class="vb-mini__vp" x="3" y="6" width="170" height="98" rx="6"/>
+                    <rect class="vb-mini__m" x="53" y="17" width="33" height="12" rx="3"/>
+                    <rect class="vb-mini__f" x="90" y="17" width="33" height="12" rx="3"/>
+                    <rect class="vb-mini__m" x="17" y="34" width="33" height="12" rx="3"/>
+                    <rect class="vb-mini__f" x="53" y="34" width="33" height="12" rx="3"/>
+                    <rect class="vb-mini__f" x="90" y="34" width="33" height="12" rx="3"/>
+                    <rect class="vb-mini__m" x="126" y="34" width="33" height="12" rx="3"/>
+                    <rect class="vb-mini__m" x="17" y="50" width="33" height="12" rx="3"/>
+                    <rect class="vb-mini__f" x="53" y="50" width="33" height="12" rx="3"/>
+                    <rect class="vb-mini__f" x="90" y="50" width="33" height="12" rx="3"/>
+                    <rect class="vb-mini__m" x="126" y="50" width="33" height="12" rx="3"/>
+                    <rect class="vb-mini__m" x="17" y="66" width="33" height="12" rx="3"/>
+                    <rect class="vb-mini__f" x="53" y="66" width="33" height="12" rx="3"/>
+                    <rect class="vb-mini__m" x="90" y="66" width="33" height="12" rx="3"/>
+                    <rect class="vb-mini__m" x="17" y="82" width="33" height="12" rx="3"/>
+                    <rect class="vb-mini__f" x="53" y="82" width="33" height="12" rx="3"/>
+                  </svg>
+                </div>
+
+                <div class="vb-multi vb-panel">
+                  <b>Выбрано: 3</b>
+                  <span class="vb-multi__who">Пётр · Аркадий · Илья</span>
+                  <button class="vb-icc" type="button" aria-label="Связать выбранных">
+                    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M8.4 11.6l3.2-3.2"/><path d="M7.4 8.4l1.2-1.2a2.7 2.7 0 0 1 3.8 3.8l-1.2 1.2"/><path d="M12.6 11.6l-1.2 1.2a2.7 2.7 0 0 1-3.8-3.8l1.2-1.2"/></svg>
+                  </button>
+                  <button class="vb-icc" type="button" aria-label="Экспортировать выбранных">
+                    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M10 3v9M6.8 6.2L10 3l3.2 3.2M4 13.5V16h12v-2.5"/></svg>
+                  </button>
+                  <button class="vb-icc" type="button" aria-label="Снять выделение">
+                    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6 6l8 8M14 6l-8 8"/></svg>
+                  </button>
+                </div>
+
+                <div class="vb-dock vb-panel">
+                  <button class="vb-dock__b" type="button">
+                    <svg viewBox="0 0 20 20" width="19" height="19" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M10 4v12M4 10h12"/></svg>
+                    Добавить
+                  </button>
+                  <button class="vb-dock__b" type="button">
+                    <svg viewBox="0 0 20 20" width="19" height="19" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M8.4 11.6l3.2-3.2"/><path d="M7.4 8.4l1.2-1.2a2.7 2.7 0 0 1 3.8 3.8l-1.2 1.2"/><path d="M12.6 11.6l-1.2 1.2a2.7 2.7 0 0 1-3.8-3.8l1.2-1.2"/></svg>
+                    Связь
+                  </button>
+                  <button class="vb-dock__b vb-dock__b--on" type="button" aria-pressed="true">
+                    <i class="vb-dock__n">3</i>
+                    <svg viewBox="0 0 20 20" width="19" height="19" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3.5 5.5h13M6 10h8M8.5 14.5h3"/></svg>
+                    Фильтр
+                  </button>
+                  <button class="vb-dock__b" type="button">
+                    <svg viewBox="0 0 20 20" width="19" height="19" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M10 3v9M6.8 6.2L10 3l3.2 3.2M4 13.5V16h12v-2.5"/></svg>
+                    Экспорт
+                  </button>
+                </div>
+
+                <aside class="vb-insp vb-panel">
+                  <div class="vb-insp__head">
+                    <span class="vb-face vb-face--m" aria-hidden="true"></span>
+                    <div>
+                      <h3 class="vb-name">Аркадий Петрович Ковалёв</h3>
+                      <span class="vb-years">1947–2011</span>
+                      <span class="vb-place">Ленинград · III поколение</span>
+                      <div class="vb-badges">
+                        <span class="vb-badge vb-badge--brass">Выбран</span>
+                        <span class="vb-badge">12 событий</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="vb-cp__acts">
+                    <button class="vb-btn vb-btn--brass vb-btn--sm" type="button">Открыть карточку</button>
+                    <button class="vb-btn vb-btn--sm" type="button">Правка</button>
+                    <button class="vb-btn vb-btn--sm vb-btn--icon" type="button" aria-label="Ещё действия">
+                      <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" fill="currentColor"><circle cx="4.5" cy="10" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="15.5" cy="10" r="1.5"/></svg>
+                    </button>
+                  </div>
+
+                  <div class="vb-sec"><h4>Факты</h4><span class="vb-hint">2 связи</span></div>
+                  <div class="vb-dl">
+                    <div class="vb-dl__r"><span class="vb-dl__k">Рождение</span><span class="vb-dl__v">1947, Ленинград</span></div>
+                    <div class="vb-dl__r"><span class="vb-dl__k">Смерть</span><span class="vb-dl__v">2011</span></div>
+                    <div class="vb-dl__r"><span class="vb-dl__k">Брак</span><span class="vb-dl__v">1971 — Нина Борисовна <em>(в девичестве Верещагина)</em></span></div>
+                    <div class="vb-dl__r"><span class="vb-dl__k">Отец</span><span class="vb-dl__v">Пётр Григорьевич, 1918–1983</span></div>
+                    <div class="vb-dl__r"><span class="vb-dl__k">Мать</span><span class="vb-dl__v">Мария Тимофеевна, 1922–2004</span></div>
+                  </div>
+
+                  <div class="vb-sec"><h4>Семья</h4><span class="vb-hint">4 человека</span></div>
+                  <div class="vb-rel">
+                    <div class="vb-rel__r"><span class="vb-rel__k">Супруга</span><b>Нина Борисовна</b><span class="vb-rel__y">1950</span></div>
+                    <div class="vb-rel__r"><span class="vb-rel__k">Дети</span><b>Илья</b><span class="vb-rel__y">1974</span><b>Ольга</b><span class="vb-rel__y">1978</span></div>
+                    <div class="vb-rel__r"><span class="vb-rel__k">Внуки</span><b>Тимур</b><span class="vb-rel__y">2005</span><b>Вера</b><span class="vb-rel__y">2009</span></div>
+                  </div>
+
+                  <p class="vb-hint" style="margin-top:auto">Shift + клик — выделить несколько карточек, ⌘K — все команды древа.</p>
+                </aside>
+
+              </div>
+            </div>
+          </div>
+          <figcaption><b>Холст древа</b> <code>torlmood.ru/tree/kovalevy</code> <span>Стеклянная обвязка парит над холстом: крошки слева, участники справа, док по центру, инспектор 320px. Латунная линия — фильтр «мужская линия», «Выбрано: 3».</span></figcaption>
+        </figure>
+
+        <!-- ---------- Карточка человека ---------- -->
+        <figure class="shot vb-shot vb-shot--desk">
+          <div class="frame">
+            <div class="browser">
+              <span class="dots"><i></i><i></i><i></i></span>
+              <span class="addr">torlmood.ru/tree/kovalevy/person/arkady</span>
+              <span class="tabs">Torlmood</span>
+            </div>
+            <div class="screen">
+              <div class="vb-app vb-app--focus">
+                <div class="vb-grid" aria-hidden="true"></div>
+
+                <div class="vb-board">
+  <svg class="vb-wires" viewBox="0 0 1280 820" aria-hidden="true" focusable="false">
+    <path class="vb-bond" d="M286 190h18M286 330h18M286 470h18"/>
+    <path d="M295 240v16M198 256h194M198 256v24M392 256v24"/>
+    <path d="M295 380v16M198 396h194M198 396v24M392 396v24"/>
+    <path d="M295 520v16M198 536h194M198 536v24M392 536v24"/>
+  </svg>
+<div class="vb-node vb-node--m" style="--x:110px;--y:140px">
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">1918–1983</span>
+    <span class="vb-node__nm">Пётр Григорьевич Ковалёв</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+<div class="vb-node vb-node--f" style="--x:304px;--y:140px">
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">1922–2004</span>
+    <span class="vb-node__nm">Мария Тимофеевна Ковалёва</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+<div class="vb-node vb-node--m vb-node--sel" style="--x:110px;--y:280px">
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">1947–2011</span>
+    <span class="vb-node__nm">Аркадий Петрович Ковалёв</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+<div class="vb-node vb-node--f" style="--x:304px;--y:280px">
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">1950</span>
+    <span class="vb-node__nm">Нина Борисовна Ковалёва</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+<div class="vb-node vb-node--m" style="--x:110px;--y:420px">
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">1974</span>
+    <span class="vb-node__nm">Илья Аркадьевич Ковалёв</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+<div class="vb-node vb-node--f" style="--x:304px;--y:420px">
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">1978</span>
+    <span class="vb-node__nm">Ольга Аркадьевна Ковалёва</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+<div class="vb-node vb-node--m" style="--x:110px;--y:560px">
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">2005</span>
+    <span class="vb-node__nm">Тимур Ильич Ковалёв</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+<div class="vb-node vb-node--f" style="--x:304px;--y:560px">
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">2009</span>
+    <span class="vb-node__nm">Вера Ильинична Ковалёва</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+                </div>
+
+                <header class="vb-top vb-panel">
+                  <div class="vb-top__l">
+                    <span class="vb-mark" aria-hidden="true">T</span>
+                    <span class="vb-crumbs"><b>Ковалёвы и Соколовы</b><i class="vb-crumb-sep">/</i>Аркадий Петрович<i class="vb-crumb-sep">/</i>Карточка</span>
+                  </div>
+                  <div class="vb-top__r">
+                    <span class="vb-avs" title="4 участника">
+                      <i class="vb-av vb-av--owner">И</i>
+                      <i class="vb-av vb-av--editor">О</i>
+                      <i class="vb-av vb-av--editor">Г</i>
+                      <i class="vb-av vb-av--viewer">Д</i>
+                    </span>
+                    <button class="vb-btn vb-btn--brass" type="button">
+                      <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M10 3.5v9M6.6 6.6L10 3.2l3.4 3.4M4.5 13v3.5h11V13"/></svg>
+                      Поделиться
+                    </button>
+                  </div>
+                </header>
+
+                <aside class="vb-cardpanel vb-panel" data-vb-tabs>
+                  <div class="vb-cp__head">
+                    <span class="vb-face vb-face--lg vb-face--m" aria-hidden="true"></span>
+                    <div>
+                      <h3 class="vb-name vb-name--lg">Аркадий Петрович Ковалёв</h3>
+                      <span class="vb-years">1947–2011 · 64 года</span>
+                      <span class="vb-place">Ленинград · III поколение · 2 связи</span>
+                      <div class="vb-badges">
+                        <span class="vb-badge vb-badge--brass">Выбран на холсте</span>
+                        <span class="vb-badge">Ольга правила 2 часа назад</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="vb-cp__acts">
+                    <button class="vb-btn vb-btn--brass vb-btn--sm" type="button">Правка</button>
+                    <button class="vb-btn vb-btn--sm" type="button">
+                      <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M10 5v10M5 10h10"/></svg>
+                      Добавить событие
+                    </button>
+                    <button class="vb-btn vb-btn--sm" type="button">
+                      <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="6" width="14" height="10" rx="2"/><circle cx="10" cy="11" r="2.6"/></svg>
+                      Фото
+                    </button>
+                    <button class="vb-btn vb-btn--sm vb-btn--icon" type="button" aria-label="Ещё действия">
+                      <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" fill="currentColor"><circle cx="4.5" cy="10" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="15.5" cy="10" r="1.5"/></svg>
+                    </button>
+                  </div>
+
+                  <div class="vb-tabs" role="tablist" aria-label="Разделы карточки">
+                    <button class="vb-tab" type="button" role="tab" data-vb-tab="facts" aria-selected="true">Факты</button>
+                    <button class="vb-tab" type="button" role="tab" data-vb-tab="events" aria-selected="false">События <span class="vb-tab__n">12</span></button>
+                    <button class="vb-tab" type="button" role="tab" data-vb-tab="history" aria-selected="false">История</button>
+                  </div>
+
+                  <div class="vb-cp__body">
+                    <div class="vb-tabpanel" data-vb-panel="facts">
+                      <div class="vb-dl">
+                        <div class="vb-dl__r"><span class="vb-dl__k">Полное имя</span><span class="vb-dl__v">Аркадий Петрович Ковалёв</span></div>
+                        <div class="vb-dl__r"><span class="vb-dl__k">Рождение</span><span class="vb-dl__v">1947, Ленинград</span></div>
+                        <div class="vb-dl__r"><span class="vb-dl__k">Смерть</span><span class="vb-dl__v">2011, Ленинград</span></div>
+                        <div class="vb-dl__r"><span class="vb-dl__k">Брак</span><span class="vb-dl__v">1971 — Нина Борисовна Ковалёва <em>(в девичестве Верещагина), 1950, Тверь</em></span></div>
+                        <div class="vb-dl__r"><span class="vb-dl__k">Отец</span><span class="vb-dl__v">Пётр Григорьевич Ковалёв, 1918–1983</span></div>
+                        <div class="vb-dl__r"><span class="vb-dl__k">Мать</span><span class="vb-dl__v">Мария Тимофеевна Ковалёва, 1922–2004</span></div>
+                      </div>
+                      <div class="vb-sec" style="margin-top:12px"><h4>Семья</h4><span class="vb-hint">нажмите, чтобы перейти на холсте</span></div>
+                      <div class="vb-rel">
+                        <div class="vb-rel__r"><span class="vb-rel__k">Супруга</span><b>Нина Борисовна</b><span class="vb-rel__y">1950</span></div>
+                        <div class="vb-rel__r"><span class="vb-rel__k">Дочь</span><b>Ольга</b><span class="vb-rel__y">1978</span></div>
+                        <div class="vb-rel__r"><span class="vb-rel__k">Сын</span><b>Илья</b><span class="vb-rel__y">1974</span></div>
+                        <div class="vb-rel__r"><span class="vb-rel__k">Внучка</span><b>Вера</b><span class="vb-rel__y">2009</span></div>
+                      </div>
+                    </div>
+
+                    <div class="vb-tabpanel" data-vb-panel="events" hidden>
+                      <ul class="vb-tl vb-tl--lg">
+                        <li class="vb-tl__i">
+                          <span class="vb-tl__d">1947 · Ленинград</span>
+                          <span class="vb-tl__t"><b>Рождение</b> — в семье Петра и Марии Ковалёвых</span>
+                        </li>
+                        <li class="vb-tl__i">
+                          <span class="vb-tl__d">1971 · Ленинград</span>
+                          <span class="vb-tl__t"><b>Свадьба</b> с Ниной Борисовной Верещагиной</span>
+                        </li>
+                        <li class="vb-tl__i">
+                          <span class="vb-tl__d">1974 · 1978</span>
+                          <span class="vb-tl__t"><b>Дети</b> — Илья и Ольга</span>
+                        </li>
+                        <li class="vb-tl__i">
+                          <span class="vb-tl__d">2 часа назад</span>
+                          <span class="vb-tl__t">Ольга уточнила <b>место рождения</b>: Тверь → Рязань <span class="vb-tl__sub">есть версия до правки</span></span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div class="vb-tabpanel" data-vb-panel="history" hidden>
+                      <div class="vb-hist">
+                        <div class="vb-hist__r">
+                          <span class="vb-hist__w">Ольга Ковалёва · редактор</span>
+                          <span class="vb-hist__m">2 часа назад</span>
+                          <span class="vb-hist__d">Место рождения: Тверь → Рязань</span>
+                        </div>
+                        <div class="vb-hist__r">
+                          <span class="vb-hist__w">Илья Ковалёв · владелец</span>
+                          <span class="vb-hist__m">5 часов назад</span>
+                          <span class="vb-hist__d">Добавлена фотография, 1978 год</span>
+                        </div>
+                        <div class="vb-hist__r">
+                          <span class="vb-hist__w">Галина Прохорова · редактор</span>
+                          <span class="vb-hist__m">3 дня назад</span>
+                          <span class="vb-hist__d">Дата свадьбы: 1971 (было «1971?»)</span>
+                        </div>
+                        <div class="vb-hist__r">
+                          <span class="vb-hist__w">Импорт GEDCOM</span>
+                          <span class="vb-hist__m">12 дней назад</span>
+                          <span class="vb-hist__d">Карточка создана вместе с 34 людьми</span>
+                        </div>
+                      </div>
+                      <button class="vb-btn vb-btn--sm" type="button" style="margin-top:12px">Откатить к версии 12 дней назад</button>
+                    </div>
+                  </div>
+
+                  <div class="vb-cp__foot">
+                    <span class="vb-hint">⌘K — команды · Esc — вернуться на холст</span>
+                    <span style="display:flex;gap:8px">
+                      <button class="vb-btn vb-btn--sm vb-btn--ghost" type="button">Скачать PDF</button>
+                      <button class="vb-btn vb-btn--sm" type="button">Показать на холсте</button>
+                    </span>
+                  </div>
+                </aside>
+
+              </div>
+            </div>
+          </div>
+          <figcaption><b>Карточка человека</b> <code>torlmood.ru/tree/kovalevy/person/arkady</code> <span>Отдельная страница превратилась в раскрытую панель 560px поверх приглушённого холста: вкладки «Факты / События / История» переключаются на месте.</span></figcaption>
+        </figure>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       02. МОБИЛЬНЫЙ
+       ================================================================ -->
+  <section class="section" id="mobile">
+    <h2><span class="num">02</span>Мобильный</h2>
+    <p>Холст во весь экран: пилюля-док снизу, плавающая «+», счётчик выделения. Карточка человека — лист снизу с ручкой, палитра — полноэкранный поиск.</p>
+
+    <div class="stage">
+      <div class="stage-row stage-row--center">
+
+        <!-- ---------- Мобильный холст ---------- -->
+        <figure class="shot vb-shot vb-shot--phone">
+          <div class="phone">
+            <div class="notch"></div>
+            <div class="phone-screen">
+              <div class="vb-app vb-app--phone">
+                <div class="vb-grid" aria-hidden="true"></div>
+                <div class="statusbar"><span class="vb-sb__t">21:40</span><span class="icons"><i class="bars"></i><i class="bat"></i></span></div>
+
+                <div class="vb-board">
+  <svg class="vb-wires" viewBox="0 0 370 824" aria-hidden="true" focusable="false">
+    <path class="vb-bond" d="M172 198h26M172 314h26M172 430h26M172 546h26"/>
+    <path d="M185 246v8M93 254h184M93 254v12M277 254v12"/>
+    <path d="M185 362v8M93 370h184M93 370v12M277 370v12"/>
+    <path d="M185 478v8M93 486h184M93 486v12M277 486v12"/>
+    <path class="vb-glow" d="M185 370v12M185 486v12"/>
+  </svg>
+<div class="vb-node vb-node--m" style="--x:14px;--y:150px">
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">1918–1983</span>
+    <span class="vb-node__nm">Пётр Григорьевич Ковалёв</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+<div class="vb-node vb-node--f" style="--x:198px;--y:150px">
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">1922–2004</span>
+    <span class="vb-node__nm">Мария Тимофеевна Ковалёва</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+<div class="vb-node vb-node--m vb-node--sel" style="--x:14px;--y:266px">
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">1947–2011</span>
+    <span class="vb-node__nm">Аркадий Петрович Ковалёв</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+<div class="vb-node vb-node--f vb-node--sel2" style="--x:198px;--y:266px">
+    <span class="vb-node__check" aria-hidden="true"><svg viewBox="0 0 20 20" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 10.6l3.2 3.2L15 7"/></svg></span>
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">1950</span>
+    <span class="vb-node__nm">Нина Борисовна Ковалёва</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+<div class="vb-node vb-node--m vb-node--sel2" style="--x:14px;--y:382px">
+    <span class="vb-node__check" aria-hidden="true"><svg viewBox="0 0 20 20" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 10.6l3.2 3.2L15 7"/></svg></span>
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">1974</span>
+    <span class="vb-node__nm">Илья Аркадьевич Ковалёв</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+<div class="vb-node vb-node--f" style="--x:198px;--y:382px">
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">1978</span>
+    <span class="vb-node__nm">Ольга Аркадьевна Ковалёва</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+<div class="vb-node vb-node--m" style="--x:14px;--y:498px">
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">2005</span>
+    <span class="vb-node__nm">Тимур Ильич Ковалёв</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+<div class="vb-node vb-node--f" style="--x:198px;--y:498px">
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">2009</span>
+    <span class="vb-node__nm">Вера Ильинична Ковалёва</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+                </div>
+
+                <div class="vb-mtop vb-panel">
+                  <span class="vb-icc" aria-hidden="true">
+                    <svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12.5 4.5L7 10l5.5 5.5"/></svg>
+                  </span>
+                  <span class="vb-mtop__t">Ковалёвы и Соколовы<span class="vb-mtop__s">148 человек · 5 поколений</span></span>
+                  <span class="vb-icc" aria-hidden="true">
+                    <svg viewBox="0 0 20 20" width="17" height="17" fill="currentColor"><circle cx="4.5" cy="10" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="15.5" cy="10" r="1.5"/></svg>
+                  </span>
+                </div>
+
+                <div class="vb-mchips">
+                  <span class="vb-mchip-count">Выбрано: 3</span>
+                  <span class="vb-chip vb-chip--on">Мужская линия</span>
+                </div>
+
+                <span class="vb-mhint">щипок — масштаб · удержание — выделение</span>
+
+                <button class="vb-fab" type="button" aria-label="Добавить человека">
+                  <svg viewBox="0 0 20 20" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 4v12M4 10h12"/></svg>
+                </button>
+
+                <div class="vb-pilldock vb-panel">
+                  <button class="vb-pilldock__b" type="button">
+                    <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M10 4v12M4 10h12"/></svg>
+                    Добавить
+                  </button>
+                  <button class="vb-pilldock__b" type="button">
+                    <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M8.4 11.6l3.2-3.2"/><path d="M7.4 8.4l1.2-1.2a2.7 2.7 0 0 1 3.8 3.8l-1.2 1.2"/><path d="M12.6 11.6l-1.2 1.2a2.7 2.7 0 0 1-3.8-3.8l1.2-1.2"/></svg>
+                    Связь
+                  </button>
+                  <button class="vb-pilldock__b vb-pilldock__b--on" type="button" aria-pressed="true">
+                    <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3.5 5.5h13M6 10h8M8.5 14.5h3"/></svg>
+                    Фильтр
+                  </button>
+                  <button class="vb-pilldock__b" type="button">
+                    <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M10 3v9M6.8 6.2L10 3l3.2 3.2M4 13.5V16h12v-2.5"/></svg>
+                    Экспорт
+                  </button>
+                </div>
+
+              </div>
+            </div>
+          </div>
+          <figcaption><b>Холст древа</b> <code>torlmood.ru/tree/kovalevy</code> <span>Холст во весь экран, стеклянная шапка, плавающая «+» и пилюля-док. Счётчик «Выбрано: 3», латунная линия — активный фильтр.</span></figcaption>
+        </figure>
+
+        <!-- ---------- Мобильная карточка ---------- -->
+        <figure class="shot vb-shot vb-shot--phone">
+          <div class="phone">
+            <div class="notch"></div>
+            <div class="phone-screen">
+              <div class="vb-app vb-app--phone vb-app--focus">
+                <div class="vb-grid" aria-hidden="true"></div>
+                <div class="statusbar"><span class="vb-sb__t">21:40</span><span class="icons"><i class="bars"></i><i class="bat"></i></span></div>
+
+                <div class="vb-board">
+  <svg class="vb-wires" viewBox="0 0 370 824" aria-hidden="true" focusable="false">
+    <path d="M185 216v48"/>
+  </svg>
+<div class="vb-node vb-node--m vb-node--sel" style="--x:14px;--y:120px">
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">1947–2011</span>
+    <span class="vb-node__nm">Аркадий Петрович Ковалёв</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+<div class="vb-node vb-node--f" style="--x:198px;--y:120px">
+    <span class="vb-node__ph" aria-hidden="true"></span>
+    <span class="vb-node__yr">1950</span>
+    <span class="vb-node__nm">Нина Борисовна Ковалёва</span>
+    <span class="vb-node__edge" aria-hidden="true"></span>
+  </div>
+                </div>
+
+                <div class="vb-mtop vb-panel">
+                  <span class="vb-icc" aria-hidden="true">
+                    <svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12.5 4.5L7 10l5.5 5.5"/></svg>
+                  </span>
+                  <span class="vb-mtop__t">Карточка человека<span class="vb-mtop__s">Ковалёвы и Соколовы</span></span>
+                  <span class="vb-icc" aria-hidden="true">
+                    <svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M10 3.5v9M6.6 6.6L10 3.2l3.4 3.4M4.5 13v3.5h11V13"/></svg>
+                  </span>
+                </div>
+
+                <section class="vb-sheet" aria-label="Карточка человека">
+                  <span class="vb-handle" aria-hidden="true"></span>
+
+                  <div class="vb-sheet__head">
+                    <span class="vb-face vb-face--m" aria-hidden="true"></span>
+                    <div>
+                      <h3 class="vb-name">Аркадий Петрович Ковалёв</h3>
+                      <span class="vb-years">1947–2011 · 64 года</span>
+                      <span class="vb-place">Ленинград · III поколение</span>
+                    </div>
+                  </div>
+
+                  <div class="vb-sheet__acts">
+                    <button class="vb-btn vb-btn--brass vb-btn--sm" type="button">Правка</button>
+                    <button class="vb-btn vb-btn--sm" type="button">Событие</button>
+                    <button class="vb-btn vb-btn--sm" type="button">Фото</button>
+                    <button class="vb-btn vb-btn--sm vb-btn--icon" type="button" aria-label="Ещё действия">
+                      <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" fill="currentColor"><circle cx="4.5" cy="10" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="15.5" cy="10" r="1.5"/></svg>
+                    </button>
+                  </div>
+
+                  <div class="vb-tabs" role="tablist" aria-label="Разделы карточки" data-vb-tabs>
+                    <button class="vb-tab" type="button" role="tab" data-vb-tab="facts" aria-selected="true">Факты</button>
+                    <button class="vb-tab" type="button" role="tab" data-vb-tab="events" aria-selected="false">События <span class="vb-tab__n">12</span></button>
+                    <button class="vb-tab" type="button" role="tab" data-vb-tab="history" aria-selected="false">История</button>
+                  </div>
+
+                  <div class="vb-sheet__body">
+                    <div class="vb-tabpanel" data-vb-panel="facts">
+                      <div class="vb-dl">
+                        <div class="vb-dl__r"><span class="vb-dl__k">Рождение</span><span class="vb-dl__v">1947, Ленинград</span></div>
+                        <div class="vb-dl__r"><span class="vb-dl__k">Смерть</span><span class="vb-dl__v">2011, Ленинград</span></div>
+                        <div class="vb-dl__r"><span class="vb-dl__k">Брак</span><span class="vb-dl__v">1971 — Нина Борисовна <em>(Верещагина), 1950, Тверь</em></span></div>
+                        <div class="vb-dl__r"><span class="vb-dl__k">Отец</span><span class="vb-dl__v">Пётр Григорьевич, 1918–1983</span></div>
+                        <div class="vb-dl__r"><span class="vb-dl__k">Мать</span><span class="vb-dl__v">Мария Тимофеевна, 1922–2004</span></div>
+                      </div>
+                      <div class="vb-sec" style="margin-top:10px"><h4>Дети и внуки</h4><span class="vb-hint">4 человека</span></div>
+                      <div class="vb-rel">
+                        <div class="vb-rel__r"><span class="vb-rel__k">Сын</span><b>Илья</b><span class="vb-rel__y">1974</span></div>
+                        <div class="vb-rel__r"><span class="vb-rel__k">Дочь</span><b>Ольга</b><span class="vb-rel__y">1978</span></div>
+                      </div>
+                    </div>
+
+                    <div class="vb-tabpanel" data-vb-panel="events" hidden>
+                      <ul class="vb-tl">
+                        <li class="vb-tl__i">
+                          <span class="vb-tl__d">1947 · Ленинград</span>
+                          <span class="vb-tl__t"><b>Рождение</b></span>
+                        </li>
+                        <li class="vb-tl__i">
+                          <span class="vb-tl__d">1971 · Ленинград</span>
+                          <span class="vb-tl__t"><b>Свадьба</b> с Ниной Борисовной</span>
+                        </li>
+                        <li class="vb-tl__i">
+                          <span class="vb-tl__d">1974 · 1978</span>
+                          <span class="vb-tl__t"><b>Дети</b> — Илья и Ольга</span>
+                        </li>
+                        <li class="vb-tl__i">
+                          <span class="vb-tl__d">2 часа назад</span>
+                          <span class="vb-tl__t">Ольга уточнила место рождения</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div class="vb-tabpanel" data-vb-panel="history" hidden>
+                      <div class="vb-hist">
+                        <div class="vb-hist__r">
+                          <span class="vb-hist__w">Ольга Ковалёва · редактор</span>
+                          <span class="vb-hist__m">2 часа назад</span>
+                          <span class="vb-hist__d">Место рождения: Тверь → Рязань</span>
+                        </div>
+                        <div class="vb-hist__r">
+                          <span class="vb-hist__w">Илья Ковалёв · владелец</span>
+                          <span class="vb-hist__m">5 часов назад</span>
+                          <span class="vb-hist__d">Добавлена фотография, 1978 год</span>
+                        </div>
+                        <div class="vb-hist__r">
+                          <span class="vb-hist__w">Галина Прохорова · редактор</span>
+                          <span class="vb-hist__m">3 дня назад</span>
+                          <span class="vb-hist__d">Дата свадьбы: 1971</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="vb-sheet__foot">
+                    <button class="vb-btn" type="button" style="flex:1">Скачать PDF</button>
+                    <button class="vb-btn vb-btn--brass" type="button" style="flex:1">Показать на холсте</button>
+                  </div>
+                </section>
+
+              </div>
+            </div>
+          </div>
+          <figcaption><b>Карточка человека</b> <code>torlmood.ru/tree/kovalevy/person/arkady</code> <span>Инспектор — лист снизу с ручкой: вкладки «Факты / События / История», действия под именем, холст остаётся виден сверху.</span></figcaption>
+        </figure>
+
+        <!-- ---------- Мобильная палитра ---------- -->
+        <figure class="shot vb-shot vb-shot--phone">
+          <div class="phone">
+            <div class="notch"></div>
+            <div class="phone-screen">
+              <div class="vb-app vb-app--phone vb-app--dash">
+                <div class="vb-grid" aria-hidden="true"></div>
+                <div class="statusbar"><span class="vb-sb__t">21:40</span><span class="icons"><i class="bars"></i><i class="bat"></i></span></div>
+
+                <div class="vb-search vb-panel">
+                  <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="9" cy="9" r="5.2"/><path d="M13 13l4 4"/></svg>
+                  <span class="vb-search__q">сокол<span class="vb-caret"></span></span>
+                  <span class="vb-btn vb-btn--sm" style="height:34px">Отмена</span>
+                </div>
+
+                <div class="vb-mchips vb-mchips--top">
+                  <span class="vb-chip">Все</span>
+                  <span class="vb-chip vb-chip--on">Люди</span>
+                  <span class="vb-chip">Места</span>
+                  <span class="vb-chip">События</span>
+                </div>
+
+                <div class="vb-mres">
+                  <div class="vb-mrow vb-mrow--on">
+                    <span class="vb-face vb-face--sm vb-face--m" aria-hidden="true"></span>
+                    <span class="vb-mrow__t"><b>Дмитрий Львович Соколов</b><span>1920–1995 · Соколов</span></span>
+                    <span class="vb-badge vb-badge--male">Зритель</span>
+                  </div>
+                  <div class="vb-mrow">
+                    <span class="vb-face vb-face--sm vb-face--f" aria-hidden="true"></span>
+                    <span class="vb-mrow__t"><b>Валентина Григорьевна Соколова</b><span>1926–1996 · Соколова</span></span>
+                  </div>
+                  <div class="vb-mrow">
+                    <span class="vb-face vb-face--sm vb-face--f" aria-hidden="true"></span>
+                    <span class="vb-mrow__t"><b>Анна Сергеевна Ковалёва</b><span>1894–1971 · в девичестве Соколова</span></span>
+                    <span class="vb-badge">Соколова</span>
+                  </div>
+                  <div class="vb-mrow">
+                    <span class="vb-icc" aria-hidden="true">
+                      <svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 2.6l7.4 3.7v3.2c0 3.9-3 6.7-7.4 8-4.4-1.3-7.4-4.1-7.4-8V6.3z"/></svg>
+                    </span>
+                    <span class="vb-mrow__t"><b>Древо «Ковалёвы и Соколовы»</b><span>148 человек · 12 событий</span></span>
+                  </div>
+
+                  <p class="vb-mgroup">Действия</p>
+                  <div class="vb-mrow" style="height:52px">
+                    <span class="vb-icc" aria-hidden="true">
+                      <svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M10 4v12M4 10h12"/></svg>
+                    </span>
+                    <span class="vb-mrow__t"><b>Добавить человека</b><span>Новый родственник в ветвь Соколовых</span></span>
+                  </div>
+                  <div class="vb-mrow" style="height:52px">
+                    <span class="vb-icc" aria-hidden="true">
+                      <svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M10 3v9M6.8 6.2L10 3l3.2 3.2M4 13.5V16h12v-2.5"/></svg>
+                    </span>
+                    <span class="vb-mrow__t"><b>Экспорт GEDCOM</b><span>148 человек · файл 412 КБ</span></span>
+                  </div>
+
+                  <div class="vb-mfoot">
+                    <p class="vb-hint" style="margin:0">Поиск идёт по 148 людям, 4 участникам, 12 событиям и 6 местам.</p>
+                    <button class="vb-mcta" type="button">
+                      <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M10 4v12M4 10h12"/></svg>
+                      Добавить человека
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+          <figcaption><b>Палитра ⌘K</b> <code>torlmood.ru/tree/kovalevy?q=сокол</code> <span>На телефоне палитра становится полноэкранным поиском: люди, места, древо и действия в одном списке.</span></figcaption>
+        </figure>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       03. ЗАМЕТКИ
+       ================================================================ -->
+  <section class="section" id="notes">
+    <h2><span class="num">03</span>Заметки</h2>
+    <p>Что даёт светлая тема, как она ложится на двухслойную палитру проекта и чем придётся заплатить.</p>
+
+    <div class="notes">
+      <div class="note-card">
+        <h3>Что даёт светлая тема</h3>
+        <p>
+          Днём и на большом экране холст читается без напряжения: белые карточки, тёмные волосяные линии,
+          имена и годы снова главное, а не фон. Для аудитории 20–70+ светлый интерфейс привычнее — его не нужно объяснять.
+        </p>
+        <ul style="margin-top:10px">
+          <li>Светлая мастерская лучше переживает солнце и печать: скриншот древа не стыдно отправить в семейный чат.</li>
+          <li>Тень и янтарный акцент честно показывают, что нажимается, что выделено и где лежит панель.</li>
+          <li>Кромка по полу — <code>#3B82F6</code> и <code>#EA8C33</code> — на белом читается как метка, а не как заливка.</li>
+        </ul>
+      </div>
+
+      <div class="note-card">
+        <h3>Как ложится на код</h3>
+        <p>
+          В проекте уже двухслойная палитра: <code>--p-*</code> → <code>@theme</code> в <code>src/app/globals.css</code>
+          и четыре темы. Светлая мастерская — это замена слоя палитры, а не переписывание компонентов:
+          разметка, геометрия и логика остаются те же.
+        </p>
+        <ul style="margin-top:10px">
+          <li><code>src/app/globals.css</code> — <b>основной объём</b>: значения светлой темы для холста, поверхности и линий; новые токены стекла и теней (<code>--p-glass</code>, <code>--p-shadow-lift</code>); из тёмного набора уходит свечение выделения.</li>
+          <li><code>src/components/tree/TreeCanvas.tsx</code> — <b>правка небольшая</b>: панели берут цвета из токенов, но проверить <code>backdrop-filter</code> и тени — на белом стекло без тени исчезает.</li>
+          <li><code>src/components/tree/PersonNode.tsx</code> — <b>средняя правка</b>: состояния hover / selected / multi — янтарное кольцо <code>0 0 0 3px rgba(161,98,7,.18)</code> вместо свечения, кромка по полу <code>#3B82F6</code> / <code>#EA8C33</code>.</li>
+          <li><code>src/components/tree/FamilyBusEdge.tsx</code> — <b>лёгкая правка</b>: линии <code>rgba(15,23,42,.28–.38)</code>, брачные скобы тем же цветом.</li>
+          <li><code>src/components/tree/NodeMenu.tsx</code> — <b>лёгкая правка</b>: меню становится белой панелью с тенью и разделителями <code>rgba(15,23,42,.06)</code>.</li>
+          <li><code>src/lib/layout.ts</code>, <code>src/lib/place.ts</code> — <b>без изменений</b>: сетка 176×100, шаг 122px и формат «1947, Ленинград» от темы не зависят.</li>
+        </ul>
+      </div>
+
+      <div class="note-card note-card--warn">
+        <h3>Риски и цена</h3>
+        <ul>
+          <li><b>На светлом видно каждую шероховатость</b>: сдвиг на 1px, разную толщину линий, «грязную» тень. Тёмная тема это прощала, светлая — нет.</li>
+          <li><b>Стекло выцветает</b>: без тени и границы панель сливается с холстом, поэтому тени приходится делать заметнее, чем в тёмной версии.</li>
+          <li><b>Тени дороже</b>: они есть у каждой карточки и панели; на слабом телефоне это лишняя отрисовка — нужен замер кадров.</li>
+          <li><b>Приглушённый текст легко сделать слишком светлым</b>: <code>#94A3B8</code> годится только для иконок и сетки, для текста — не светлее <code>#64748B</code>.</li>
+          <li><b>Зато на солнце светлая тема выигрывает</b>: тёмный холст на улице читается заметно хуже, а большая часть семьи смотрит древо с телефона.</li>
+        </ul>
+      </div>
+
+      <div class="note-card">
+        <h3>Палитра</h3>
+        <p>Светлая тема проекта; вместо латуни — янтарь. Тёмный янтарь <code>#A16207</code> только для текста и иконок, заливки <code>#F5C542</code>/<code>#EAB308</code> — всегда с тёмным текстом внутри.</p>
+        <div class="swatches">
+          <div class="swatch"><i style="background:#F1F3F5"></i><b>Холст</b><span>#F1F3F5</span></div>
+          <div class="swatch"><i style="background:#FFFFFF"></i><b>Поверхность</b><span>#FFFFFF</span></div>
+          <div class="swatch"><i style="background:#0F172A"></i><b>Текст</b><span>#0F172A · 18.1:1</span></div>
+          <div class="swatch"><i style="background:#64748B"></i><b>Приглушённый</b><span>#64748B · 4.8:1</span></div>
+          <div class="swatch"><i style="background:#A16207"></i><b>Янтарь</b><span>#A16207 · 4.9:1</span></div>
+          <div class="swatch"><i style="background:linear-gradient(180deg,#3B82F6 50%,#EA8C33 50%)"></i><b>Пол</b><span>#3B82F6 / #EA8C33</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <p class="footer">Вариант B, светлая тема · <a href="index.html">вернуться к обзору</a> · <a href="b-canvas-studio.html">тёмная версия</a></p>
+</div>
+
+<script>
+/* Переключение вкладок «Факты / События / История» — единственный скрипт страницы. */
+document.querySelectorAll('[data-vb-tabs]').forEach(function (root) {
+  var tabs = root.querySelectorAll('.vb-tab');
+  var panels = root.querySelectorAll('.vb-tabpanel');
+  tabs.forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      tabs.forEach(function (t) { t.setAttribute('aria-selected', 'false'); });
+      tab.setAttribute('aria-selected', 'true');
+      panels.forEach(function (p) {
+        p.hidden = p.getAttribute('data-vb-panel') !== tab.getAttribute('data-vb-tab');
+      });
+    });
+  });
+});
+</script>
+
+</body>
+</html>

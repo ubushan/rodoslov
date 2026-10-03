@@ -4,8 +4,8 @@ import { memo } from "react";
 import { useNodes, useEdges, type EdgeProps } from "@xyflow/react";
 import { primaryParentByChild } from "@/lib/layout";
 
-const FALLBACK_W = 236;
-const FALLBACK_H = 104;
+const FALLBACK_W = 176;
+const FALLBACK_H = 100;
 
 /**
  * Ребро «родитель — ребёнок» в стиле MyHeritage (нисходящая пирамида, компакт):
@@ -39,6 +39,13 @@ function FamilyBusEdgeComponent({ source, targetX, targetY }: EdgeProps) {
   if (spouseId) parentIds.add(spouseId);
 
   const parents = [...parentIds].map((id) => ({ id, ...bottom(id) })).sort((a, b) => a.x - b.x);
+
+  // Выбранная карточка подсвечивает свою ветвь латунью — как «w-glow»
+  // в прототипе студии: цвет берём из акцентных токенов темы.
+  const selectedIds = nodes.filter((n) => n.selected).map((n) => n.id);
+  const highlighted =
+    selectedIds.length > 0 &&
+    (selectedIds.includes(source) || (!!spouseId && selectedIds.includes(spouseId)));
 
   // дети этой семьи. Ребёнок рисуется только от основного родителя —
   // то же правило использует раскладка, иначе линия ушла бы в чужую ветвь
@@ -93,8 +100,8 @@ function FamilyBusEdgeComponent({ source, targetX, targetY }: EdgeProps) {
     <path
       d={`${bracket} ${run}`}
       fill="none"
-      stroke="var(--color-canvas-line)"
-      strokeWidth={1.5}
+      stroke={highlighted ? "var(--p-acc-line)" : "var(--color-canvas-line)"}
+      strokeWidth={highlighted ? 2 : 1.5}
       strokeLinecap="round"
       strokeLinejoin="round"
     />

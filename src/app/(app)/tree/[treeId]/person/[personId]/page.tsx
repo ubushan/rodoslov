@@ -3,16 +3,45 @@ import { createClient } from "@/lib/supabase/server";
 import { PersonPage, type NewRelation } from "@/components/person/PersonPage";
 import type { ChangeRow } from "@/components/person/PersonHistory";
 import { getSettings } from "@/lib/settings";
-import { shortName, formatDateTime } from "@/lib/format";
+import { shortName, formatDateTime, publicUrl } from "@/lib/format";
 import { embeddedName } from "@/lib/admin";
 import type { Person, Relationship, Attachment, MemberRole } from "@/lib/types";
 
 type Params = { params: Promise<{ treeId: string; personId: string }> };
 type Search = { searchParams: Promise<{ relateTo?: string; relation?: string }> };
 
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+
+/**
+ * Размеры файлов архива: Storage отдаёт Content-Length по публичной ссылке.
+ * Если файл не ответил (или бакет закрыт) — размер просто не показываем,
+ * вместо него в списке остаётся дата добавления.
+ */
+async function attachmentSizes(attachments: Attachment[]) {
+  const sizes: Record<string, number> = {};
+  await Promise.all(
+    attachments.map(async (a) => {
+      const url = publicUrl(SUPABASE_URL, "archive", a.storage_path);
+      if (!url) return;
+      try {
+        const res = await fetch(url, {
+          method: "HEAD",
+          cache: "no-store",
+          signal: AbortSignal.timeout(1500),
+        });
+        const length = Number(res.headers.get("content-length"));
+        if (res.ok && Number.isFinite(length) && length > 0) sizes[a.id] = length;
+      } catch {
+        // размер не критичен — без него покажем дату добавления
+      }
+    })
+  );
+  return sizes;
+}
+
 export async function generateMetadata({ params }: Params) {
   const { treeId, personId } = await params;
-  if (personId === "new") return { title: "Новая карточка — Родослов" };
+  if (personId === "new") return { title: "Новая карточка — Torlmud" };
 
   const supabase = await createClient();
   const { data } = await supabase
@@ -22,7 +51,7 @@ export async function generateMetadata({ params }: Params) {
     .eq("tree_id", treeId)
     .maybeSingle();
 
-  return { title: data ? `${shortName(data)} — Родослов` : "Карточка — Родослов" };
+  return { title: data ? `${shortName(data)} — Torlmud` : "Карточка — Torlmud" };
 }
 
 export default async function PersonCardPage({ params, searchParams }: Params & Search) {
@@ -87,6 +116,11 @@ export default async function PersonCardPage({ params, searchParams }: Params & 
     }
   }
 
+  const personAttachments = ((attachments ?? []) as Attachment[]).filter(
+    (a) => a.person_id === person?.id
+  );
+  const sizes = await attachmentSizes(personAttachments);
+
   return (
     <PersonPage
       treeId={treeId}
@@ -95,7 +129,8 @@ export default async function PersonCardPage({ params, searchParams }: Params & 
       person={person ?? null}
       persons={(persons ?? []) as Person[]}
       relationships={(relationships ?? []) as Relationship[]}
-      attachments={((attachments ?? []) as Attachment[]).filter((a) => a.person_id === person?.id)}
+      attachments={personAttachments}
+      attachmentSizes={sizes}
       hasDeathPlace={!deathPlaceError}
       relation={relateTo && kind ? { relateTo, kind } : null}
       limitReached={limitReached}

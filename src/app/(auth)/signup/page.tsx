@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { SignupForm } from "./form";
+import { Button } from "@/components/ui/button";
 import { getSettings } from "@/lib/settings";
 
-export const metadata = { title: "Регистрация — Родослов" };
+export const metadata = { title: "Регистрация — Torlmud" };
 
 export default async function SignupPage() {
   // регистрацию можно закрыть в панели администратора
@@ -11,16 +12,18 @@ export default async function SignupPage() {
   if (!allowSignups) {
     return (
       <>
-        <h1 className="text-[28px] leading-tight text-ink-800">Регистрация закрыта</h1>
-        <p className="mt-2 text-sm text-ink-500">
+        <span className="studio-chip">Регистрация</span>
+        <h1 className="mt-4 font-display text-[26px] leading-tight text-ink-800 sm:text-[28px]">
+          Регистрация закрыта
+        </h1>
+        <p className="mt-2 text-sm leading-relaxed text-ink-500">
           Новые аккаунты сейчас не создаются — так решил администратор платформы. Если вас
           пригласили в древо, войдите в существующий аккаунт или попросите приглашение заново.
         </p>
-        <Link
-          href="/login"
-          className="mt-6 inline-flex h-12 items-center justify-center rounded-xl bg-brass-500 px-6 text-[15px] font-medium text-ink-900 transition-colors hover:bg-brass-400"
-        >
-          Войти
+        <Link href="/login" className="mt-6 block">
+          <Button size="lg" className="w-full">
+            Войти
+          </Button>
         </Link>
       </>
     );
@@ -28,16 +31,23 @@ export default async function SignupPage() {
 
   return (
     <>
-      <h1 className="text-[28px] leading-tight text-ink-800">Заведите семейный архив</h1>
-      <p className="mt-2 text-sm text-ink-500">
+      <span className="studio-chip">Регистрация</span>
+
+      <h1 className="mt-4 font-display text-[26px] leading-tight text-ink-800 sm:text-[28px]">
+        Заведите семейный архив
+      </h1>
+      <p className="mt-2 text-sm leading-relaxed text-ink-500">
         Аккаунт нужен, чтобы древо сохранилось и его увидели только те, кого вы пригласите.
       </p>
 
       <SignupForm />
 
-      <p className="mt-6 text-sm text-ink-500">
+      <p className="mt-7 text-sm text-ink-500">
         Уже зарегистрированы?{" "}
-        <Link href="/login" className="font-medium text-brass-600 hover:underline">
+        <Link
+          href="/login"
+          className="font-medium text-brass-600 underline decoration-brass-500/40 underline-offset-4 hover:decoration-brass-500"
+        >
           Войти
         </Link>
       </p>

@@ -1,164 +1,73 @@
 "use client";
 
-import { memo, useEffect, useRef, useState } from "react";
+import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { shortName, lifespan, ageYears, yearsWord, peopleWord } from "@/lib/format";
-import type { Gender, Person } from "@/lib/types";
-import type { NewRelative } from "@/lib/place";
-import { NodeMenu, MenuItem } from "./NodeMenu";
-
-export type { NewRelative };
+import { shortName, peopleWord } from "@/lib/format";
+import type { Person } from "@/lib/types";
 
 export type PersonNodeData = {
   person: Person;
   photoUrl: string | null;
-  canEdit: boolean;
-  /** есть супруги или дети — семейную ветку есть что показывать */
-  canOpenBranch: boolean;
   /** на странице ветки: сколько человек общего древа в неё не попало */
   hiddenCount?: number;
-  /** Пол уже добавленных родителей: чтобы не завести второго отца или мать */
-  parentGenders: Gender[];
   onOpen: (id: string) => void;
-  onAdd: (id: string, relation: NewRelative) => void;
-  onBranch: (id: string) => void;
-  onHover: (id: string, over: boolean) => void;
 };
 
-type AddOption = { key: NewRelative; label: string; disabled?: boolean; hint?: string };
-
-/** Карандаш для кнопки редактирования */
-function IconEdit() {
-  return (
-    <svg
-      width="17"
-      height="17"
-      viewBox="0 0 18 18"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.9"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M4 14v-2.3L11.7 4a1.7 1.7 0 0 1 2.4 2.4L6.3 14H4Z" />
-      <path d="M10.4 5.3 12.7 7.6" />
-    </svg>
-  );
-}
-
-/** Стрелки внутрь — кнопка сужает вид до семейной ветки */
-function IconCollapse() {
-  return (
-    <svg
-      width="17"
-      height="17"
-      viewBox="0 0 18 18"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.9"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M3 10.5h4.5V15M15 7.5h-4.5V3M10.5 7.5l5-5M2.5 15.5l5-5" />
-    </svg>
-  );
+/**
+ * «1889–1954», «1974» — годы в углу карточки, как в прототипе.
+ * Полные даты в карточку не влезают (11px моноширинного текста в правом
+ * верхнем углу), поэтому берём только год: остальное — в карточке человека.
+ */
+function cardYears(person: Person) {
+  const yearOf = (iso: string | null, year: number | null) => {
+    if (iso) {
+      const m = /(\d{4})/.exec(iso);
+      if (m) return m[1];
+      return iso;
+    }
+    return year ? String(year) : null;
+  };
+  const birth = yearOf(person.birth_date, person.birth_year);
+  const death = yearOf(person.death_date, person.death_year);
+  if (person.is_living) return birth;
+  if (!birth && !death) return null;
+  return `${birth ?? "?"}–${death ?? "?"}`;
 }
 
 /**
- * Карточка на холсте: портрет, имя, годы жизни с возрастом, место.
- * Ширина подстраивается под содержимое (не больше 320px), поэтому
- * длинные имена не режутся многоточием, а переносятся на новую строку.
- * Умершие отмечены приглушённым портретом и тире в годах.
+ * Карточка на холсте — 176×100, как в прототипе студии:
+ *   верхняя строка  — портрет 26px кругом слева, годы справа;
+ *   нижняя строка   — имя (до трёх строк);
+ *   кромка по низу  — цвет пола (рисует .studio-card).
  *
- * Точки-хэндлы скрыты: вместо них ряд кнопок на верхней грани — «+» с меню
- * (отец, мать, супруг(а), ребёнок), правка карточки и открытие семейной ветки.
+ * Кнопок на самой карточке нет: клик выделяет человека и открывает панель
+ * деталей (инспектор) справа, там «Открыть карточку», «Открыть семейную
+ * ветку» и добавление родственников. Двойной клик открывает карточку.
+ *
+ * Точки-хэндлы скрыты в CSS: к ним крепятся линии связи.
  */
 function PersonNodeComponent({ data, selected }: NodeProps) {
-  const { person, photoUrl, canEdit, parentGenders, canOpenBranch, hiddenCount, onBranch, onOpen, onAdd, onHover } =
-    data as PersonNodeData;
-  const years = lifespan(person);
-  const age = ageYears(person);
+  const { person, photoUrl, hiddenCount, onOpen } = data as PersonNodeData;
+  const years = cardYears(person);
 
-  // супруга называем по полу того, от кого добавляем
-  const spouseLabel =
-    person.gender === "male" ? "Супруга" : person.gender === "female" ? "Супруг" : "Супруг(а)";
-  const hasFather = parentGenders.includes("male");
-  const hasMother = parentGenders.includes("female");
-  // брат или сестра — родство по общим родителям: без них связывать не с чем
-  const hasParents = hasFather || hasMother;
-
-
-  // цвет карточки: рамка, подсветка выделения и кнопки — всё по полу.
-  // Значения — токены темы, поэтому карточки читаются и в тёмной, и в сепии.
-  const accent =
-    person.gender === "male"
-      ? "var(--color-male)"
-      : person.gender === "female"
-        ? "var(--color-female)"
-        : "var(--color-plain)";
-  // лёгкая заливка карточки в тон рамки
-  const accentTint =
-    person.gender === "male"
-      ? "var(--color-male-tint)"
-      : person.gender === "female"
-        ? "var(--color-female-tint)"
-        : "var(--color-plain-tint)";
-  const accentRing = `color-mix(in srgb, ${accent} 35%, transparent)`;
-
-  const plusRef = useRef<HTMLButtonElement>(null);
-  const cardRef = useRef<HTMLDivElement>(null);
-  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
-  // на тач-экране наведения нет — кнопки показываем по нажатию на карточку
-  const [actionsOpen, setActionsOpen] = useState(false);
-
-  useEffect(() => {
-    if (!actionsOpen) return;
-    // capture: React Flow гасит всплытие у кликов по холсту
-    const close = (event: MouseEvent) => {
-      if (!cardRef.current?.contains(event.target as Node)) setActionsOpen(false);
-    };
-    document.addEventListener("mousedown", close, true);
-    return () => document.removeEventListener("mousedown", close, true);
-  }, [actionsOpen]);
-
-  // порядок по иерархии: отец, мать, брат, сестра, супруг(а), ребёнок.
-  // Занятый родительский слот не предлагаем повторно.
-  const siblingHint = hasParents ? undefined : "Сначала укажите родителей";
-  const addOptions: AddOption[] = [
-    { key: "father", label: "Отец", disabled: hasFather, hint: hasFather ? "Отец уже указан" : undefined },
-    { key: "mother", label: "Мать", disabled: hasMother, hint: hasMother ? "Мать уже указана" : undefined },
-    { key: "brother", label: "Брат", disabled: !hasParents, hint: siblingHint },
-    { key: "sister", label: "Сестра", disabled: !hasParents, hint: siblingHint },
-    { key: "spouse", label: spouseLabel },
-    { key: "child", label: "Ребёнок" },
-  ];
-
-  function openMenu() {
-    const r = plusRef.current?.getBoundingClientRect();
-    if (!r) return;
-    setMenu({ x: Math.round(r.left + r.width / 2 - 98), y: Math.round(r.bottom + 8) });
-  }
+  // кромка по низу — по полу: значения заданы токенами темы, поэтому карточка
+  // читается и в тёмной, и в сепии. Полосу 2px рисует .studio-card через
+  // .is-male/.is-female.
+  const genderClass =
+    person.gender === "male" ? "is-male" : person.gender === "female" ? "is-female" : "";
 
   return (
     <div
-      ref={cardRef}
-      style={{
-        backgroundColor: accentTint,
-        borderColor: accent,
-        ...(selected
+      style={
+        selected
           ? {
-              boxShadow: `0 0 0 3px ${accentRing}, 0 1px 2px rgba(10,17,32,.06), 0 12px 32px -12px rgba(10,17,32,.24)`,
+              // выделение — янтарное кольцо и мягкая тень, без свечения
+              borderColor: "var(--p-acc-line)",
+              boxShadow: "0 0 0 3px var(--p-acc-soft), var(--shadow-lift)",
             }
-          : {}),
-      }}
-      className="person-card group relative flex min-h-[104px] w-[236px] cursor-pointer items-center gap-3
-                 rounded-[13px] border-[1.5px] px-3 py-3 shadow-lift transition-colors"
-      onMouseEnter={() => onHover?.(person.id, true)}
-      onMouseLeave={() => onHover?.(person.id, false)}
-      onClick={() => {
-        // на устройствах без наведения кнопки открывает одно нажатие на карточку
-        if (window.matchMedia("(hover: none)").matches) setActionsOpen((open) => !open);
-      }}
+          : undefined
+      }
+      className={`person-card studio-card ${genderClass} relative grid h-[100px] w-[176px] cursor-pointer grid-cols-[26px_1fr] grid-rows-[26px_auto] content-start gap-x-2 gap-y-[5px] px-2.5 py-2 transition-colors`}
       onDoubleClick={() => onOpen(person.id)}
       role="button"
       tabIndex={0}
@@ -171,138 +80,43 @@ function PersonNodeComponent({ data, selected }: NodeProps) {
       <Handle id="spouse-l" type="target" position={Position.Left} />
       <Handle id="spouse-r" type="source" position={Position.Right} />
 
+      {/* верхняя строка: портрет кругом 26px — фото или силуэт по полу */}
       {photoUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={photoUrl}
           alt=""
           crossOrigin="anonymous"
-          className={`h-14 w-14 shrink-0 rounded-xl object-cover ${
+          className={`col-start-1 row-start-1 h-[26px] w-[26px] rounded-full border border-[var(--p-line)] object-cover ${
             person.is_living ? "" : "opacity-80 saturate-50"
           }`}
         />
-      ) : person.gender !== "unknown" ? (
-        // без фотографии — силуэт по полу
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={person.gender === "male" ? "/avatars/male.png" : "/avatars/female.png"}
-          alt=""
-          className={`h-14 w-14 shrink-0 rounded-full ${
-            person.is_living ? "" : "opacity-80 saturate-50"
-          }`}
-        />
-      ) : null}
-
-      <span className="min-w-0 flex-1">
+      ) : (
+        // без фотографии — силуэт-заглушка: голова и плечи цветом пола,
+        // как в прототипе (подробности — в .card-face)
         <span
-          className="block font-display text-[16px] font-semibold leading-tight text-ink-800"
-        >
-          {shortName(person)}
+          aria-hidden="true"
+          className={`card-face col-start-1 row-start-1 ${person.is_living ? "" : "opacity-70"}`}
+        />
+      )}
+
+      {/* годы — справа в верхней строке, моноширинным набором как в прототипе */}
+      {years && (
+        <span className="col-start-2 row-start-1 min-w-0 justify-self-end self-center truncate pl-1 font-mono text-[11px] leading-none tabular-nums text-ink-400">
+          {years}
         </span>
-        {person.middle_name && (
-          <span className="block text-[13px] leading-tight text-ink-400">
-            {person.middle_name}
-          </span>
-        )}
-        {years && (
-          <>
-            <span
-              aria-hidden="true"
-              className="mt-1.5 mb-1 block h-px w-full opacity-60"
-              style={{ backgroundImage: `linear-gradient(90deg, ${accent}, transparent)` }}
-            />
-            <span className="block text-[13px] leading-tight text-ink-500">
-            {years}
-            {age != null && (
-              <span className="text-ink-400">
-                {" "}
-                · {age} {yearsWord(age)}
-              </span>
-            )}
-            </span>
-          </>
-        )}
+      )}
+
+      {/* имя — во всю ширину, до трёх строк */}
+      <span className="col-span-2 col-start-1 row-start-2 line-clamp-3 font-display text-[15px] font-medium leading-[1.08] tracking-[-0.01em] text-ink-800 [overflow-wrap:anywhere]">
+        {shortName(person)}
       </span>
 
       {/* сколько человек общего древа не попало в открытую ветку */}
       {!!hiddenCount && (
-        <span className="pointer-events-none absolute -top-11 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-mist-200 bg-surface/95 px-2.5 py-1 text-[11px] font-medium text-ink-500 shadow-sm">
+        <span className="studio-chip pointer-events-none absolute -top-11 left-1/2 -translate-x-1/2">
           скрыто {hiddenCount} {peopleWord(hiddenCount)}
         </span>
-      )}
-
-      {/* кнопки на верхней грани, слева: добавить, редактировать, открыть ветку */}
-      <span
-        className={`card-actions absolute -top-4 left-3 gap-1.5 ${
-          actionsOpen ? "flex" : "hidden group-hover:flex"
-        }`}
-      >
-        {canEdit && (
-          <button
-            ref={plusRef}
-            style={{ "--accent": accent } as React.CSSProperties}
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              openMenu();
-            }}
-            aria-label="Добавить родственника"
-            title="Добавить родственника"
-            className="node-btn card-btn grid h-8 w-8 place-items-center rounded-full text-[19px] font-bold leading-none"
-          >
-            +
-          </button>
-        )}
-        <button
-          style={{ "--accent": accent } as React.CSSProperties}
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpen(person.id);
-          }}
-          className="node-btn card-btn grid h-8 w-8 place-items-center rounded-full"
-          aria-label="Открыть карточку"
-          title="Открыть карточку"
-        >
-          <IconEdit />
-        </button>
-        <button
-          style={{ "--accent": accent } as React.CSSProperties}
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            onBranch(person.id);
-          }}
-          disabled={!canOpenBranch}
-          className={`node-btn card-btn grid h-8 w-8 place-items-center rounded-full ${
-            canOpenBranch ? "" : "node-btn-off"
-          }`}
-          aria-label="Открыть семейную ветку"
-          title={canOpenBranch ? "Открыть семейную ветку" : "Нет супругов и детей"}
-        >
-          <IconCollapse />
-        </button>
-      </span>
-
-      {canEdit && (
-        <>
-          {menu && (
-            <NodeMenu x={menu.x} y={menu.y} onClose={() => setMenu(null)}>
-              {addOptions.map((o) => (
-                <MenuItem
-                  key={o.key}
-                  label={o.label}
-                  hint={o.hint}
-                  disabled={o.disabled}
-                  onClick={() => {
-                    setMenu(null);
-                    onAdd(person.id, o.key);
-                  }}
-                />
-              ))}
-            </NodeMenu>
-          )}
-        </>
       )}
     </div>
   );

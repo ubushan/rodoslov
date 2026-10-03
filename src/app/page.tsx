@@ -34,6 +34,20 @@ const ROLES = [
   },
 ];
 
+const CARD_FIELDS = [
+  ["Имя и даты", "ФИО, девичья фамилия, другие варианты написания, годы жизни"],
+  ["География", "Место рождения и место проживания"],
+  ["Портрет", "Главная фотография, которая видна прямо на древе"],
+  ["История", "Биография, заметки, устные семейные воспоминания"],
+  ["Архив", "Сканы свидетельств, писем, справок и дополнительные снимки"],
+];
+
+const Eyebrow = ({ children }: { children: React.ReactNode }) => (
+  <p className="text-[11.5px] font-semibold uppercase tracking-[0.16em] text-brass-600">
+    {children}
+  </p>
+);
+
 export default async function LandingPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -41,45 +55,52 @@ export default async function LandingPage() {
   return (
     <div className="min-h-dvh bg-mist-100">
       {/* ---------------- Шапка ---------------- */}
-      <header className="absolute inset-x-0 top-0 z-20" style={{ paddingTop: "env(safe-area-inset-top)" }}>
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
+      <header
+        className="absolute inset-x-0 top-0 z-20"
+        style={{ paddingTop: "env(safe-area-inset-top)" }}
+      >
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-4 sm:px-6">
           <Link href="/" className="flex items-center gap-2.5">
             <span
               aria-hidden="true"
-              className="grid h-8 w-8 place-items-center rounded-[9px] border border-brass-500/50 font-display text-[15px] text-brass-400"
+              className="grid h-9 w-9 place-items-center rounded-[10px] border border-brass-400/50 bg-white/[0.06] font-display text-[16px] text-brass-400"
             >
-              Р
+              T
             </span>
-            <span className="font-display text-[17px] text-album-text">Родослов</span>
+            <span className="font-display text-[18px] text-album-text">Torlmud</span>
           </Link>
 
-          <nav className="flex items-center gap-1 sm:gap-2">
+          <nav className="flex items-center gap-1.5 sm:gap-2">
             <Link
               href="#how"
-              className="hidden rounded-lg px-3 py-2 text-sm text-album-muted transition-colors hover:text-album-text sm:block"
+              className="hidden rounded-[10px] px-3 py-2 text-sm text-album-muted transition-colors hover:text-album-text md:block"
             >
               Как устроено
             </Link>
             <Link
               href="#card"
-              className="hidden rounded-lg px-3 py-2 text-sm text-album-muted transition-colors hover:text-album-text sm:block"
+              className="hidden rounded-[10px] px-3 py-2 text-sm text-album-muted transition-colors hover:text-album-text md:block"
             >
               Карточка
             </Link>
             {user ? (
               <Link href="/dashboard">
-                <Button size="sm">Мои древа</Button>
+                <Button size="md" className="min-h-[44px]">
+                  Мои древа
+                </Button>
               </Link>
             ) : (
               <>
                 <Link
                   href="/login"
-                  className="rounded-lg px-3 py-2 text-sm text-album-muted transition-colors hover:text-album-text"
+                  className="inline-flex h-11 items-center rounded-[10px] px-3 text-sm text-album-muted transition-colors hover:text-album-text"
                 >
                   Войти
                 </Link>
-                <Link href="/signup">
-                  <Button size="sm">Создать древо</Button>
+                <Link href="/signup" className="hidden sm:block">
+                  <Button size="md" className="min-h-[44px]">
+                    Создать древо
+                  </Button>
                 </Link>
               </>
             )}
@@ -90,15 +111,19 @@ export default async function LandingPage() {
 
       {/* ---------------- Герой ---------------- */}
       <section className="plate grain relative overflow-hidden">
-        <div className="mx-auto grid max-w-6xl items-center gap-14 px-5 pb-20 pt-28 lg:grid-cols-[1.05fr_1fr] lg:gap-10 lg:pb-28 lg:pt-36">
+        <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 pb-20 pt-28 lg:grid-cols-[1.05fr_1fr] lg:gap-12 lg:pb-28 lg:pt-36">
           <div className="rise">
-            <h1 className="max-w-[16ch] font-display text-[clamp(2.3rem,6.2vw,4.1rem)] leading-[1.04] text-album-text">
-              Родословная, которую собирают всей семьёй
+            <p className="text-[11.5px] font-semibold uppercase tracking-[0.16em] text-brass-400">
+              Семейный архив
+            </p>
+
+            <h1 className="mt-4 max-w-[16ch] font-display text-[clamp(2.15rem,6vw,4rem)] leading-[1.04] text-album-text">
+              Семейное древо, которое собирают всей семьёй
             </h1>
 
-            <p className="mt-6 max-w-[54ch] text-[17px] leading-relaxed text-album-muted">
+            <p className="mt-6 max-w-[54ch] text-[16.5px] leading-relaxed text-album-muted">
               Бабушка помнит имена и деревни, дядя хранит фотографии, двоюродная сестра
-              знает, кто на ком женился. Родослов собирает эти кусочки в одно древо —
+              знает, кто на ком женился. Torlmud собирает эти кусочки в одно древо —
               открывайте доступ по ссылке и заполняйте его вместе.
             </p>
 
@@ -107,7 +132,11 @@ export default async function LandingPage() {
                 <Button size="lg">{user ? "Открыть мои древа" : "Начать древо"}</Button>
               </Link>
               <Link href="#how">
-                <Button size="lg" variant="ghost" className="text-album-text hover:bg-white/10 hover:text-album-text">
+                <Button
+                  size="lg"
+                  variant="ghost"
+                  className="text-album-text hover:bg-white/10 hover:text-album-text"
+                >
                   Посмотреть, как устроено
                 </Button>
               </Link>
@@ -118,7 +147,7 @@ export default async function LandingPage() {
             </p>
           </div>
 
-          <div className="lg:pl-6">
+          <div className="lg:pl-4">
             <MiniTree />
           </div>
         </div>
@@ -126,15 +155,16 @@ export default async function LandingPage() {
 
       {/* ---------------- Как устроено ---------------- */}
       <section id="how" className="mx-auto max-w-6xl px-5 py-20 lg:py-28">
-        <h2 className="max-w-[20ch] text-[clamp(1.75rem,3.6vw,2.6rem)] leading-tight text-ink-800">
+        <Eyebrow>Как устроено</Eyebrow>
+        <h2 className="mt-3 max-w-[20ch] text-[clamp(1.75rem,3.6vw,2.6rem)] leading-tight text-ink-800">
           Три шага от первой карточки до готового древа
         </h2>
 
-        <ol className="mt-12 grid gap-px overflow-hidden rounded-2xl bg-mist-300 md:grid-cols-3">
+        <ol className="mt-11 grid gap-4 md:grid-cols-3">
           {STEPS.map((s, i) => (
-            <li key={s.title} className="bg-surface p-7">
-              <span className="font-display text-[15px] text-brass-600">Шаг {i + 1}</span>
-              <h3 className="mt-3 text-[19px] leading-snug text-ink-800">{s.title}</h3>
+            <li key={s.title} className="panel p-6">
+              <span className="studio-chip">Шаг {i + 1}</span>
+              <h3 className="mt-4 text-[19px] leading-snug text-ink-800">{s.title}</h3>
               <p className="mt-2.5 text-[15px] leading-relaxed text-ink-500">{s.text}</p>
             </li>
           ))}
@@ -142,13 +172,14 @@ export default async function LandingPage() {
       </section>
 
       {/* ---------------- Карточка человека ---------------- */}
-      <section id="card" className="border-y border-mist-200 bg-mist-50">
+      <section id="card" className="border-y border-[var(--p-line)] bg-mist-50">
         <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-20 lg:grid-cols-2 lg:py-28">
           <div>
-            <h2 className="max-w-[18ch] text-[clamp(1.75rem,3.6vw,2.6rem)] leading-tight text-ink-800">
+            <Eyebrow>Карточка</Eyebrow>
+            <h2 className="mt-3 max-w-[18ch] text-[clamp(1.75rem,3.6vw,2.6rem)] leading-tight text-ink-800">
               Человек — это не только имя и даты
             </h2>
-            <p className="mt-5 max-w-[56ch] text-[17px] leading-relaxed text-ink-500">
+            <p className="mt-5 max-w-[56ch] text-[16.5px] leading-relaxed text-ink-500">
               В карточке хранится всё, что удалось выяснить: девичья фамилия, места, где
               человек жил, история, рассказанная за столом, и отсканированные документы.
               Незаполненные поля не мешают — их можно дописать, когда найдётся
@@ -156,14 +187,8 @@ export default async function LandingPage() {
             </p>
 
             <dl className="mt-9 space-y-4 text-[15px]">
-              {[
-                ["Имя и даты", "ФИО, девичья фамилия, другие варианты написания, годы жизни"],
-                ["География", "Место рождения и место проживания"],
-                ["Портрет", "Главная фотография, которая видна прямо на древе"],
-                ["История", "Биография, заметки, устные семейные воспоминания"],
-                ["Архив", "Сканы свидетельств, писем, справок и дополнительные снимки"],
-              ].map(([term, def]) => (
-                <div key={term} className="flex gap-4 border-b border-mist-200 pb-4">
+              {CARD_FIELDS.map(([term, def]) => (
+                <div key={term} className="flex gap-4 border-b border-[var(--p-line)] pb-4">
                   <dt className="w-32 shrink-0 font-medium text-ink-700">{term}</dt>
                   <dd className="text-ink-500">{def}</dd>
                 </div>
@@ -173,10 +198,10 @@ export default async function LandingPage() {
 
           {/* Реалистичное превью карточки */}
           <div className="relative">
-            <div className="mx-auto max-w-[380px] overflow-hidden rounded-2xl border border-mist-200 bg-surface shadow-plate">
+            <div className="studio-card is-female mx-auto max-w-[380px] overflow-hidden">
               <div className="plate grain relative h-28" />
-              <div className="-mt-11 px-6 pb-6">
-                <div className="grid h-20 w-20 place-items-center rounded-2xl border-4 border-white bg-album font-display text-xl text-brass-400 shadow-lift">
+              <div className="-mt-11 px-6 pb-7">
+                <div className="grid h-20 w-20 place-items-center rounded-[18px] border-4 border-[var(--color-surface)] bg-album font-display text-xl text-brass-400">
                   МК
                 </div>
                 <h3 className="mt-4 text-[21px] leading-tight text-ink-800">
@@ -206,13 +231,9 @@ export default async function LandingPage() {
                   письма деда с фронта — сканы в архиве карточки.
                 </p>
 
-                <div className="mt-5 flex gap-2">
-                  <span className="rounded-lg bg-mist-100 px-2.5 py-1 text-xs text-ink-500">
-                    4 документа
-                  </span>
-                  <span className="rounded-lg bg-mist-100 px-2.5 py-1 text-xs text-ink-500">
-                    7 фотографий
-                  </span>
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <span className="studio-chip">4 документа</span>
+                  <span className="studio-chip">7 фотографий</span>
                 </div>
               </div>
             </div>
@@ -222,21 +243,22 @@ export default async function LandingPage() {
 
       {/* ---------------- Совместная работа ---------------- */}
       <section className="mx-auto max-w-6xl px-5 py-20 lg:py-28">
-        <div className="grid gap-12 lg:grid-cols-[1fr_1.1fr]">
+        <div className="grid gap-10 lg:grid-cols-[1fr_1.1fr]">
           <div>
-            <h2 className="max-w-[18ch] text-[clamp(1.75rem,3.6vw,2.6rem)] leading-tight text-ink-800">
+            <Eyebrow>Доступ</Eyebrow>
+            <h2 className="mt-3 max-w-[18ch] text-[clamp(1.75rem,3.6vw,2.6rem)] leading-tight text-ink-800">
               Доступ по ссылке, права — на ваше усмотрение
             </h2>
-            <p className="mt-5 max-w-[52ch] text-[17px] leading-relaxed text-ink-500">
+            <p className="mt-5 max-w-[52ch] text-[16.5px] leading-relaxed text-ink-500">
               Создайте ссылку-приглашение, выберите роль и отправьте родственнику в
               мессенджер. Ссылку можно ограничить по сроку и числу переходов, а потом
               отозвать. Правки участников видны сразу, без перезагрузки страницы.
             </p>
           </div>
 
-          <ul className="space-y-px overflow-hidden rounded-2xl bg-mist-300">
+          <ul className="panel divide-y divide-[var(--p-line)] overflow-hidden">
             {ROLES.map((r) => (
-              <li key={r.role} className="flex flex-col gap-1.5 bg-surface p-6 sm:flex-row sm:gap-6">
+              <li key={r.role} className="flex flex-col gap-1.5 p-6 sm:flex-row sm:gap-6">
                 <span className="w-28 shrink-0 font-display text-[17px] text-ink-800">
                   {r.role}
                 </span>
@@ -247,11 +269,12 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* ---------------- Экспорт ---------------- */}
-      <section className="border-t border-mist-200 bg-surface">
-        <div className="mx-auto grid max-w-6xl gap-10 px-5 py-20 md:grid-cols-2 lg:py-24">
-          <div>
-            <h2 className="text-[clamp(1.6rem,3vw,2.2rem)] leading-tight text-ink-800">
+      {/* ---------------- Экспорт и приватность ---------------- */}
+      <section className="border-t border-[var(--p-line)] bg-mist-50">
+        <div className="mx-auto grid max-w-6xl gap-4 px-5 py-20 md:grid-cols-2 lg:py-24">
+          <div className="panel p-7">
+            <span className="studio-chip">Экспорт</span>
+            <h2 className="mt-4 text-[clamp(1.5rem,2.8vw,2rem)] leading-tight text-ink-800">
               Древо скачивается картинкой
             </h2>
             <p className="mt-4 max-w-[52ch] text-[16px] leading-relaxed text-ink-500">
@@ -260,8 +283,9 @@ export default async function LandingPage() {
               отправки родным, у которых нет аккаунта.
             </p>
           </div>
-          <div>
-            <h2 className="text-[clamp(1.6rem,3vw,2.2rem)] leading-tight text-ink-800">
+          <div className="panel p-7">
+            <span className="studio-chip">Приватность</span>
+            <h2 className="mt-4 text-[clamp(1.5rem,2.8vw,2rem)] leading-tight text-ink-800">
               Никто посторонний не увидит
             </h2>
             <p className="mt-4 max-w-[52ch] text-[16px] leading-relaxed text-ink-500">
@@ -289,7 +313,7 @@ export default async function LandingPage() {
 
       <footer className="bg-album-2 py-8">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-5 text-sm text-album-muted sm:flex-row">
-          <span>Родослов</span>
+          <span>Torlmud</span>
           <span>Семейный архив, который переживёт нас</span>
         </div>
       </footer>

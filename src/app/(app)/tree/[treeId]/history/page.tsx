@@ -5,32 +5,34 @@ import { embeddedName } from "@/lib/admin";
 import { describeChange } from "@/lib/changes";
 import { formatDateTime } from "@/lib/format";
 
-export const metadata = { title: "История изменений — Родослов" };
+export const metadata = { title: "История изменений — Torlmud" };
 
-/** Что произошло: значок и подпись для списка. */
-const KIND_ICON: Record<string, string> = {
-  person_created: "＋",
-  person_updated: "✎",
-  person_deleted: "✕",
-  relation_added: "⇄",
-  relation_removed: "⇹",
-  tree_created: "★",
-  tree_renamed: "✎",
-  member_added: "＋",
-  member_role: "✎",
-  member_removed: "✕",
-  invite_created: "✉",
-  invite_revoked: "✕",
-  import: "⇪",
+/** Что произошло: значок, подпись чипа и тон для списка. */
+const KIND: Record<string, { icon: string; label: string; tone: string }> = {
+  person_created: { icon: "＋", label: "Карточка", tone: "text-male border-male/40 bg-male/10" },
+  person_updated: { icon: "✎", label: "Карточка", tone: "text-male border-male/40 bg-male/10" },
+  person_deleted: { icon: "✕", label: "Карточка", tone: "text-male border-male/40 bg-male/10" },
+  relation_added: { icon: "⇄", label: "Связь", tone: "text-ink-600 border-[var(--p-line)] bg-[var(--p-row-bg)]" },
+  relation_removed: { icon: "⇹", label: "Связь", tone: "text-ink-600 border-[var(--p-line)] bg-[var(--p-row-bg)]" },
+  tree_created: { icon: "★", label: "Древо", tone: "text-brass-500 border-[var(--p-acc-line)] bg-[var(--p-acc-bg)]" },
+  tree_renamed: { icon: "✎", label: "Древо", tone: "text-brass-500 border-[var(--p-acc-line)] bg-[var(--p-acc-bg)]" },
+  member_added: { icon: "＋", label: "Участник", tone: "text-female border-female/40 bg-female/10" },
+  member_role: { icon: "✎", label: "Роль", tone: "text-female border-female/40 bg-female/10" },
+  member_removed: { icon: "✕", label: "Участник", tone: "text-female border-female/40 bg-female/10" },
+  invite_created: { icon: "✉", label: "Приглашение", tone: "text-brass-500 border-[var(--p-acc-line)] bg-[var(--p-acc-bg)]" },
+  invite_revoked: { icon: "✕", label: "Приглашение", tone: "text-brass-500 border-[var(--p-acc-line)] bg-[var(--p-acc-bg)]" },
+  import: { icon: "⇪", label: "Импорт", tone: "text-ink-600 border-[var(--p-line)] bg-[var(--p-row-bg)]" },
 };
+
+const UNKNOWN_KIND = { icon: "•", label: "Событие", tone: "text-ink-600 border-[var(--p-line)] bg-[var(--p-row-bg)]" };
 
 type Row = {
   id: number;
   author: string;
-  date: string;
+  time: string;
   day: string;
   summary: string;
-  icon: string;
+  kind: { icon: string; label: string; tone: string };
   diff: string[];
 };
 
@@ -67,10 +69,10 @@ export default async function TreeHistoryPage({ params }: { params: Promise<{ tr
     return {
       id: event.id as number,
       author: embeddedName(event.actor) ?? "Удалённый пользователь",
-      date: stamp,
+      time: stamp.split(",")[1]?.trim() ?? "",
       day: stamp.split(",")[0] ?? "",
       summary: event.summary as string,
-      icon: KIND_ICON[event.kind as string] ?? "•",
+      kind: KIND[event.kind as string] ?? UNKNOWN_KIND,
       // разницу показываем только там, где есть оба снимка карточки
       diff:
         before && after && typeof before === "object" && typeof after === "object"
@@ -79,72 +81,123 @@ export default async function TreeHistoryPage({ params }: { params: Promise<{ tr
     };
   });
 
-  let lastDay = "";
+  // Лента по дням: заголовок дня, под ним — компактные строки одного дня
+  const groups: { day: string; rows: Row[] }[] = [];
+  for (const row of rows) {
+    const last = groups[groups.length - 1];
+    if (!last || last.day !== row.day) groups.push({ day: row.day, rows: [row] });
+    else last.rows.push(row);
+  }
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-5 py-10 sm:py-14">
+    <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-5 sm:py-12">
       <Link
         href={`/tree/${treeId}`}
-        className="text-sm text-ink-400 transition-colors hover:text-ink-700"
+        className="inline-flex items-center gap-1.5 text-sm text-ink-400 transition-colors hover:text-ink-700"
       >
-        ← К древу «{tree.title}»
+        <span aria-hidden="true">←</span> К древу «{tree.title}»
       </Link>
 
-      <h1 className="mt-4 text-[30px] leading-tight text-ink-800">История изменений</h1>
+      <h1 className="mt-4 text-[28px] leading-tight text-ink-800 sm:text-[30px]">
+        История изменений
+      </h1>
       <p className="mt-1.5 max-w-[60ch] text-sm leading-relaxed text-ink-500">
-        Кто и когда правил древо: карточки, связи, участники и приглашения. Показаны последние
-        200 событий.
+        Кто и когда правил древо: карточки, связи, участники и приглашения.
       </p>
 
       {error ? (
-        <p className="mt-8 rounded-2xl border border-danger-line bg-danger-soft px-5 py-4 text-sm text-danger-ink">
+        <p className="panel mt-8 border-danger-line bg-danger-soft px-5 py-4 text-sm leading-relaxed text-danger-ink">
           История пока недоступна: выполните в Supabase файл{" "}
           <code className="font-mono">supabase/tree-history.sql</code>.
         </p>
       ) : rows.length === 0 ? (
-        <p className="mt-8 rounded-2xl border border-dashed border-mist-300 bg-surface px-5 py-10 text-center text-sm text-ink-400">
+        <p className="panel mt-8 border-dashed px-5 py-12 text-center text-sm text-ink-400">
           Пока ничего не менялось.
         </p>
       ) : (
-        <ol className="mt-8 space-y-2.5">
-          {rows.map((row) => {
-            const showDay = row.day !== lastDay;
-            lastDay = row.day;
-            return (
-              <li key={row.id}>
-                {showDay && (
-                  <p className="mb-2 mt-6 text-[12px] uppercase tracking-[0.07em] text-ink-400">
-                    {row.day}
-                  </p>
-                )}
-                <div className="flex gap-3 rounded-2xl border border-mist-200 bg-surface px-4 py-3">
-                  <span
-                    aria-hidden="true"
-                    className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-mist-100 text-[13px] text-ink-500"
-                  >
-                    {row.icon}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-[14px] leading-snug text-ink-800">{row.summary}</p>
-                    {row.diff.length > 0 && (
-                      <ul className="mt-1 space-y-0.5">
-                        {row.diff.map((line, index) => (
-                          <li key={index} className="text-[13px] leading-snug text-ink-500">
-                            {line}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    <p className="mt-1 text-[12px] text-ink-400">
-                      {row.author} · {row.date.split(",")[1]?.trim() ?? ""}
-                    </p>
-                  </div>
+        <>
+          <div className="mt-5 flex flex-wrap gap-2">
+            <span className="studio-chip">
+              {rows.length} {eventsWord(rows.length)}
+            </span>
+            <span className="studio-chip">
+              {groups.length} {daysWord(groups.length)} · последние 200 событий
+            </span>
+          </div>
+
+          <div className="mt-7 space-y-7">
+            {groups.map((group) => (
+              <section key={group.day}>
+                <div className="mb-2.5 flex items-center gap-3 px-1">
+                  <h2 className="text-[12px] font-semibold uppercase tracking-[0.1em] text-ink-400">
+                    {group.day}
+                  </h2>
+                  <span aria-hidden="true" className="h-px flex-1 bg-[var(--p-line)]" />
+                  <span className="text-[12px] tabular-nums text-ink-300">{group.rows.length}</span>
                 </div>
-              </li>
-            );
-          })}
-        </ol>
+
+                <ol className="panel divide-y divide-[var(--p-line)] overflow-hidden">
+                  {group.rows.map((row) => (
+                    <li key={row.id} className="flex items-start gap-3 px-4 py-3.5 sm:px-5">
+                      <span
+                        aria-hidden="true"
+                        className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-[10px] border text-[13px] ${row.kind.tone}`}
+                      >
+                        {row.kind.icon}
+                      </span>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <p className="min-w-0 break-words text-[14px] leading-snug text-ink-800">
+                            {row.summary}
+                          </p>
+                          <span className="studio-chip h-[22px] px-2 text-[11px]">
+                            {row.kind.label}
+                          </span>
+                        </div>
+
+                        {row.diff.length > 0 && (
+                          <ul className="mt-1.5 space-y-0.5 border-l border-[var(--p-line)] pl-2.5">
+                            {row.diff.map((line, index) => (
+                              <li
+                                key={index}
+                                className="break-words text-[12.5px] leading-snug text-ink-500"
+                              >
+                                {line}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+
+                        <p className="mt-1.5 break-words text-[12px] text-ink-400">
+                          {row.author}
+                          {row.time && <span className="tabular-nums"> · {row.time}</span>}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
+}
+
+/** «1 событие», «3 события», «12 событий» */
+function eventsWord(n: number) {
+  const m10 = n % 10, m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return "событие";
+  if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return "события";
+  return "событий";
+}
+
+/** «1 день», «3 дня», «12 дней» */
+function daysWord(n: number) {
+  const m10 = n % 10, m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return "день";
+  if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return "дня";
+  return "дней";
 }

@@ -1,0 +1,2035 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Torlmood — вариант D: Картотека</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Literata:wght@400;500;600&family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="base.css">
+<style>
+/* =====================================================================
+   Вариант D. «Картотека» — плотный архивный указатель.
+   Слева всегда список, справа всегда досье. Цифры моноширинные,
+   годы в столбец, счётчики, документы превью, история правок.
+   Все классы интерфейса — с префиксом vd-. Рамку (.topbar, .wrap,
+   .doc-head, .stage, .shot, .frame, .browser, .screen, .phone,
+   .phone-screen, .notes, .note-card, .swatches) задаёт base.css.
+   ===================================================================== */
+
+/* ---------------------------------------------------------------------
+   01. Основа экрана: токены и корневая колонка «шапка · вкладки · область».
+   В base.css описаны не все цвета проекта (нет --female, --brass,
+   --danger-line и тени), поэтому дополняем их здесь — в области .vd-root,
+   чтобы не задевать соседние варианты.
+   --------------------------------------------------------------------- */
+.vd-root,
+.vd-app,
+.vd-mob{
+  --brass: var(--brass-400);
+  --male: var(--bond-400);
+  --female: #cf8b4a;
+  --female-tint: #fbe8d7;
+  --female-line: #f0d3b4;
+  --female-ink: #a25f18;
+  --danger: #c05a4d;
+  --danger-line: #e4c3bd;
+  --ok: #4a6b3f;
+  --lift: 0 1px 2px rgba(10,17,32,.06), 0 12px 32px -12px rgba(10,17,32,.24);
+}
+.vd-app,.vd-mob{
+  display:flex; flex-direction:column;
+  width:100%; height:100%;
+  background:var(--mist-50); color:var(--ink-800);
+  font-family:var(--sans); font-size:13px; line-height:1.45;
+}
+.vd-app i,.vd-mob i{font-style:normal}
+.vd-app svg,.vd-mob svg{display:block}
+
+/* ---------------------------------------------------------------------
+   02. Шапка приложения и верхние вкладки
+   --------------------------------------------------------------------- */
+.vd-top{
+  display:flex; align-items:center; gap:16px; flex:none;
+  height:56px; padding:0 20px 0 18px;
+  background:linear-gradient(180deg,var(--ink-700),var(--ink-900));
+  color:var(--mist-50); white-space:nowrap;
+}
+.vd-top > *{flex:none}
+.vd-brand{display:flex; align-items:center; gap:10px; font-family:var(--serif); font-size:15px; flex:none}
+.vd-mark{
+  display:grid; place-items:center; flex:none;
+  width:26px; height:26px; border-radius:8px;
+  border:1px solid rgba(201,162,39,.55);
+  background:radial-gradient(120% 120% at 20% 0,rgba(201,162,39,.3),transparent 62%);
+  color:var(--brass-400); font-size:12.5px;
+}
+.vd-tsep{width:1px; height:24px; background:rgba(247,249,252,.18)}
+.vd-tree{display:flex; flex-direction:column; line-height:1.25}
+.vd-tree b{font-family:var(--serif); font-weight:500; font-size:13.5px; color:#fff}
+.vd-tree span{font-family:var(--mono); font-size:10.5px; color:#93a0b8; letter-spacing:.03em}
+.vd-grow{flex:1}
+.vd-tools{display:flex; align-items:center; gap:4px}
+.vd-icon{
+  display:grid; place-items:center; width:30px; height:30px;
+  border:1px solid transparent; border-radius:8px;
+  background:none; color:#c8d2e2; cursor:pointer; padding:0;
+}
+.vd-icon:hover{color:#fff; border-color:rgba(200,210,226,.32); background:rgba(247,249,252,.06)}
+.vd-icon--chip{width:auto; gap:7px; padding:0 10px}
+.vd-roles{display:flex; align-items:center; gap:6px}
+.vd-role{
+  font-family:var(--mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase;
+  padding:2px 7px; border-radius:999px; border:1px solid rgba(247,249,252,.2); color:#c8d2e2;
+}
+.vd-role--owner{background:rgba(201,162,39,.18); border-color:rgba(201,162,39,.55); color:var(--brass-400)}
+.vd-me{display:flex; align-items:center; gap:8px; font-size:12.5px; color:#e6ebf4}
+.vd-av{
+  display:grid; place-items:center; flex:none;
+  width:28px; height:28px; border-radius:50%;
+  background:linear-gradient(160deg,var(--ink-500),var(--ink-800));
+  border:1px solid rgba(247,249,252,.24);
+  font-family:var(--mono); font-size:10.5px; color:#dfe5ee;
+}
+.vd-av--sm{width:22px; height:22px; font-size:9px}
+
+.vd-tabs{
+  display:flex; align-items:stretch; gap:2px; flex:none;
+  height:42px; padding:0 14px;
+  background:#fff; border-bottom:1px solid var(--mist-200);
+}
+.vd-tab{
+  position:relative; display:flex; align-items:center; gap:8px;
+  padding:0 14px; text-decoration:none;
+  color:var(--ink-400); font-size:13.5px; border-bottom:2px solid transparent;
+}
+.vd-tab:hover{color:var(--ink-700)}
+.vd-tab[aria-current="page"]{color:var(--ink-800); font-weight:500; border-bottom-color:var(--brass)}
+.vd-tab .vd-n{font-family:var(--mono); font-size:10.5px; color:var(--ink-300)}
+.vd-tab[aria-current="page"] .vd-n{color:var(--brass-600)}
+
+/* ---------------------------------------------------------------------
+   03. Общая рабочая область: крошки, заголовки, карточки, кнопки
+   --------------------------------------------------------------------- */
+.vd-work{flex:1; min-height:0; display:flex}
+.vd-bar{
+  display:flex; align-items:center; gap:14px; flex:none;
+  height:44px; padding:0 18px;
+  background:#fff; border-bottom:1px solid var(--mist-200);
+}
+.vd-crumbs{display:flex; align-items:center; gap:7px; font-size:12.5px; color:var(--ink-400); min-width:0}
+.vd-crumbs a{color:var(--ink-400); text-decoration:none}
+.vd-crumbs a:hover{color:var(--ink-700); text-decoration:underline}
+.vd-crumbs b{color:var(--ink-700); font-weight:500}
+.vd-crumbs i{color:var(--mist-300)}
+.vd-btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:7px;
+  height:28px; padding:0 11px; border-radius:8px; flex:none;
+  border:1px solid var(--mist-300); background:#fff; color:var(--ink-700);
+  font:inherit; font-size:12.5px; font-weight:500; cursor:pointer; white-space:nowrap;
+}
+.vd-btn:hover{border-color:var(--ink-300); background:var(--mist-50)}
+.vd-btn--brass{background:var(--brass); border-color:var(--brass-600); color:#2a2205}
+.vd-btn--brass:hover{background:var(--brass-400); border-color:var(--brass-600)}
+.vd-btn--danger{color:var(--danger); border-color:#e4c3bd; background:#fff}
+.vd-btn--danger:hover{background:#fdf4f2; border-color:var(--danger)}
+.vd-btn--sm{height:24px; padding:0 9px; font-size:11.5px; border-radius:7px}
+.vd-btn--ghost{border-color:transparent; background:transparent}
+.vd-btn--ghost:hover{background:var(--mist-100); border-color:transparent}
+.vd-sep{width:1px; height:22px; background:var(--mist-200); flex:none}
+
+.vd-panel{background:#fff; border:1px solid var(--mist-200); border-radius:12px}
+.vd-ph{
+  display:flex; align-items:center; gap:10px; flex:none;
+  height:34px; padding:0 12px 0 14px;
+  border-bottom:1px solid var(--mist-200); background:var(--mist-50);
+  border-radius:12px 12px 0 0;
+}
+.vd-ph h3{
+  margin:0; font-family:var(--mono); font-size:10.5px; font-weight:500;
+  letter-spacing:.13em; text-transform:uppercase; color:var(--ink-400);
+}
+.vd-ph .vd-count{
+  font-family:var(--mono); font-size:10.5px; color:var(--ink-400);
+  background:#fff; border:1px solid var(--mist-200); border-radius:999px; padding:1px 7px;
+}
+.vd-mono{font-family:var(--mono); font-variant-numeric:tabular-nums}
+.vd-num{font-family:var(--mono); font-variant-numeric:tabular-nums; color:var(--ink-800)}
+.vd-male{color:var(--bond-500)}
+.vd-female{color:var(--female)}
+.vd-dot{display:inline-block; width:6px; height:6px; border-radius:50%; background:currentColor; vertical-align:1px}
+.vd-badge{
+  display:inline-flex; align-items:center; gap:5px; flex:none;
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.02em;
+  padding:2px 8px; border-radius:999px;
+  border:1px solid var(--mist-300); background:var(--mist-50); color:var(--ink-500);
+}
+.vd-badge--brass{border-color:rgba(201,162,39,.55); background:#fdf8e8; color:var(--brass-600)}
+.vd-badge--ok{border-color:#cdd9c7; background:#f3f7f1; color:var(--ok)}
+.vd-badge--male{border-color:var(--bond-200); background:var(--bond-100); color:var(--bond-500)}
+.vd-badge--female{border-color:#f0d3b4; background:var(--female-tint); color:#a25f18}
+.vd-empty{
+  margin:12px; padding:14px; border:1px dashed var(--mist-300); border-radius:10px;
+  color:var(--ink-400); font-size:12.5px; background:var(--mist-50);
+}
+
+/* ---------------------------------------------------------------------
+   04. Дашборд: сводка древ и картотека приглашений
+   --------------------------------------------------------------------- */
+.vd-dash{flex:1; min-height:0; display:grid; grid-template-rows:auto minmax(0,1fr); align-content:start}
+.vd-dash-top{display:grid; grid-template-columns:330px 1fr; gap:16px; padding:14px 18px 0}
+.vd-dash-head h2{
+  margin:0; font-family:var(--serif); font-weight:500; font-size:22px; letter-spacing:-.015em;
+  line-height:1.2;
+}
+.vd-dash-head p{margin:6px 0 0; color:var(--ink-400); font-size:12.5px}
+.vd-addtree{
+  margin-top:12px; display:flex; flex-direction:column; align-items:flex-start; gap:8px;
+  border:1px dashed var(--mist-300); border-radius:10px; padding:12px;
+  background:var(--mist-50);
+}
+.vd-addtree p{margin:0; font-size:12.5px; color:var(--ink-400)}
+.vd-tiles{display:grid; grid-template-columns:1fr 1fr; gap:12px; align-content:start}
+.vd-tile{border:1px solid var(--mist-200); border-radius:12px; background:#fff; padding:12px 14px}
+.vd-tile .vd-tl{
+  font-family:var(--mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--ink-400);
+}
+.vd-tile .vd-tv{display:flex; align-items:baseline; gap:8px; margin-top:5px}
+.vd-tile .vd-tv b{font-family:var(--mono); font-size:27px; font-weight:500; line-height:1.1; color:var(--ink-800)}
+.vd-tile .vd-tv span{font-size:12px; color:var(--ink-400)}
+.vd-tile .vd-tf{
+  margin-top:6px; font-size:11.5px; color:var(--ink-400);
+  border-top:1px solid var(--mist-100); padding-top:6px;
+}
+.vd-tile .vd-tf b{color:var(--ink-600); font-weight:500}
+.vd-dash-grid{
+  display:grid; grid-template-columns:1fr 336px; gap:16px;
+  padding:14px 18px 16px; min-height:0; overflow:hidden;
+}
+.vd-tree-row{
+  display:grid; align-items:center; gap:12px;
+  grid-template-columns:1fr 74px 74px 74px 96px 22px;
+  min-height:62px; padding:0 14px;
+  border-top:1px solid var(--mist-100);
+}
+.vd-tree-row:first-child{border-top:0}
+.vd-tree-row--on{background:#fdf8e8; box-shadow:inset 3px 0 0 var(--brass)}
+.vd-tree-name{display:flex; align-items:center; gap:12px; min-width:0}
+.vd-thumb{
+  flex:none; width:54px; height:54px; border-radius:9px; overflow:hidden;
+  border:1px solid var(--ink-600);
+  background:linear-gradient(180deg,var(--ink-700),var(--ink-900));
+}
+.vd-tree-name b{display:block; font-family:var(--serif); font-weight:500; font-size:15px; color:var(--ink-800)}
+.vd-tree-name span{display:block; margin-top:2px; font-size:11.5px; color:var(--ink-400)}
+.vd-cell{font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:12.5px; color:var(--ink-600)}
+.vd-cell small{display:block; font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-300)}
+.vd-chev{color:var(--ink-300); justify-self:end}
+
+.vd-feed{list-style:none; margin:0; padding:3px 0}
+.vd-feed li{display:flex; gap:10px; padding:7px 14px; border-top:1px solid var(--mist-100)}
+.vd-feed li:first-child{border-top:0}
+.vd-feed .vd-fdot{flex:none; margin-top:6px}
+.vd-feed b{font-weight:500; color:var(--ink-700)}
+.vd-feed time{display:block; margin-top:2px; font-family:var(--mono); font-size:10.5px; color:var(--ink-300)}
+.vd-feed .vd-was{display:block; margin-top:3px; font-size:11.5px; color:var(--ink-400)}
+.vd-feed .vd-was em{color:var(--ink-500); font-style:normal}
+.vd-feed .vd-was i{color:var(--ink-300); margin:0 4px}
+.vd-invite{margin:12px 14px; border:1px solid rgba(201,162,39,.5); border-radius:10px; background:#fdf8e8; padding:12px}
+.vd-invite h4{margin:0; font-family:var(--serif); font-weight:500; font-size:14px; color:var(--ink-800)}
+.vd-invite p{margin:6px 0 0; font-size:12px; color:var(--ink-500)}
+.vd-link{
+  display:flex; align-items:center; gap:8px; margin-top:9px;
+  font-family:var(--mono); font-size:11.5px; color:var(--ink-500);
+  background:#fff; border:1px solid var(--mist-200); border-radius:8px; padding:5px 9px;
+}
+.vd-link span{flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.vd-prog{margin-top:10px}
+.vd-prog .vd-pt{display:flex; justify-content:space-between; font-family:var(--mono); font-size:11px; color:var(--ink-500)}
+.vd-track{height:5px; margin-top:6px; border-radius:999px; background:var(--mist-200); overflow:hidden}
+.vd-track i{display:block; height:100%; width:30%; background:var(--brass); border-radius:999px}
+.vd-invite .vd-acts{display:flex; gap:7px; margin-top:10px}
+.vd-dates{margin:0; padding:4px 0; list-style:none}
+.vd-dates li{display:flex; gap:11px; align-items:center; padding:9px 14px; border-top:1px solid var(--mist-100)}
+.vd-dates li:first-child{border-top:0}
+.vd-date{
+  flex:none; width:42px; text-align:center; border:1px solid var(--mist-200); border-radius:8px;
+  padding:3px 0; background:var(--mist-50);
+}
+.vd-date b{display:block; font-family:var(--mono); font-size:14px; font-weight:500; color:var(--ink-800); line-height:1.1}
+.vd-date span{display:block; font-family:var(--mono); font-size:9.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-300)}
+.vd-dates b{font-weight:500; color:var(--ink-700); font-size:12.5px}
+.vd-dates span{display:block; font-size:11.5px; color:var(--ink-400)}
+
+/* ---------------------------------------------------------------------
+   05. Вкладка «Древо»: панель, холст, легенда, миникарта, подвал
+   --------------------------------------------------------------------- */
+.vd-treepage{flex:1; min-height:0; display:flex; flex-direction:column}
+.vd-treewrap{flex:1; min-height:0; display:flex}
+.vd-rail{
+  flex:none; width:228px; display:flex; flex-direction:column;
+  background:#fff; border-right:1px solid var(--mist-200);
+}
+.vd-rail-scroll{
+  flex:1; min-height:0; padding:6px 12px 8px;
+  display:flex; flex-direction:column; gap:8px; overflow:hidden;
+}
+.vd-group .vd-gl{
+  font-family:var(--mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--ink-300); margin:0 0 6px;
+}
+.vd-zoom{display:flex; align-items:center; gap:6px}
+.vd-zoombox{
+  display:flex; align-items:center; justify-content:space-between; gap:8px; flex:1;
+  height:28px; padding:0 9px; border:1px solid var(--mist-200); border-radius:8px; background:var(--mist-50);
+  font-family:var(--mono); font-size:12px; color:var(--ink-700);
+}
+.vd-legend{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:5px}
+.vd-legend li{display:flex; align-items:center; gap:9px; font-size:12px; color:var(--ink-500)}
+.vd-lg{flex:none; width:18px; height:12px; border-radius:3px; border:1px solid var(--mist-300); background:var(--mist-50)}
+.vd-lg--male{border-color:var(--male); background:var(--bond-100)}
+.vd-lg--female{border-color:var(--female); background:var(--female-tint)}
+.vd-lg--sel{border-color:var(--brass); background:#fdf8e8; box-shadow:0 0 0 2px rgba(201,162,39,.25)}
+.vd-lg--both{border-color:var(--brass); background:#fff; box-shadow:inset 2px 0 0 var(--brass), inset -2px 0 0 var(--female)}
+.vd-switch{display:flex; align-items:center; gap:9px; font-size:12.5px; color:var(--ink-500)}
+.vd-knob{
+  position:relative; flex:none; width:32px; height:18px; border-radius:999px;
+  background:var(--brass); border:1px solid var(--brass-600);
+}
+.vd-knob::after{content:""; position:absolute; top:2px; left:16px; width:12px; height:12px; border-radius:50%; background:#fff}
+.vd-knob--off{background:var(--mist-300); border-color:var(--mist-300)}
+.vd-knob--off::after{left:2px}
+.vd-rail-foot{flex:none; padding:10px 12px; border-top:1px solid var(--mist-200); background:var(--mist-50)}
+.vd-mini{
+  width:100%; border:1px solid var(--mist-200); border-radius:9px; overflow:hidden;
+  background:var(--mist-100);
+}
+.vd-mini{height:106px}
+.vd-mini svg{width:100%; height:100%}
+.vd-mini-legend{display:flex; flex-wrap:wrap; gap:4px 10px; margin-top:7px; font-family:var(--mono); font-size:9.5px; color:var(--ink-400)}
+.vd-mini-legend b{font-weight:500; color:var(--ink-500)}
+
+.vd-stage{
+  position:relative; flex:1; min-width:0; min-height:0;
+  display:flex; flex-direction:column; background:var(--mist-100); overflow:hidden;
+}
+.vd-stage::before{
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background:radial-gradient(circle at 1px 1px,var(--mist-300) 1px,transparent 0) 0 0 / 22px 22px;
+}
+/* Полотно не заходит под плавающую панель «Выбранная карточка»:
+   справа оставлено ровно её место + отступ, поэтому под панелью
+   всегда пустой холст, а не карточка человека. */
+.vd-canvas{position:relative; flex:1; min-height:0; padding-right:268px}
+.vd-canvas .vd-csvg{width:100%; height:100%}
+.vd-legendbox{
+  position:relative; z-index:3; flex:none;
+  display:flex; align-items:center; gap:16px;
+  background:rgba(255,255,255,.96); border-top:1px solid var(--mist-200);
+  padding:8px 18px;
+}
+.vd-legendbox ul{list-style:none; display:flex; align-items:center; gap:16px; margin:0; padding:0; flex-wrap:wrap}
+.vd-legendbox li{display:flex; align-items:center; gap:7px; font-size:11.5px; color:var(--ink-500); white-space:nowrap}
+.vd-card{
+  position:absolute; right:16px; top:16px; width:240px; z-index:3;
+  background:rgba(255,255,255,.96); border:1px solid rgba(201,162,39,.5); border-radius:10px;
+  padding:11px 13px; box-shadow:var(--lift);
+}
+.vd-card .vd-cl{
+  font-family:var(--mono); font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--brass-600);
+}
+.vd-card h3{margin:6px 0 0; font-family:var(--serif); font-weight:500; font-size:16px; color:var(--ink-800)}
+.vd-card .vd-cy{margin-top:3px; font-family:var(--mono); font-size:12.5px; color:var(--ink-600)}
+.vd-card dl{display:grid; grid-template-columns:auto 1fr; gap:2px 10px; margin:9px 0 0; padding-top:8px; border-top:1px solid var(--mist-200)}
+.vd-card dt{font-size:11px; color:var(--ink-400)}
+.vd-card dd{margin:0; font-size:11.5px; color:var(--ink-700); text-align:right}
+.vd-card .vd-cact{display:flex; gap:6px; margin-top:10px}
+.vd-card .vd-cact .vd-btn{flex:1}
+.vd-bottom{
+  flex:none; display:flex; align-items:center; gap:14px;
+  height:48px; padding:0 18px; background:#fff; border-top:1px solid var(--mist-200);
+}
+.vd-bottom .vd-stat{font-family:var(--mono); font-size:12px; color:var(--ink-500)}
+.vd-bottom .vd-stat b{font-weight:500; color:var(--ink-800)}
+.vd-bottom .vd-stat i{color:var(--mist-300); margin:0 6px}
+
+/* ---------------------------------------------------------------------
+   06. Мастер-деталь «Люди»: таблица 380px слева, досье справа
+   --------------------------------------------------------------------- */
+.vd-people{flex:1; min-height:0; display:flex}
+.vd-master{
+  flex:none; width:380px; display:flex; flex-direction:column;
+  background:#fff; border-right:1px solid var(--mist-200);
+}
+.vd-search{display:flex; align-items:center; gap:9px; padding:11px 14px; border-bottom:1px solid var(--mist-200)}
+.vd-input{
+  display:flex; align-items:center; gap:8px; flex:1; height:30px; padding:0 10px;
+  border:1px solid var(--mist-300); border-radius:8px; background:#fff;
+  color:var(--ink-400); font-size:12.5px;
+}
+.vd-filters{display:flex; flex-wrap:nowrap; gap:4px; padding:9px 10px; border-bottom:1px solid var(--mist-200); background:var(--mist-50)}
+.vd-f{
+  display:inline-flex; align-items:center; gap:6px; height:24px; padding:0 9px;
+  border:1px solid var(--mist-200); border-radius:999px; background:#fff;
+  font-size:11.5px; color:var(--ink-500); cursor:pointer;
+}
+.vd-f b{font-family:var(--mono); font-size:10px; font-weight:500; color:var(--ink-300)}
+.vd-f:hover{border-color:var(--ink-300)}
+.vd-f--on{background:var(--ink-800); border-color:var(--ink-800); color:var(--mist-50)}
+.vd-f--on b{color:var(--brass-400)}
+.vd-tablehead{
+  display:grid; grid-template-columns:minmax(0,1fr) 70px 24px 70px; gap:6px; flex:none;
+  padding:7px 14px; border-bottom:1px solid var(--mist-200);
+  font-family:var(--mono); font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-300);
+}
+.vd-tablehead span:nth-child(2){text-align:right}
+.vd-tablehead span:nth-child(3){text-align:center}
+.vd-list{flex:1; min-height:0; overflow:hidden; padding-bottom:4px}
+.vd-row{
+  position:relative; display:grid; align-items:center; gap:6px;
+  grid-template-columns:minmax(0,1fr) 70px 24px 70px;
+  padding:5px 12px; min-height:40px; border-top:1px solid var(--mist-100);
+}
+.vd-row:first-child{border-top:0}
+.vd-row--gen{border-top-color:var(--mist-200)}
+.vd-row:hover{background:var(--mist-50)}
+.vd-row--on{background:#fdf8e8; box-shadow:inset 3px 0 0 var(--brass)}
+.vd-row--on:hover{background:#fbf3dd}
+.vd-row .vd-name{display:flex; align-items:baseline; gap:6px; min-width:0; overflow:hidden}
+.vd-row .vd-name b{
+  font-weight:500; font-size:12px; color:var(--ink-800);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.vd-row--on .vd-name b{font-weight:600}
+.vd-row .vd-name small{font-family:var(--mono); font-size:10px; color:var(--ink-300); white-space:nowrap}
+.vd-row .vd-years{
+  text-align:right; font-family:var(--mono); font-variant-numeric:tabular-nums;
+  font-size:11.5px; color:var(--ink-500); white-space:nowrap;
+}
+.vd-row .vd-gen{
+  display:grid; place-items:center; width:22px; height:22px; justify-self:center;
+  border:1px solid var(--mist-200); border-radius:6px; background:var(--mist-50);
+  font-family:var(--mono); font-size:10.5px; color:var(--ink-500);
+}
+.vd-row--on .vd-gen{border-color:rgba(201,162,39,.55); background:#fff; color:var(--brass-600)}
+.vd-row .vd-place{
+  font-size:11px; color:var(--ink-400); text-align:right;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.vd-master-foot{
+  flex:none; display:flex; align-items:center; gap:8px; height:34px; padding:0 12px; overflow:hidden;
+  border-top:1px solid var(--mist-200); background:var(--mist-50);
+  font-family:var(--mono); font-size:10.5px; color:var(--ink-400); white-space:nowrap; text-overflow:ellipsis;
+}
+
+.vd-dossier{flex:1; min-width:0; display:flex; flex-direction:column; background:var(--mist-50)}
+.vd-dossier-top{
+  flex:none; display:flex; align-items:center; gap:14px;
+  padding:12px 18px; background:#fff; border-bottom:1px solid var(--mist-200);
+}
+.vd-portrait{
+  position:relative; flex:none; width:80px; height:80px; border-radius:12px; overflow:hidden;
+  border:1px solid var(--ink-600);
+  background:
+    radial-gradient(120% 90% at 18% 0,rgba(201,162,39,.3),transparent 62%),
+    linear-gradient(160deg,var(--ink-600),var(--ink-900));
+}
+.vd-portrait svg{position:absolute; inset:0; width:100%; height:100%}
+.vd-dossier-head{flex:1; min-width:0}
+.vd-dossier-head h2{
+  margin:0; font-family:var(--serif); font-weight:500; font-size:25px; letter-spacing:-.02em;
+  line-height:1.1; color:var(--ink-800);
+}
+.vd-lifeline{display:flex; align-items:baseline; gap:10px; margin-top:5px}
+.vd-lifeline b{font-family:var(--mono); font-size:15px; font-weight:500; color:var(--ink-700)}
+.vd-lifeline span{font-size:12px; color:var(--ink-400)}
+.vd-badges{display:flex; flex-wrap:wrap; gap:6px; margin-top:9px}
+.vd-actions{display:flex; flex-direction:column; gap:7px; align-items:stretch; flex:none}
+
+.vd-dossier-body{
+  flex:1; min-height:0; display:grid; gap:10px; padding:10px 18px 12px;
+  grid-template-columns:minmax(0,1fr) 330px;
+  grid-template-rows:minmax(0,auto) minmax(0,1fr);
+  grid-template-areas:"facts docs" "events hist";
+}
+.vd-facts{grid-area:facts; min-width:0}
+.vd-docs{grid-area:docs; min-width:0}
+.vd-events{grid-area:events; min-height:0; min-width:0; display:flex; flex-direction:column}
+.vd-hist{grid-area:hist; min-height:0; min-width:0; display:flex; flex-direction:column}
+.vd-facts .vd-dl{
+  display:grid; grid-template-columns:minmax(0,1.05fr) minmax(0,1.35fr) minmax(0,1.05fr) minmax(0,1.35fr); gap:0 10px;
+  margin:0; padding:4px 14px 6px;
+}
+.vd-facts dt{
+  padding:5px 0; font-size:11.5px; color:var(--ink-400); border-top:1px solid var(--mist-100);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.vd-facts dd{
+  margin:0; padding:5px 0; font-size:12.5px; color:var(--ink-800); border-top:1px solid var(--mist-100);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.vd-facts dt:nth-of-type(1),.vd-facts dd:nth-of-type(1){border-top:0}
+/* подвал «Фактов»: что осталось незаполненным */
+.vd-facts{display:flex; flex-direction:column}
+.vd-facts-foot{
+  display:flex; align-items:center; gap:8px; flex:none;
+  margin-top:auto; padding:7px 14px; border-top:1px solid var(--mist-200);
+  background:var(--mist-50); border-radius:0 0 12px 12px;
+  font-size:11.5px; color:var(--ink-400);
+}
+.vd-facts-foot b{color:var(--ink-600)}
+.vd-facts dd i{color:var(--ink-400)}
+.vd-facts dd.vd-mono{font-variant-numeric:tabular-nums}
+
+.vd-docgrid{display:grid; grid-template-columns:repeat(3,1fr); gap:9px; padding:10px 12px 12px}
+.vd-doccard{
+  border:1px solid var(--mist-200); border-radius:9px; overflow:hidden; background:#fff;
+}
+.vd-doccard--add{border-style:dashed; background:var(--mist-50)}
+.vd-prev{
+  position:relative; display:block; height:62px; border-bottom:1px solid var(--mist-200); overflow:hidden; background:#fff;
+  background-image:
+    repeating-linear-gradient(180deg,transparent 0 7px,rgba(10,17,32,.07) 7px 8px),
+    linear-gradient(180deg,#fff,var(--mist-50));
+}
+.vd-prev--photo{
+  background-image:
+    radial-gradient(80% 60% at 50% 30%,rgba(255,255,255,.28),transparent 70%),
+    linear-gradient(160deg,var(--ink-500),var(--ink-900));
+}
+.vd-prev--seal::after{
+  content:""; position:absolute; right:8px; bottom:7px; width:17px; height:17px; border-radius:50%;
+  border:1.5px solid rgba(163,130,26,.6); background:radial-gradient(circle at 35% 30%,rgba(201,162,39,.35),transparent 70%);
+}
+.vd-prev svg{position:absolute; inset:0; width:100%; height:100%}
+.vd-docmeta{display:block; padding:6px 8px 7px}
+.vd-docmeta b{display:block; font-size:10.5px; font-weight:500; color:var(--ink-700); line-height:1.25; height:27px; overflow:hidden}
+.vd-docmeta span{display:flex; justify-content:space-between; gap:6px; margin-top:3px; font-family:var(--mono); font-size:9.5px; color:var(--ink-300); white-space:nowrap; overflow:hidden}
+.vd-docmeta span i{color:var(--ok)}
+
+.vd-events .vd-scroll,.vd-hist .vd-scroll{flex:1; min-height:0; overflow:hidden}
+.vd-tl{list-style:none; margin:0; padding:4px 0 6px}
+.vd-tl li{position:relative; display:grid; grid-template-columns:78px minmax(0,1fr); gap:12px; padding:3px 14px 3px 26px}
+.vd-tl li::before{
+  content:""; position:absolute; left:14px; top:11px; width:7px; height:7px; border-radius:50%;
+  background:#fff; border:1.5px solid var(--mist-300);
+}
+.vd-tl li::after{
+  content:""; position:absolute; left:17px; top:18px; bottom:-3px; width:1px; background:var(--mist-200);
+}
+.vd-tl li:last-child::after{content:none}
+.vd-tl li.vd-on::before{border-color:var(--brass); background:var(--brass)}
+.vd-tl time{font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:11.5px; color:var(--ink-500)}
+.vd-tl b{display:block; font-weight:500; font-size:12.5px; color:var(--ink-700)}
+.vd-tl span{display:block; margin-top:1px; font-size:11.5px; color:var(--ink-400); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+
+.vd-hist .vd-scroll{padding:2px 0 4px}
+.vd-hrow{
+  display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:start;
+  padding:5px 14px; border-top:1px solid var(--mist-100);
+}
+.vd-hrow:first-child{border-top:0}
+.vd-hist .vd-hrow:first-child{background:#fefbf0}
+.vd-hrow p{margin:0; font-size:12px; color:var(--ink-500); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.vd-hrow p b{font-weight:500; color:var(--ink-700)}
+.vd-hrow .vd-was{display:block; margin-top:3px; font-size:11.5px; color:var(--ink-400); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.vd-hrow .vd-was em{font-style:normal; color:var(--ink-600)}
+.vd-hrow .vd-was i{color:var(--ink-300); margin:0 5px}
+.vd-hrow time{display:block; margin-top:3px; font-family:var(--mono); font-size:10.5px; color:var(--ink-300)}
+.vd-hrow .vd-ha{display:flex; align-items:center; gap:6px; white-space:nowrap}
+
+/* ---------------------------------------------------------------------
+   07. Мобильные экраны: залипающие фильтры, лента, досье, нижняя навигация
+   --------------------------------------------------------------------- */
+.vd-mob{position:relative; width:100%; height:100%; display:flex; flex-direction:column; background:var(--mist-50); font-size:13px}
+.vd-mobtop{
+  flex:none; display:flex; align-items:center; gap:10px;
+  padding:38px 14px 11px;
+  background:linear-gradient(180deg,var(--ink-700),var(--ink-900)); color:var(--mist-50);
+}
+.vd-mtitle{flex:1; min-width:0}
+.vd-mtitle b{display:block; font-family:var(--serif); font-weight:500; font-size:17px; color:#fff}
+.vd-mtitle span{display:block; margin-top:1px; font-family:var(--mono); font-size:10.5px; color:#93a0b8}
+.vd-mback{
+  display:flex; align-items:center; gap:7px; width:100%;
+  padding:38px 14px 11px; background:linear-gradient(180deg,var(--ink-700),var(--ink-900));
+  color:var(--mist-50); border:0; text-align:left;
+}
+.vd-mback .vd-mtitle b{font-size:16px}
+.vd-crumb{display:block; font-family:var(--mono); font-size:10.5px; color:#93a0b8}
+.vd-mcount{display:flex; align-items:center; gap:6px; font-family:var(--mono); font-size:11.5px; color:#dfe5ee}
+
+.vd-mfilters{
+  position:sticky; top:0; z-index:12; flex:none;
+  padding:9px 14px 10px; background:#fff; border-bottom:1px solid var(--mist-200);
+  box-shadow:0 6px 14px -12px rgba(10,17,32,.5);
+}
+.vd-msearch{
+  display:flex; align-items:center; gap:8px; height:34px; padding:0 11px;
+  border:1px solid var(--mist-300); border-radius:9px; background:var(--mist-50);
+  color:var(--ink-400); font-size:12.5px;
+}
+.vd-mchips{display:flex; gap:6px; margin-top:8px}
+.vd-mchip{
+  display:inline-flex; align-items:center; gap:6px; flex:1; justify-content:center;
+  height:34px; border:1px solid var(--mist-200); border-radius:999px; background:#fff;
+  font-size:11.5px; color:var(--ink-500);
+}
+.vd-mchip b{font-family:var(--mono); font-size:10px; font-weight:500; color:var(--ink-300)}
+.vd-mchip--on{background:var(--ink-800); border-color:var(--ink-800); color:var(--mist-50)}
+.vd-mchip--on b{color:var(--brass-400)}
+.vd-mlist{flex:1; min-height:0; overflow:hidden; padding:6px 12px 10px}
+.vd-mgrouph{
+  display:flex; align-items:center; gap:9px; padding:7px 2px 5px;
+  font-family:var(--mono); font-size:9.5px; letter-spacing:.11em; text-transform:uppercase; color:var(--ink-300);
+}
+.vd-mgrouph i{flex:1; height:1px; background:var(--mist-200)}
+.vd-mcard{
+  position:relative; display:grid; grid-template-columns:1fr auto; gap:4px 10px;
+  min-height:58px; padding:9px 12px; margin-bottom:7px;
+  background:#fff; border:1px solid var(--mist-200); border-radius:11px;
+}
+.vd-mcard--on{border-color:var(--brass); background:#fefbf0; box-shadow:0 0 0 2px rgba(201,162,39,.18)}
+.vd-mcard b{font-weight:500; font-size:13.5px; color:var(--ink-800); line-height:1.25}
+.vd-mcard .vd-myrs{font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:11.5px; color:var(--ink-500); white-space:nowrap}
+.vd-mcard .vd-mplace{grid-column:1 / -1; font-size:11.5px; color:var(--ink-400)}
+.vd-mcard .vd-mplace i{color:var(--mist-300); margin:0 5px}
+.vd-mcard--on b{font-weight:600}
+.vd-mcard--dash{border-style:dashed; background:var(--mist-50)}
+.vd-mcard--dash b{color:var(--ink-400)}
+
+.vd-mbody{flex:1; min-height:0; overflow:hidden; padding:11px 12px; display:flex; flex-direction:column}
+.vd-msec{background:#fff; border:1px solid var(--mist-200); border-radius:12px; margin-bottom:10px}
+.vd-msec .vd-ph{height:32px; border-radius:12px 12px 0 0}
+.vd-mhero{display:flex; gap:12px; align-items:center; padding:11px 12px}
+.vd-mhero .vd-portrait{width:62px; height:62px; border-radius:11px}
+.vd-mhero h1{margin:0; font-family:var(--serif); font-weight:500; font-size:18px; line-height:1.15; color:var(--ink-800)}
+.vd-mhero .vd-lifeline{margin-top:3px}
+.vd-mhero .vd-lifeline b{font-size:13px}
+.vd-mhero .vd-badges{margin-top:7px}
+.vd-mdl{display:grid; grid-template-columns:88px minmax(0,1fr); gap:0 10px; margin:0; padding:3px 12px 8px}
+.vd-mdl dt{
+  padding:4px 0; font-size:11.5px; color:var(--ink-400); border-top:1px solid var(--mist-100);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.vd-mdl dd{
+  margin:0; padding:4px 0; font-size:12.5px; color:var(--ink-800); border-top:1px solid var(--mist-100);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.vd-mdl dt:first-of-type,.vd-mdl dd:first-of-type{border-top:0}
+.vd-mdocs{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; padding:9px 12px 11px}
+.vd-mdocs .vd-prev{height:46px}
+.vd-mdocs .vd-docmeta{padding:5px 7px 6px}
+.vd-mdocs .vd-docmeta b{height:24px; font-size:10px}
+.vd-mtl{list-style:none; margin:0; padding:3px 0 7px}
+.vd-mtl li{position:relative; display:grid; grid-template-columns:74px minmax(0,1fr); gap:10px; padding:3px 12px 3px 25px}
+.vd-mtl li::before{content:""; position:absolute; left:12px; top:11px; width:6px; height:6px; border-radius:50%; background:#fff; border:1.5px solid var(--mist-300)}
+.vd-mtl li::after{content:""; position:absolute; left:14.5px; top:17px; bottom:-3px; width:1px; background:var(--mist-200)}
+.vd-mtl li:last-child::after{content:none}
+.vd-mtl li.vd-on::before{border-color:var(--brass); background:var(--brass)}
+.vd-mtl time{font-family:var(--mono); font-size:11px; color:var(--ink-500)}
+.vd-mtl b{display:block; font-weight:500; font-size:12px; color:var(--ink-700)}
+.vd-mtl span{display:block; font-size:11px; color:var(--ink-400); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.vd-mhist{padding:2px 0 5px}
+.vd-mhist .vd-hrow{padding:6px 12px}
+.vd-mcanvas{position:relative; flex:1; min-height:0; background:var(--mist-100); overflow:hidden}
+.vd-mcanvas::before{
+  content:""; position:absolute; inset:0;
+  background:radial-gradient(circle at 1px 1px,var(--mist-300) 1px,transparent 0) 0 0 / 20px 20px;
+}
+/* Полотно останавливается над нижним листом, чтобы карточки младших
+   поколений не уходили под «Открыть досье». */
+.vd-mcanvas .vd-msvg{position:absolute; left:0; top:0; width:100%; height:calc(100% - 118px)}
+.vd-mcanvas .vd-mzoom{bottom:130px}
+.vd-mlegend{
+  position:absolute; left:12px; right:12px; top:12px; z-index:3;
+  display:flex; gap:12px; padding:8px 10px;
+  background:rgba(255,255,255,.94); border:1px solid var(--mist-200); border-radius:10px;
+}
+.vd-mlegend span{display:flex; align-items:center; gap:6px; font-size:10.5px; color:var(--ink-500)}
+.vd-mzoom{
+  position:absolute; right:12px; bottom:12px; z-index:3; display:flex; flex-direction:column;
+  border:1px solid var(--mist-200); border-radius:10px; background:#fff; overflow:hidden;
+}
+.vd-mzoom i{display:grid; place-items:center; width:36px; height:36px; color:var(--ink-600); border-top:1px solid var(--mist-200)}
+.vd-mzoom i:first-child{border-top:0}
+.vd-sheet{
+  position:absolute; left:0; right:0; bottom:0; z-index:4;
+  background:rgba(255,255,255,.96); border-top:1px solid var(--mist-200);
+  border-radius:14px 14px 0 0; box-shadow:0 -14px 30px -22px rgba(10,17,32,.7);
+  padding:8px 12px 12px;
+}
+.vd-sheet .vd-handle{width:38px; height:4px; border-radius:999px; background:var(--mist-300); margin:0 auto 8px}
+.vd-sheet h3{margin:0; font-family:var(--serif); font-weight:500; font-size:15px; color:var(--ink-800)}
+.vd-sheet p{margin:3px 0 0; font-family:var(--mono); font-size:11px; color:var(--ink-500)}
+.vd-sheet .vd-acts{display:flex; gap:7px; margin-top:9px}
+.vd-sheet .vd-acts .vd-btn{flex:1; height:34px; font-size:12px}
+
+.vd-mnav{
+  flex:none; display:grid; grid-template-columns:1fr 1fr 1fr; gap:4px;
+  padding:7px 10px 20px; background:#fff; border-top:1px solid var(--mist-200);
+}
+.vd-mnav a{
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+  min-width:0; min-height:48px; border-radius:10px; text-decoration:none;
+  font-size:10.5px; color:var(--ink-400);
+}
+.vd-mnav a[aria-current="page"]{color:var(--brass-600); background:#fdf8e8}
+.vd-mnav a b{font-weight:500; font-size:10.5px; white-space:nowrap}
+.vd-mnav a svg{flex:none}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand"><i>T</i> Torlmood — тестовые варианты интерфейса</div>
+  <nav aria-label="Варианты интерфейса">
+    <a href="index.html">Обзор</a>
+    <a href="a-quiet-archive.html">A · Тихий архив</a>
+    <a href="b-canvas-studio.html">B · Холст-студия</a>
+    <a href="c-family-atlas.html">C · Атлас рода</a>
+    <a href="d-card-catalog.html" aria-current="page">D · Картотека</a>
+    <a href="e-chronicle.html">E · Хроника</a>
+  </nav>
+</div>
+
+<div class="wrap">
+  <header class="doc-head">
+    <p class="eyebrow">Вариант D</p>
+    <h1>Картотека</h1>
+    <p class="lead">Плотный архивный указатель: слева всегда список людей с годами, поколением и местом, справа — досье выбранного. Всё подписано, у всего есть счётчик и время изменения. Это направление для семьи, которая уже наполнила древо и приходит в него <b>работать со списком</b>: найти, уточнить, дописать, проверить, что изменилось за неделю.</p>
+    <div class="chips">
+      <span class="chip"><b>Мастер-деталь</b> список 380px и досье, без переходов</span>
+      <span class="chip"><b>Цифры</b> моноширинные, годы в столбец</span>
+      <span class="chip"><b>Счётчики</b> 148 человек · 61 связь · 12 событий</span>
+      <span class="chip"><b>Документы</b> превью сеткой в досье</span>
+      <span class="chip"><b>Правки</b> история с кнопкой «Откатить»</span>
+    </div>
+  </header>
+
+  <div class="rule"></div>
+
+  <!-- ================= ДЕСКТОП ================= -->
+  <section class="section" id="desktop">
+    <h2><span class="num">01</span>Десктоп</h2>
+    <p>Три экрана: дашборд-картотека древ, вкладка «Древо» с компактным холстом и главный экран направления — «Люди», где список и досье живут рядом и никогда не разлучаются. Верхние вкладки «Люди · Древо · История» одинаковы на всех экранах, поэтому из досье в холст и обратно — один клик.</p>
+
+    <div class="stage">
+      <div class="stage-row">
+
+        <!-- ---------- Экран 1: дашборд ---------- -->
+        <figure class="shot">
+          <div class="frame">
+            <div class="browser">
+              <div class="dots"><i></i><i></i><i></i></div>
+              <div class="addr">torlmood.ru/dashboard</div>
+              <div class="tabs">2 дерева</div>
+            </div>
+            <div class="screen">
+              <div class="vd-root vd-app">
+
+                <!-- 02 шапка -->
+                <div class="vd-top">
+                  <div class="vd-brand"><i class="vd-mark">T</i> Torlmood</div>
+                  <i class="vd-tsep"></i>
+                  <div class="vd-tree">
+                    <b>Ковалёвы и Соколовы</b>
+                    <span>РЯЗАНЬ → ЛЕНИНГРАД</span>
+                  </div>
+                  <i class="vd-grow"></i>
+                  <div class="vd-tools">
+                    <button class="vd-icon vd-icon--chip" type="button" aria-label="Поиск по древу">
+                      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="6.6" cy="6.6" r="4.6" fill="none" stroke="currentColor" stroke-width="1.5"></circle><path d="M10.2 10.2 14.4 14.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+                      <span class="vd-mono" style="font-size:11.5px">Поиск</span>
+                      <span class="vd-role">⌘K</span>
+                    </button>
+                    <button class="vd-icon" type="button" aria-label="Экспорт древа">
+                      <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 11V2.6M8 2.6 5 5.6M8 2.6l3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path><path d="M2.6 10.4v2.2c0 .6.4 1 1 1h8.8c.6 0 1-.4 1-1v-2.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+                    </button>
+                    <button class="vd-icon" type="button" aria-label="Уведомления">
+                      <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2a3.6 3.6 0 0 0-3.6 3.6v2.6L3.2 10.6h9.6l-1.2-2.4V5.6A3.6 3.6 0 0 0 8 2Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"></path><path d="M6.4 12.4a1.7 1.7 0 0 0 3.2 0" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"></path></svg>
+                    </button>
+                  </div>
+                  <i class="vd-tsep"></i>
+                  <div class="vd-tree" style="flex-direction:row; align-items:center; gap:8px">
+                    <span class="vd-av">ИК</span>
+                    <span style="font-size:12.5px">Илья Ковалёв</span>
+                    <span class="vd-role vd-role--owner">Владелец</span>
+                  </div>
+                </div>
+
+                <!-- 02 вкладки: дашборд вне вкладок, поэтому ни одна не активна -->
+                <nav class="vd-tabs" aria-label="Разделы древа">
+                  <a class="vd-tab" href="#">Люди <span class="vd-n">148</span></a>
+                  <a class="vd-tab" href="#">Древо</a>
+                  <a class="vd-tab" href="#">История <span class="vd-n">12</span></a>
+                  <i class="vd-grow"></i>
+                  <a class="vd-tab" href="#" aria-current="page">Древа</a>
+                </nav>
+
+                <!-- 04 дашборд -->
+                <div class="vd-dash">
+                  <div class="vd-dash-top">
+                    <div class="vd-dash-head">
+                      <h2>Мои древа</h2>
+                      <p>2 древа · 152 человека · последнее изменение 2 часа назад</p>
+                      <div class="vd-addtree">
+                        <button class="vd-btn vd-btn--brass" type="button" style="height:32px">
+                          <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path></svg>
+                          Создать древо
+                        </button>
+                        <p>или <b style="color:var(--ink-600); font-weight:500">импортировать GEDCOM</b> — 34 человека за один раз</p>
+                      </div>
+                    </div>
+                    <div class="vd-tiles">
+                      <div class="vd-tile">
+                        <span class="vd-tl">Людей</span>
+                        <span class="vd-tv"><b>148</b><span>в двух древах</span></span>
+                        <span class="vd-tf">в основном древе <b>138</b></span>
+                      </div>
+                      <div class="vd-tile">
+                        <span class="vd-tl">Связей</span>
+                        <span class="vd-tv"><b>61</b><span>брак и родительство</span></span>
+                        <span class="vd-tf">без родителей <b>6 человек</b></span>
+                      </div>
+                      <div class="vd-tile">
+                        <span class="vd-tl">События</span>
+                        <span class="vd-tv"><b>12</b><span>за 30 дней</span></span>
+                        <span class="vd-tf">последнее <b>2 часа назад</b></span>
+                      </div>
+                      <div class="vd-tile">
+                        <span class="vd-tl">Приглашения</span>
+                        <span class="vd-tv"><b>2</b><span>активны</span></span>
+                        <span class="vd-tf">3 из 10 переходов · 14 дней</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="vd-dash-grid">
+                    <div class="vd-panel" style="display:flex; flex-direction:column; min-height:0; overflow:hidden">
+                      <div class="vd-ph">
+                        <h3>Картотека древ</h3>
+                        <span class="vd-count">2 записи</span>
+                        <i class="vd-grow"></i>
+                        <span class="vd-mono" style="font-size:10.5px; color:var(--ink-300)">ИЗМЕНЕНО</span>
+                      </div>
+                      <div style="flex:1; min-height:0">
+                        <div class="vd-tree-row vd-tree-row--on">
+                          <div class="vd-tree-name">
+                            <span class="vd-thumb">
+                              <svg width="54" height="54" viewBox="0 0 54 54" aria-hidden="true">
+                                <path d="M27 39V30M27 30H14M27 30h13M14 30v-8M40 30v-8M14 22h-4M14 22h4M40 22h-4M40 22h4" fill="none" stroke="#8fa2c0" stroke-width="1.2"></path>
+                                <rect x="6" y="13" width="8" height="7" rx="1.6" fill="#7fa6c9"></rect>
+                                <rect x="14" y="13" width="8" height="7" rx="1.6" fill="#d1873f"></rect>
+                                <rect x="23" y="33" width="8" height="7" rx="1.6" fill="#7fa6c9" stroke="#c9a227" stroke-width="1.2"></rect>
+                                <rect x="36" y="13" width="8" height="7" rx="1.6" fill="#d1873f"></rect>
+                                <rect x="44" y="13" width="8" height="7" rx="1.6" fill="#c6cfdd"></rect>
+                                <rect x="23" y="3" width="8" height="7" rx="1.6" fill="#7fa6c9"></rect>
+                                <path d="M27 10v4" fill="none" stroke="#8fa2c0" stroke-width="1.2"></path>
+                              </svg>
+                            </span>
+                            <div>
+                              <b>Ковалёвы и Соколовы</b>
+                              <span>Рязань → Ленинград · вы владелец</span>
+                            </div>
+                          </div>
+                          <div class="vd-cell"><small>людей</small>138</div>
+                          <div class="vd-cell"><small>связей</small>57</div>
+                          <div class="vd-cell"><small>событий</small>11</div>
+                          <div class="vd-cell" style="font-size:11.5px"><small>изменено</small>2 часа назад</div>
+                          <div class="vd-chev"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+                        </div>
+                        <div class="vd-tree-row">
+                          <div class="vd-tree-name">
+                            <span class="vd-thumb" style="background:linear-gradient(180deg,#5c4a35,#3a2e21); border-color:#5c4a35">
+                              <svg width="54" height="54" viewBox="0 0 54 54" aria-hidden="true">
+                                <path d="M27 37V28M27 28H16M27 28h11M16 28v-7M38 28v-7" fill="none" stroke="#b9a382" stroke-width="1.2"></path>
+                                <rect x="11" y="13" width="10" height="8" rx="1.6" fill="#7d94ab"></rect>
+                                <rect x="33" y="13" width="10" height="8" rx="1.6" fill="#b57338"></rect>
+                                <rect x="22" y="31" width="10" height="8" rx="1.6" fill="#7d94ab"></rect>
+                              </svg>
+                            </span>
+                            <div>
+                              <b>Соколовы, ветвь Дмитрия</b>
+                              <span>Чернигов → Санкт-Петербург · редактор Галина</span>
+                            </div>
+                          </div>
+                          <div class="vd-cell"><small>людей</small>10</div>
+                          <div class="vd-cell"><small>связей</small>4</div>
+                          <div class="vd-cell"><small>событий</small>1</div>
+                          <div class="vd-cell" style="font-size:11.5px"><small>изменено</small>6 дней назад</div>
+                          <div class="vd-chev"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+                        </div>
+                      </div>
+                      <div class="vd-ph" style="border-top:1px solid var(--mist-200); border-radius:0">
+                        <h3>Ближайшие даты</h3>
+                        <span class="vd-count">2 в этом месяце</span>
+                      </div>
+                      <ul class="vd-dates">
+                        <li>
+                          <span class="vd-date"><b>02</b><span>окт</span></span>
+                          <div>
+                            <b>Нина Борисовна Ковалёва</b>
+                            <span>75 лет · в девичестве Верещагина</span>
+                          </div>
+                        </li>
+                        <li>
+                          <span class="vd-date"><b>14</b><span>ноя</span></span>
+                          <div>
+                            <b>Тимур Ильич Ковалёв</b>
+                            <span>21 год · V поколение</span>
+                          </div>
+                        </li>
+                      </ul>
+                      <div class="vd-master-foot" style="height:34px; background:#fff; border-radius:0 0 12px 12px">
+                        148 человек · 61 связь · 12 событий · 4 участника · 2 приглашения
+                      </div>
+                    </div>
+
+                    <div style="display:flex; flex-direction:column; gap:16px; min-height:0">
+                      <div class="vd-panel" style="display:flex; flex-direction:column">
+                        <div class="vd-ph">
+                          <h3>Последние изменения</h3>
+                          <span class="vd-count">12 событий</span>
+                        </div>
+                        <ul class="vd-feed">
+                          <li>
+                            <i class="vd-dot vd-fdot" style="color:var(--brass)"></i>
+                            <div>
+                              <b>Ольга</b> изменила место рождения
+                              <span class="vd-was">Тверь <i>→</i> Рязань</span>
+                              <time>2 часа назад</time>
+                            </div>
+                          </li>
+                          <li>
+                            <i class="vd-dot vd-fdot" style="color:var(--bond-400)"></i>
+                            <div>
+                              <b>Илья</b> добавил карточку Веры Ильиничны
+                              <span class="vd-was">V поколение, 2009</span>
+                              <time>вчера, 21:40</time>
+                            </div>
+                          </li>
+                          <li>
+                            <i class="vd-dot vd-fdot" style="color:var(--ok)"></i>
+                            <div>
+                              <b>Дмитрий Соколов</b> присоединился к древу
+                              <span class="vd-was">роль: зритель</span>
+                              <time>3 дня назад</time>
+                            </div>
+                          </li>
+                        </ul>
+                      </div>
+
+                      <div class="vd-panel" style="display:flex; flex-direction:column">
+                        <div class="vd-ph">
+                          <h3>Приглашение</h3>
+                          <span class="vd-count">активно</span>
+                        </div>
+                        <div class="vd-invite">
+                          <h4>Ссылка для родственников</h4>
+                          <div class="vd-link">
+                            <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.4 9.6 9.6 6.4M6.8 4.4l1.4-1.4a2.4 2.4 0 0 1 3.4 3.4L10.2 7.8M9.2 11.6l-1.4 1.4a2.4 2.4 0 0 1-3.4-3.4l1.4-1.4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"></path></svg>
+                            <span>torlmood.ru/invite/kov-7f3a</span>
+                          </div>
+                          <div class="vd-prog">
+                            <span class="vd-pt"><span>3 из 10 переходов</span><span>осталось 14 дней</span></span>
+                            <span class="vd-track"><i></i></span>
+                          </div>
+                          <div class="vd-acts">
+                            <button class="vd-btn vd-btn--sm" type="button">Скопировать</button>
+                            <button class="vd-btn vd-btn--sm vd-btn--ghost" type="button">Отозвать</button>
+                          </div>
+                        </div>
+                      </div>
+
+</div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+          <figcaption><b>Дашборд</b> <code>torlmood.ru/dashboard</code> <span>картотека древ со сводкой: людей, связей, событий, приглашений, плюс лента изменений и ближайшие даты</span></figcaption>
+        </figure>
+
+        <!-- ---------- Экран 2: вкладка «Древо» ---------- -->
+        <figure class="shot">
+          <div class="frame">
+            <div class="browser">
+              <div class="dots"><i></i><i></i><i></i></div>
+              <div class="addr">torlmood.ru/tree/kovalevy</div>
+              <div class="tabs">вкладка «Древо»</div>
+            </div>
+            <div class="screen">
+              <div class="vd-root vd-app">
+
+                <div class="vd-top">
+                  <div class="vd-brand"><i class="vd-mark">T</i> Torlmood</div>
+                  <i class="vd-tsep"></i>
+                  <div class="vd-tree">
+                    <b>Ковалёвы и Соколовы</b>
+                    <span>148 ЧЕЛОВЕК · 4 УЧАСТНИКА</span>
+                  </div>
+                  <i class="vd-grow"></i>
+                  <div class="vd-tools">
+                    <div class="vd-icon" style="width:auto; padding:0 4px">
+                      <span class="vd-av vd-av--sm">ИК</span>
+                      <span class="vd-av vd-av--sm" style="margin-left:-8px; background:linear-gradient(160deg,#8a5a22,#4a3113)">ОК</span>
+                      <span class="vd-av vd-av--sm" style="margin-left:-8px; background:linear-gradient(160deg,#3f5a35,#22331d)">ГП</span>
+                      <span class="vd-av vd-av--sm" style="margin-left:-8px">ДС</span>
+                    </div>
+                    <button class="vd-icon vd-icon--chip" type="button" aria-label="Поиск по древу">
+                      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="6.6" cy="6.6" r="4.6" fill="none" stroke="currentColor" stroke-width="1.5"></circle><path d="M10.2 10.2 14.4 14.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+                      <span class="vd-role">⌘K</span>
+                    </button>
+                  </div>
+                  <i class="vd-tsep"></i>
+                  <button class="vd-btn vd-btn--brass" type="button" style="height:30px">
+                    <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path></svg>
+                    Добавить человека
+                  </button>
+                </div>
+
+                <nav class="vd-tabs" aria-label="Разделы древа">
+                  <a class="vd-tab" href="#">Люди <span class="vd-n">148</span></a>
+                  <a class="vd-tab" href="#" aria-current="page">Древо</a>
+                  <a class="vd-tab" href="#">История <span class="vd-n">12</span></a>
+                  <i class="vd-grow"></i>
+                  <span class="vd-tab" style="pointer-events:none">Сохранено 2 часа назад</span>
+                </nav>
+
+                <div class="vd-treepage">
+                  <div class="vd-bar" style="border-bottom:1px solid var(--mist-200)">
+                    <div class="vd-crumbs">
+                      <a href="#">Древа</a><i>›</i><a href="#">Ковалёвы и Соколовы</a><i>›</i><b>Древо</b>
+                    </div>
+                    <i class="vd-grow"></i>
+                    <span class="vd-badge vd-badge--brass">Фильтр: все поколения</span>
+                    <span class="vd-badge">I–V</span>
+                    <i class="vd-sep"></i>
+                    <button class="vd-btn vd-btn--sm" type="button">Экспорт PNG</button>
+                    <button class="vd-btn vd-btn--sm" type="button">GEDCOM</button>
+                  </div>
+
+                  <div class="vd-treewrap">
+                    <div class="vd-rail">
+                      <div class="vd-rail-scroll">
+                        <div class="vd-group">
+                          <p class="vd-gl">Масштаб</p>
+                          <div class="vd-zoom">
+                            <button class="vd-icon" type="button" aria-label="Уменьшить масштаб" style="width:28px; height:28px; border-color:var(--mist-200); color:var(--ink-600)">
+                              <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8h9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path></svg>
+                            </button>
+                            <span class="vd-zoombox">100 %<i style="color:var(--ink-300)">⌄</i></span>
+                            <button class="vd-icon" type="button" aria-label="Увеличить масштаб" style="width:28px; height:28px; border-color:var(--mist-200); color:var(--ink-600)">
+                              <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path></svg>
+                            </button>
+                          </div>
+                        </div>
+
+                        <div class="vd-group">
+                          <p class="vd-gl">Найти</p>
+                          <div class="vd-search" style="padding:0; border:0">
+                            <span class="vd-input">
+                              <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><circle cx="6.6" cy="6.6" r="4.6" fill="none" stroke="currentColor" stroke-width="1.5"></circle><path d="M10.2 10.2 14.4 14.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+                              имя, год, место
+                            </span>
+                          </div>
+                        </div>
+
+                        <div class="vd-group">
+                          <p class="vd-gl">Выделенный</p>
+                          <div style="display:flex; align-items:center; gap:9px; border:1px solid rgba(201,162,39,.5); background:#fdf8e8; border-radius:9px; padding:8px 9px">
+                            <span class="vd-av" style="background:linear-gradient(160deg,var(--ink-500),var(--ink-800))">АК</span>
+                            <div style="min-width:0">
+                              <b style="display:block; font-family:var(--serif); font-weight:500; font-size:13px; color:var(--ink-800)">Аркадий Петрович</b>
+                              <span class="vd-mono" style="font-size:10.5px; color:var(--ink-500)">1947–2011 · III</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div class="vd-group">
+                          <p class="vd-gl">Поколения</p>
+                          <ul class="vd-legend">
+                            <li><i class="vd-lg"></i> I · 1880–1920 <b class="vd-mono" style="margin-left:auto; font-weight:400; font-size:11px; color:var(--ink-400)">2</b></li>
+                            <li><i class="vd-lg"></i> II · 1905–1945 <b class="vd-mono" style="margin-left:auto; font-weight:400; font-size:11px; color:var(--ink-400)">4</b></li>
+                            <li><i class="vd-lg" style="box-shadow:inset 3px 0 0 var(--brass)"></i> III · 1930–1970 <b class="vd-mono" style="margin-left:auto; font-weight:400; font-size:11px; color:var(--ink-400)">38</b></li>
+                            <li><i class="vd-lg"></i> IV · 1955–1995 <b class="vd-mono" style="margin-left:auto; font-weight:400; font-size:11px; color:var(--ink-400)">61</b></li>
+                            <li><i class="vd-lg"></i> V · 1980–2020 <b class="vd-mono" style="margin-left:auto; font-weight:400; font-size:11px; color:var(--ink-400)">43</b></li>
+                          </ul>
+                        </div>
+
+                        <div class="vd-group">
+                          <p class="vd-gl">Показывать</p>
+                          <div style="display:flex; flex-direction:column; gap:9px">
+                            <span class="vd-switch"><i class="vd-knob"></i> линии брака</span>
+                            <span class="vd-switch"><i class="vd-knob"></i> годы у карточек</span>
+                            <span class="vd-switch"><i class="vd-knob vd-knob--off"></i> только прямые предки</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="vd-rail-foot">
+                        <p class="vd-gl" style="margin-bottom:6px">Обзор холста</p>
+                        <div class="vd-mini">
+                          <svg viewBox="0 0 192 150" aria-hidden="true" role="img" aria-label="Обзор холста: то же расположение карточек, что и на полотне">
+                            <rect width="192" height="150" fill="#eef1f6"></rect>
+                            <!-- ветви -->
+                            <path d="M34 26v12h70M70 38h46M152 38v14M54 38v14M34 38v56h38M120 70v24h16M70 70v24h40M160 70v24" fill="none" stroke="#c6cfdd" stroke-width="1.2"></path>
+                            <!-- I поколение -->
+                            <rect x="14" y="14" width="34" height="12" rx="2" fill="#7fa6c9"></rect>
+                            <rect x="56" y="14" width="34" height="12" rx="2" fill="#d1873f"></rect>
+                            <!-- II поколение -->
+                            <rect x="30" y="52" width="40" height="18" rx="2" fill="#7fa6c9"></rect>
+                            <rect x="76" y="52" width="40" height="18" rx="2" fill="#d1873f"></rect>
+                            <rect x="128" y="52" width="40" height="18" rx="2" fill="#d1873f"></rect>
+                            <!-- III поколение -->
+                            <rect x="16" y="94" width="36" height="18" rx="2" fill="#c9a227"></rect>
+                            <rect x="56" y="94" width="36" height="18" rx="2" fill="#d1873f"></rect>
+                            <rect x="100" y="94" width="36" height="18" rx="2" fill="#d1873f"></rect>
+                            <rect x="140" y="94" width="36" height="18" rx="2" fill="#7fa6c9"></rect>
+                            <!-- IV поколение -->
+                            <rect x="24" y="126" width="34" height="16" rx="2" fill="#7fa6c9"></rect>
+                            <rect x="62" y="126" width="34" height="16" rx="2" fill="#d1873f"></rect>
+                            <rect x="104" y="126" width="34" height="16" rx="2" fill="#7fa6c9"></rect>
+                            <!-- видимая область: полотно целиком -->
+                            <rect x="7" y="7" width="178" height="140" rx="4" fill="none" stroke="#a3821a" stroke-width="1.3" stroke-dasharray="5 4"></rect>
+                          </svg>
+                        </div>
+                        <div class="vd-mini-legend">
+                          <span><b>видно</b> всё полотно</span><span><b>выделен</b> Аркадий</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="vd-stage">
+                      <div class="vd-canvas">
+                        <svg class="vd-csvg" viewBox="0 0 760 600" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Фрагмент древа: три поколения Ковалёвых и Соколовых, выделен Аркадий Петрович">
+                          <!-- линии супружества -->
+                          <path d="M150 61H164M310 61H324M470 61H484" fill="none" stroke="#c9a227" stroke-width="2" stroke-linecap="round"></path>
+                          <path d="M230 212H244M430 212H444" fill="none" stroke="#c9a227" stroke-width="2" stroke-linecap="round"></path>
+                          <!-- ветвь I → II -->
+                          <path d="M152 132V164H632M632 164V208" fill="none" stroke="#7a8ca6" stroke-width="1.4" stroke-linecap="round"></path>
+                          <path d="M318 132V164M152 164V208" fill="none" stroke="#7a8ca6" stroke-width="1.4" stroke-linecap="round"></path>
+                          <!-- ветвь II → III -->
+                          <path d="M632 288V312H140M140 312V368" fill="none" stroke="#7a8ca6" stroke-width="1.4" stroke-linecap="round"></path>
+                          <path d="M318 288V340H477M477 340V368" fill="none" stroke="#7a8ca6" stroke-width="1.4" stroke-linecap="round"></path>
+
+                          <text x="10" y="18" font-family="'JetBrains Mono', monospace" font-size="9.5" letter-spacing="1.2" fill="#a9b3c4">I ПОКОЛЕНИЕ</text>
+                          <text x="10" y="172" font-family="'JetBrains Mono', monospace" font-size="9.5" letter-spacing="1.2" fill="#a9b3c4">II ПОКОЛЕНИЕ</text>
+                          <text x="10" y="336" font-family="'JetBrains Mono', monospace" font-size="9.5" letter-spacing="1.2" fill="#a9b3c4">III ПОКОЛЕНИЕ</text>
+
+                          <!-- I поколение -->
+                          <rect x="6" y="32" width="144" height="72" rx="9" fill="#fff" stroke="#7fa6c9" stroke-width="1.5" stroke-dasharray="6 4"></rect>
+                          <rect x="6" y="32" width="3" height="72" rx="1.5" fill="#7fa6c9"></rect>
+                          <text x="18" y="53" font-family="Literata, Georgia, serif" font-size="10.5" fill="#131e33">Григорий Ильич</text>
+                          <text x="18" y="68" font-family="Literata, Georgia, serif" font-size="10.5" fill="#131e33">Ковалёв</text>
+                          <text x="18" y="84" font-family="'JetBrains Mono', monospace" font-size="9" fill="#47597a">1889–1954</text>
+                          <text x="18" y="97" font-family="'Golos Text', sans-serif" font-size="8.5" fill="#7487a5">Рязань</text>
+
+                          <rect x="164" y="32" width="146" height="72" rx="9" fill="#fff" stroke="#d1873f" stroke-width="1.5" stroke-dasharray="6 4"></rect>
+                          <rect x="164" y="32" width="3" height="72" rx="1.5" fill="#d1873f"></rect>
+                          <text x="176" y="53" font-family="Literata, Georgia, serif" font-size="10.5" fill="#131e33">Анна Сергеевна</text>
+                          <text x="176" y="68" font-family="Literata, Georgia, serif" font-size="10.5" fill="#131e33">Ковалёва</text>
+                          <text x="176" y="84" font-family="'JetBrains Mono', monospace" font-size="9" fill="#47597a">1894–1971</text>
+                          <text x="176" y="97" font-family="'Golos Text', sans-serif" font-size="8.5" fill="#7487a5">в дев. Соколова</text>
+
+                          <!-- II поколение -->
+                          <rect x="150" y="208" width="176" height="80" rx="9" fill="#fff" stroke="#7fa6c9" stroke-width="1.5"></rect>
+                          <rect x="150" y="208" width="3" height="80" rx="1.5" fill="#7fa6c9"></rect>
+                          <text x="162" y="231" font-family="Literata, Georgia, serif" font-size="11" fill="#131e33">Пётр Григорьевич</text>
+                          <text x="162" y="245" font-family="Literata, Georgia, serif" font-size="11" fill="#131e33">Ковалёв</text>
+                          <text x="162" y="262" font-family="'JetBrains Mono', monospace" font-size="9.5" fill="#47597a">1918–1983</text>
+                          <text x="162" y="276" font-family="'Golos Text', sans-serif" font-size="8.5" fill="#7487a5">Ленинград · III колено</text>
+
+                          <rect x="310" y="208" width="176" height="80" rx="9" fill="#fff" stroke="#d1873f" stroke-width="1.5"></rect>
+                          <rect x="310" y="208" width="3" height="80" rx="1.5" fill="#d1873f"></rect>
+                          <text x="322" y="231" font-family="Literata, Georgia, serif" font-size="11" fill="#131e33">Мария Тимофеевна</text>
+                          <text x="322" y="245" font-family="Literata, Georgia, serif" font-size="11" fill="#131e33">Ковалёва</text>
+                          <text x="322" y="262" font-family="'JetBrains Mono', monospace" font-size="9.5" fill="#47597a">1922–2004</text>
+                          <text x="322" y="276" font-family="'Golos Text', sans-serif" font-size="8.5" fill="#7487a5">в дев. Зайцева · ⚭ 1946</text>
+
+                          <rect x="546" y="208" width="196" height="80" rx="9" fill="#fff" stroke="#d1873f" stroke-width="1.5"></rect>
+                          <rect x="546" y="208" width="3" height="80" rx="1.5" fill="#d1873f"></rect>
+                          <text x="558" y="231" font-family="Literata, Georgia, serif" font-size="11" fill="#131e33">Валентина Григорьевна</text>
+                          <text x="558" y="245" font-family="Literata, Georgia, serif" font-size="11" fill="#131e33">Соколова</text>
+                          <text x="558" y="262" font-family="'JetBrains Mono', monospace" font-size="9.5" fill="#47597a">1926–1996</text>
+                          <text x="558" y="276" font-family="'Golos Text', sans-serif" font-size="8.5" fill="#7487a5">Дмитрий Львович · ⚭ 1949</text>
+
+
+                          <!-- III поколение -->
+                          <rect x="60" y="368" width="160" height="84" rx="9" fill="#fefbf0" stroke="#c9a227" stroke-width="2"></rect>
+                          <rect x="60" y="368" width="3" height="84" rx="1.5" fill="#c9a227"></rect>
+                          <text x="72" y="391" font-family="Literata, Georgia, serif" font-size="11" fill="#0f1a2e">Аркадий Петрович</text>
+                          <text x="72" y="405" font-family="Literata, Georgia, serif" font-size="11" fill="#0f1a2e">Ковалёв</text>
+                          <text x="72" y="422" font-family="'JetBrains Mono', monospace" font-size="9.5" fill="#a3821a">1947–2011</text>
+                          <text x="72" y="436" font-family="'Golos Text', sans-serif" font-size="8.5" fill="#47597a">Ленинград · выбран</text>
+
+                          <rect x="230" y="368" width="176" height="84" rx="9" fill="#fff" stroke="#d1873f" stroke-width="1.5"></rect>
+                          <rect x="230" y="368" width="3" height="84" rx="1.5" fill="#d1873f"></rect>
+                          <text x="242" y="391" font-family="Literata, Georgia, serif" font-size="11" fill="#131e33">Нина Борисовна</text>
+                          <text x="242" y="405" font-family="Literata, Georgia, serif" font-size="11" fill="#131e33">Ковалёва</text>
+                          <text x="242" y="422" font-family="'JetBrains Mono', monospace" font-size="9.5" fill="#47597a">1950</text>
+                          <text x="242" y="436" font-family="'Golos Text', sans-serif" font-size="8.5" fill="#7487a5">в дев. Верещагина · Тверь</text>
+
+                          <rect x="416" y="368" width="176" height="84" rx="9" fill="#fff" stroke="#d1873f" stroke-width="1.5"></rect>
+                          <rect x="416" y="368" width="3" height="84" rx="1.5" fill="#d1873f"></rect>
+                          <text x="428" y="391" font-family="Literata, Georgia, serif" font-size="11" fill="#131e33">Галина Петровна</text>
+                          <text x="428" y="405" font-family="Literata, Georgia, serif" font-size="11" fill="#131e33">Прохорова</text>
+                          <text x="428" y="422" font-family="'JetBrains Mono', monospace" font-size="9.5" fill="#47597a">1952</text>
+                          <text x="428" y="436" font-family="'Golos Text', sans-serif" font-size="8.5" fill="#7487a5">Ленинград · редактор</text>
+
+                          <rect x="602" y="368" width="152" height="84" rx="9" fill="#fff" stroke="#7fa6c9" stroke-width="1.5"></rect>
+                          <rect x="602" y="368" width="3" height="84" rx="1.5" fill="#7fa6c9"></rect>
+                          <text x="614" y="391" font-family="Literata, Georgia, serif" font-size="11" fill="#131e33">Юрий Андреевич</text>
+                          <text x="614" y="405" font-family="Literata, Georgia, serif" font-size="11" fill="#131e33">Прохоров</text>
+                          <text x="614" y="422" font-family="'JetBrains Mono', monospace" font-size="9.5" fill="#47597a">1949</text>
+                          <text x="614" y="436" font-family="'Golos Text', sans-serif" font-size="8.5" fill="#7487a5">⚭ 1975 · Псков</text>
+
+                          <!-- IV поколение -->
+                          <rect x="60" y="512" width="160" height="76" rx="9" fill="#fff" stroke="#7fa6c9" stroke-width="1.5" stroke-dasharray="5 4"></rect>
+                          <rect x="60" y="512" width="3" height="76" rx="1.5" fill="#7fa6c9"></rect>
+                          <text x="72" y="534" font-family="Literata, Georgia, serif" font-size="11" fill="#131e33">Илья Аркадьевич</text>
+                          <text x="72" y="548" font-family="Literata, Georgia, serif" font-size="11" fill="#131e33">Ковалёв</text>
+                          <text x="72" y="564" font-family="'JetBrains Mono', monospace" font-size="9.5" fill="#47597a">1974</text>
+                          <text x="72" y="578" font-family="'Golos Text', sans-serif" font-size="8.5" fill="#7487a5">Санкт-Петербург · владелец</text>
+
+                          <rect x="230" y="512" width="176" height="76" rx="9" fill="#fff" stroke="#d1873f" stroke-width="1.5" stroke-dasharray="5 4"></rect>
+                          <rect x="230" y="512" width="3" height="76" rx="1.5" fill="#d1873f"></rect>
+                          <text x="242" y="534" font-family="Literata, Georgia, serif" font-size="11" fill="#131e33">Ольга Аркадьевна</text>
+                          <text x="242" y="548" font-family="Literata, Georgia, serif" font-size="11" fill="#131e33">Ковалёва</text>
+                          <text x="242" y="564" font-family="'JetBrains Mono', monospace" font-size="9.5" fill="#47597a">1978</text>
+                          <text x="242" y="578" font-family="'Golos Text', sans-serif" font-size="8.5" fill="#7487a5">Санкт-Петербург · редактор</text>
+
+                          <rect x="416" y="512" width="176" height="76" rx="9" fill="#fff" stroke="#7fa6c9" stroke-width="1.5" stroke-dasharray="5 4"></rect>
+                          <rect x="416" y="512" width="3" height="76" rx="1.5" fill="#7fa6c9"></rect>
+                          <text x="428" y="534" font-family="Literata, Georgia, serif" font-size="11" fill="#131e33">Антон Юрьевич</text>
+                          <text x="428" y="548" font-family="Literata, Georgia, serif" font-size="11" fill="#131e33">Прохоров</text>
+                          <text x="428" y="564" font-family="'JetBrains Mono', monospace" font-size="9.5" fill="#47597a">1980</text>
+                          <text x="428" y="578" font-family="'Golos Text', sans-serif" font-size="8.5" fill="#7487a5">Псков · зритель</text>
+                        </svg>
+                      </div>
+
+                      <div class="vd-card">
+                        <span class="vd-cl">Выбранная карточка</span>
+                        <h3>Аркадий Петрович Ковалёв</h3>
+                        <div class="vd-cy">1947–2011 · 63 года</div>
+                        <dl>
+                          <dt>Поколение</dt><dd>III</dd>
+                          <dt>Место</dt><dd>Ленинград</dd>
+                          <dt>Документов</dt><dd>4</dd>
+                          <dt>Событий</dt><dd>6</dd>
+                          <dt>Правок</dt><dd>12</dd>
+                        </dl>
+                        <div class="vd-cact">
+                          <button class="vd-btn vd-btn--brass vd-btn--sm" type="button">Открыть досье</button>
+                          <button class="vd-btn vd-btn--sm" type="button">Родня</button>
+                        </div>
+                      </div>
+
+                      <div class="vd-legendbox">
+                        <ul>
+                          <li><i class="vd-lg vd-lg--male"></i> мужчина</li>
+                          <li><i class="vd-lg vd-lg--female"></i> женщина</li>
+                          <li><i class="vd-lg vd-lg--sel"></i> выбран</li>
+                          <li><i class="vd-lg vd-lg--both"></i> пара</li>
+                          <li><i style="flex:none; width:18px; height:0; border-top:2px solid var(--brass)"></i> брак</li>
+                          <li><i style="flex:none; width:18px; height:0; border-top:1.5px dashed var(--mist-300)"></i> есть родня вне кадра</li>
+                          <li style="margin-left:auto; color:var(--ink-300)">перетаскивание — сдвиг · колесо — масштаб · клик — досье</li>
+                        </ul>
+                      </div>
+
+                    </div>
+                  </div>
+
+                  <div class="vd-bottom">
+                    <span class="vd-stat"><b>148</b> человек <i>·</i> <b>61</b> связь <i>·</i> <b>12</b> событий</span>
+                    <i class="vd-sep"></i>
+                    <span class="vd-badge vd-badge--male"><i class="vd-dot"></i> 72 мужчины</span>
+                    <span class="vd-badge vd-badge--female"><i class="vd-dot"></i> 76 женщин</span>
+                    <span class="vd-badge vd-badge--ok"><i class="vd-dot"></i> 94 живых</span>
+                    <span class="vd-badge">18 без дат</span>
+                    <i class="vd-grow"></i>
+                    <span class="vd-mono" style="font-size:11.5px; color:var(--ink-300)">Сетка: 22px · слой «связи»</span>
+                    <button class="vd-btn vd-btn--sm" type="button">Уместить</button>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+          <figcaption><b>Древо — вкладка холста</b> <code>torlmood.ru/tree/kovalevy</code> <span>холст живёт отдельной вкладкой рядом с «Люди» и «История»: слева панель с масштабом, поколениями и обзором, снизу — счётчики связей и пола</span></figcaption>
+        </figure>
+
+      </div>
+
+      <div class="stage-row">
+
+        <!-- ---------- Экран 3: мастер-деталь «Люди» + досье ---------- -->
+        <figure class="shot">
+          <div class="frame">
+            <div class="browser">
+              <div class="dots"><i></i><i></i><i></i></div>
+              <div class="addr">torlmood.ru/tree/kovalevy/person/arkady</div>
+              <div class="tabs">вкладка «Люди»</div>
+            </div>
+            <div class="screen">
+              <div class="vd-root vd-app">
+
+                <div class="vd-top">
+                  <div class="vd-brand"><i class="vd-mark">T</i> Torlmood</div>
+                  <i class="vd-tsep"></i>
+                  <div class="vd-tree">
+                    <b>Ковалёвы и Соколовы</b>
+                    <span>148 ЧЕЛОВЕК · 61 СВЯЗЬ</span>
+                  </div>
+                  <i class="vd-grow"></i>
+                  <div class="vd-tools">
+                    <button class="vd-icon vd-icon--chip" type="button" aria-label="Поиск по древу">
+                      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="6.6" cy="6.6" r="4.6" fill="none" stroke="currentColor" stroke-width="1.5"></circle><path d="M10.2 10.2 14.4 14.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+                      <span class="vd-mono" style="font-size:11.5px">Поиск</span>
+                      <span class="vd-role">⌘K</span>
+                    </button>
+                  </div>
+                  <i class="vd-tsep"></i>
+                  <button class="vd-btn vd-btn--brass" type="button" style="height:30px">
+                    <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path></svg>
+                    Добавить человека
+                  </button>
+                </div>
+
+                <nav class="vd-tabs" aria-label="Разделы древа">
+                  <a class="vd-tab" href="#" aria-current="page">Люди <span class="vd-n">148</span></a>
+                  <a class="vd-tab" href="#">Древо</a>
+                  <a class="vd-tab" href="#">История <span class="vd-n">12</span></a>
+                  <i class="vd-grow"></i>
+                  <span class="vd-tab" style="pointer-events:none">Аркадий Петрович · в досье</span>
+                </nav>
+
+                <div class="vd-people">
+                  <!-- 06 мастер: таблица 380px -->
+                  <div class="vd-master">
+                    <div class="vd-search">
+                      <span class="vd-input">
+                        <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><circle cx="6.6" cy="6.6" r="4.6" fill="none" stroke="currentColor" stroke-width="1.5"></circle><path d="M10.2 10.2 14.4 14.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+                        Ковалёв, 1947, Ленинград
+                      </span>
+                      <button class="vd-icon" type="button" aria-label="Расширенный поиск" style="width:28px; height:28px; border-color:var(--mist-300); color:var(--ink-500)">
+                        <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h11M4.5 8h7M6.5 11.5h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg>
+                      </button>
+                    </div>
+                    <div class="vd-filters">
+                      <button class="vd-f vd-f--on" type="button">Все <b>148</b></button>
+                      <button class="vd-f" type="button">Мужчины</button>
+                      <button class="vd-f" type="button">Женщины</button>
+                      <button class="vd-f" type="button">Живые</button>
+                      <button class="vd-f" type="button">Без дат</button>
+                    </div>
+                    <div class="vd-tablehead">
+                      <span>Имя</span><span>Годы</span><span>Пок.</span><span>Место</span>
+                    </div>
+                    <div class="vd-list">
+                      <div class="vd-row vd-row--gen">
+                        <span class="vd-name"><b>Григорий Ильич Ковалёв</b><small>1889</small></span>
+                        <span class="vd-years">1889–1954</span>
+                        <span class="vd-gen">I</span>
+                        <span class="vd-place">Рязань</span>
+                      </div>
+                      <div class="vd-row">
+                        <span class="vd-name"><b>Анна Сергеевна Ковалёва</b><small>в дев.</small></span>
+                        <span class="vd-years">1894–1971</span>
+                        <span class="vd-gen">I</span>
+                        <span class="vd-place">Рязань</span>
+                      </div>
+                      <div class="vd-row vd-row--gen">
+                        <span class="vd-name"><b>Пётр Григорьевич Ковалёв</b><small>1918</small></span>
+                        <span class="vd-years">1918–1983</span>
+                        <span class="vd-gen">II</span>
+                        <span class="vd-place">Ленинград</span>
+                      </div>
+                      <div class="vd-row">
+                        <span class="vd-name"><b>Мария Тимофеевна Ковалёва</b><small>в дев.</small></span>
+                        <span class="vd-years">1922–2004</span>
+                        <span class="vd-gen">II</span>
+                        <span class="vd-place">Ленинград</span>
+                      </div>
+                      <div class="vd-row">
+                        <span class="vd-name"><b>Валентина Григорьевна Соколова</b><small>1926</small></span>
+                        <span class="vd-years">1926–1996</span>
+                        <span class="vd-gen">II</span>
+                        <span class="vd-place">Чернигов</span>
+                      </div>
+                      <div class="vd-row vd-row--gen">
+                        <span class="vd-name"><b>Аркадий Петрович Ковалёв</b><small>1947</small></span>
+                        <span class="vd-years">1947–2011</span>
+                        <span class="vd-gen">III</span>
+                        <span class="vd-place">Ленинград</span>
+                      </div>
+                      <div class="vd-row">
+                        <span class="vd-name"><b>Нина Борисовна Ковалёва</b><small>в дев.</small></span>
+                        <span class="vd-years">1950</span>
+                        <span class="vd-gen">III</span>
+                        <span class="vd-place">Тверь → Рязань</span>
+                      </div>
+                      <div class="vd-row">
+                        <span class="vd-name"><b>Галина Петровна Прохорова</b><small>1952</small></span>
+                        <span class="vd-years">1952</span>
+                        <span class="vd-gen">III</span>
+                        <span class="vd-place">Ленинград</span>
+                      </div>
+                      <div class="vd-row vd-row--gen">
+                        <span class="vd-name"><b>Илья Аркадьевич Ковалёв</b><small>1974</small></span>
+                        <span class="vd-years">1974</span>
+                        <span class="vd-gen">IV</span>
+                        <span class="vd-place">СПб</span>
+                      </div>
+                      <div class="vd-row">
+                        <span class="vd-name"><b>Ольга Аркадьевна Ковалёва</b><small>1978</small></span>
+                        <span class="vd-years">1978</span>
+                        <span class="vd-gen">IV</span>
+                        <span class="vd-place">СПб</span>
+                      </div>
+                      <div class="vd-row">
+                        <span class="vd-name"><b>Антон Юрьевич Прохоров</b><small>1980</small></span>
+                        <span class="vd-years">1980</span>
+                        <span class="vd-gen">IV</span>
+                        <span class="vd-place">Псков</span>
+                      </div>
+                      <div class="vd-row vd-row--gen">
+                        <span class="vd-name"><b>Тимур Ильич Ковалёв</b><small>2005</small></span>
+                        <span class="vd-years">2005</span>
+                        <span class="vd-gen">V</span>
+                        <span class="vd-place">СПб</span>
+                      </div>
+                      <div class="vd-row">
+                        <span class="vd-name"><b>Вера Ильинична Ковалёва</b><small>2009</small></span>
+                        <span class="vd-years">2009</span>
+                        <span class="vd-gen">V</span>
+                        <span class="vd-place">СПб</span>
+                      </div>
+                    </div>
+                    <div class="vd-master-foot">
+                      показаны 13 из 148 · мужчин 72 · женщин 76 · без дат 18
+                    </div>
+                  </div>
+
+                  <!-- 06 деталь: досье -->
+                  <div class="vd-dossier">
+                    <div class="vd-dossier-top">
+                      <span class="vd-portrait">
+                        <svg viewBox="0 0 80 80" aria-hidden="true">
+                          <circle cx="40" cy="30" r="14" fill="rgba(247,249,252,.9)"></circle>
+                          <path d="M12 80c0-16 12.5-25 28-25s28 9 28 25Z" fill="rgba(247,249,252,.9)"></path>
+                        </svg>
+                      </span>
+                      <div class="vd-dossier-head">
+                        <h2>Аркадий Петрович Ковалёв</h2>
+                        <div class="vd-lifeline">
+                          <b>1947–2011</b>
+                          <span>63 года · III поколение · 4 документа · 6 событий</span>
+                        </div>
+                        <div class="vd-badges">
+                          <span class="vd-badge vd-badge--male"><i class="vd-dot"></i> мужчина</span>
+                          <span class="vd-badge">III поколение</span>
+                          <span class="vd-badge vd-badge--brass">есть расхождения</span>
+                          <span class="vd-badge">изменено 2 часа назад</span>
+                        </div>
+                      </div>
+                      <div class="vd-actions">
+                        <button class="vd-btn vd-btn--brass" type="button">Редактировать</button>
+                        <button class="vd-btn" type="button">Открыть древо</button>
+                        <button class="vd-btn vd-btn--ghost" type="button">Ещё · 4</button>
+                      </div>
+                    </div>
+
+                    <div class="vd-dossier-body">
+                      <div class="vd-panel vd-facts">
+                        <div class="vd-ph"><h3>Факты</h3><span class="vd-count">7 заполнено · 2 пусто</span></div>
+                        <dl class="vd-dl">
+                          <dt>Дата рождения</dt>
+                          <dd class="vd-mono">14 марта 1947</dd>
+                          <dt>Место рождения</dt>
+                          <dd>Ленинград <i>(сейчас Санкт-Петербург)</i></dd>
+                          <dt>Дата смерти</dt>
+                          <dd class="vd-mono">2 августа 2011</dd>
+                          <dt>Место смерти</dt>
+                          <dd>Санкт-Петербург</dd>
+                          <dt>Девичья фамилия</dt>
+                          <dd><i>нет — мужчина</i></dd>
+                          <dt>Супруг(а)</dt>
+                          <dd>Нина Борисовна Ковалёва, в девичестве Верещагина · ⚭ 1971</dd>
+                          <dt>Родители</dt>
+                          <dd>Пётр Григорьевич Ковалёв и Мария Тимофеевна, в девичестве Зайцева</dd>
+                          <dt>Дети</dt>
+                          <dd>Илья (1974), Ольга (1978)</dd>
+                          <dt>Место жительства</dt>
+                          <dd>Ленинград, ул. Марата, 12 <i>— из документа</i></dd>
+                          <dt>Профессия</dt>
+                          <dd><i>не заполнено</i></dd>
+                        </dl>
+                        <div class="vd-facts-foot">
+                          <span><b class="vd-mono">2</b> поля пустые: профессия, место захоронения</span>
+                          <i class="vd-grow"></i>
+                          <button class="vd-btn vd-btn--sm vd-btn--ghost" type="button">Заполнить</button>
+                        </div>
+                      </div>
+
+                      <div class="vd-panel vd-docs">
+                        <div class="vd-ph"><h3>Документы</h3><span class="vd-count">4 файла · 18 МБ</span><i class="vd-grow"></i><span class="vd-mono" style="font-size:10.5px; color:var(--ink-300)">ПРЕВЬЮ</span></div>
+                        <div class="vd-docgrid">
+                          <div class="vd-doccard">
+                            <span class="vd-prev vd-prev--seal">
+                              <svg viewBox="0 0 96 58" aria-hidden="true">
+                                <text x="48" y="20" text-anchor="middle" font-family="Literata, Georgia, serif" font-size="9" fill="#47597a">СВИДЕТЕЛЬСТВО</text>
+                                <text x="48" y="32" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="8" fill="#7487a5">о рождении</text>
+                                <path d="M18 40h60M18 46h44" stroke="rgba(10,17,32,.14)" stroke-width="1.6" stroke-linecap="round"></path>
+                              </svg>
+                            </span>
+                            <span class="vd-docmeta">
+                              <b>Свидетельство о рождении, 1947</b>
+                              <span><i>1947</i>2,4 МБ</span>
+                            </span>
+                          </div>
+                          <div class="vd-doccard">
+                            <span class="vd-prev vd-prev--photo">
+                              <svg viewBox="0 0 96 58" aria-hidden="true">
+                                <circle cx="48" cy="24" r="9" fill="rgba(247,249,252,.85)"></circle>
+                                <path d="M28 58c0-11 9-17 20-17s20 6 20 17Z" fill="rgba(247,249,252,.85)"></path>
+                              </svg>
+                            </span>
+                            <span class="vd-docmeta">
+                              <b>Фото, 1963</b>
+                              <span><i>1963</i>1,1 МБ</span>
+                            </span>
+                          </div>
+                          <div class="vd-doccard">
+                            <span class="vd-prev vd-prev--seal">
+                              <svg viewBox="0 0 96 58" aria-hidden="true">
+                                <text x="48" y="19" text-anchor="middle" font-family="Literata, Georgia, serif" font-size="8.5" fill="#47597a">АТТЕСТАТ</text>
+                                <text x="48" y="30" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="7.5" fill="#7487a5">№ 41-Б · 1965</text>
+                                <path d="M16 38h64M16 44h52M16 50h34" stroke="rgba(10,17,32,.14)" stroke-width="1.6" stroke-linecap="round"></path>
+                              </svg>
+                            </span>
+                            <span class="vd-docmeta">
+                              <b>Аттестат, 1965</b>
+                              <span><i>1965</i>3,0 МБ</span>
+                            </span>
+                          </div>
+                          <div class="vd-doccard">
+                            <span class="vd-prev vd-prev--seal">
+                              <svg viewBox="0 0 96 58" aria-hidden="true">
+                                <path d="M24 16h48v26H24z" fill="none" stroke="rgba(10,17,32,.2)" stroke-width="1.4"></path>
+                                <text x="48" y="27" text-anchor="middle" font-family="Literata, Georgia, serif" font-size="8" fill="#47597a">СВИДЕТЕЛЬСТВО</text>
+                                <text x="48" y="36" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="7.5" fill="#7487a5">о браке · 1971</text>
+                              </svg>
+                            </span>
+                            <span class="vd-docmeta">
+                              <b>Свидетельство о браке, 1971</b>
+                              <span><i>1971</i>5,2 МБ</span>
+                            </span>
+                          </div>
+                          <div class="vd-doccard">
+                            <span class="vd-prev">
+                              <svg viewBox="0 0 96 58" aria-hidden="true">
+                                <path d="M18 14h60M18 22h60M18 30h60M18 38h44M18 46h30" stroke="rgba(10,17,32,.14)" stroke-width="1.6" stroke-linecap="round"></path>
+                              </svg>
+                            </span>
+                            <span class="vd-docmeta">
+                              <b>Трудовая книжка, 1966</b>
+                              <span><i>1966</i>6,1 МБ</span>
+                            </span>
+                          </div>
+                          <div class="vd-doccard vd-doccard--add">
+                            <span class="vd-prev" style="background:repeating-linear-gradient(135deg,#fff 0 6px,var(--mist-50) 6px 12px)">
+                              <svg viewBox="0 0 96 58" aria-hidden="true">
+                                <path d="M48 22v14M41 29h14" stroke="#a9b3c4" stroke-width="1.8" stroke-linecap="round"></path>
+                              </svg>
+                            </span>
+                            <span class="vd-docmeta">
+                              <b>Прикрепить файл</b>
+                              <span>PNG, JPG, PDF</span>
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="vd-panel vd-events">
+                        <div class="vd-ph"><h3>События</h3><span class="vd-count">показано 5 из 6</span><i class="vd-grow"></i><button class="vd-btn vd-btn--sm vd-btn--ghost" type="button">Добавить</button></div>
+                        <div class="vd-scroll">
+                          <ul class="vd-tl">
+                            <li class="vd-on">
+                              <time>14.03.1947</time>
+                              <div><b>Рождение</b><span>Ленинград · свидетельство о рождении</span></div>
+                            </li>
+                            <li>
+                              <time>1965</time>
+                              <div><b>Окончил школу</b><span>Ленинград, школа № 14 · аттестат</span></div>
+                            </li>
+                            <li>
+                              <time>12.06.1971</time>
+                              <div><b>Брак</b><span>Нина Борисовна Верещагина · Тверь</span></div>
+                            </li>
+                            <li>
+                              <time>09.05.1974</time>
+                              <div><b>Рождение сына Ильи</b><span>Ленинград</span></div>
+                            </li>
+                            <li>
+                              <time>02.08.2011</time>
+                              <div><b>Смерть</b><span>Санкт-Петербург · 63 года</span></div>
+                            </li>
+                          </ul>
+                        </div>
+                      </div>
+
+                      <div class="vd-panel vd-hist">
+                        <div class="vd-ph"><h3>История правок</h3><span class="vd-count">3 из 12</span><i class="vd-grow"></i><a href="#" style="font-family:var(--mono); font-size:10.5px; color:var(--ink-400); text-decoration:none">вся история →</a></div>
+                        <div class="vd-scroll">
+                          <div class="vd-hrow">
+                            <div>
+                              <p><b>Ольга</b> изменила место рождения</p>
+                              <span class="vd-was">Тверь <i>→</i> <em>Рязань</em></span>
+                              <time>2 часа назад · 19:12</time>
+                            </div>
+                            <div class="vd-ha">
+                              <button class="vd-btn vd-btn--sm vd-btn--danger" type="button">
+                                <svg width="11" height="11" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8a4.5 4.5 0 1 0 1.4-3.3M3.4 3v2.6h2.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                                Откатить
+                              </button>
+                            </div>
+                          </div>
+                          <div class="vd-hrow">
+                            <div>
+                              <p><b>Илья</b> прикрепил свидетельство о рождении</p>
+                              <span class="vd-was">1947 · скан, 2,4 МБ</span>
+                              <time>вчера, 21:40</time>
+                            </div>
+                            <div class="vd-ha"><button class="vd-btn vd-btn--sm vd-btn--ghost" type="button">Откатить</button></div>
+                          </div>
+                          <div class="vd-hrow">
+                            <div>
+                              <p><b>Галина</b> уточнила место рождения</p>
+                              <span class="vd-was">Ленинград <i>→</i> <em>Санкт-Петербург</em>, формулировка</span>
+                              <time>4 дня назад</time>
+                            </div>
+                            <div class="vd-ha"><button class="vd-btn vd-btn--sm vd-btn--ghost" type="button">Откатить</button></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+          <figcaption><b>Люди — досье человека</b> <code>torlmood.ru/tree/kovalevy/person/arkady</code> <span>мастер-деталь: слева таблица 380px с фильтрами и поиском, справа факты определениями, документы превью, таймлайн и история правок с «Откатить»</span></figcaption>
+        </figure>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= МОБИЛЬНЫЙ ================= -->
+  <section class="section" id="mobile">
+    <h2><span class="num">02</span>Мобильный</h2>
+    <p>На телефоне картотека разворачивается в ленту: залипающие фильтры сверху, карточки списком, досье — отдельным экраном с секциями, а нижняя навигация из трёх вкладок держит «Древо · Люди · История» под большим пальцем. Холст на телефоне не таблица, поэтому там картотека уступает место компактному древу ветви.</p>
+
+    <div class="stage">
+      <div class="stage-row stage-row--center">
+
+        <!-- ---------- Мобильный 1: лента людей ---------- -->
+        <figure class="shot">
+          <div class="phone">
+            <div class="notch"></div>
+            <div class="phone-screen">
+              <div class="statusbar"><span>9:41</span><span class="icons"><i class="bars"></i><i class="bat"></i></span></div>
+              <div class="vd-root vd-mob">
+                <div class="vd-mobtop">
+                  <div class="vd-mtitle">
+                    <span class="vd-crumb">Ковалёвы и Соколовы</span>
+                    <b>Люди</b>
+                  </div>
+                  <span class="vd-mcount"><i>148</i></span>
+                  <span class="vd-av vd-av--sm">ИК</span>
+                  <button class="vd-icon" type="button" aria-label="Фильтры и сортировка" style="width:34px; height:34px">
+                    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h11M4.5 8h7M6.5 11.5h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg>
+                  </button>
+                </div>
+
+                <div class="vd-mfilters">
+                  <div class="vd-msearch">
+                    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="6.6" cy="6.6" r="4.6" fill="none" stroke="currentColor" stroke-width="1.5"></circle><path d="M10.2 10.2 14.4 14.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+                    имя, год, место
+                  </div>
+                  <div class="vd-mchips">
+                    <span class="vd-mchip vd-mchip--on">Все <b>148</b></span>
+                    <span class="vd-mchip">Муж. <b>72</b></span>
+                    <span class="vd-mchip">Жен. <b>76</b></span>
+                    <span class="vd-mchip">Живые <b>94</b></span>
+                  </div>
+                </div>
+
+                <div class="vd-mlist">
+                  <div class="vd-mgrouph">Поколение III · 1930–1970 <i></i> 38</div>
+                  <div class="vd-mcard vd-mcard--on">
+                    <b>Аркадий Петрович Ковалёв</b>
+                    <span class="vd-myrs">1947–2011</span>
+                    <span class="vd-mplace">Ленинград <i>·</i> III <i>·</i> 4 документа · открыт</span>
+                  </div>
+                  <div class="vd-mcard">
+                    <b>Нина Борисовна Ковалёва</b>
+                    <span class="vd-myrs">1950</span>
+                    <span class="vd-mplace">в девичестве Верещагина <i>·</i> Тверь → Рязань</span>
+                  </div>
+                  <div class="vd-mcard">
+                    <b>Галина Петровна Прохорова</b>
+                    <span class="vd-myrs">1952</span>
+                    <span class="vd-mplace">Ленинград <i>·</i> редактор древа</span>
+                  </div>
+                  <div class="vd-mgrouph">Поколение IV · 1955–1995 <i></i> 61</div>
+                  <div class="vd-mcard">
+                    <b>Илья Аркадьевич Ковалёв</b>
+                    <span class="vd-myrs">1974</span>
+                    <span class="vd-mplace">Санкт-Петербург <i>·</i> владелец древа</span>
+                  </div>
+                  <div class="vd-mcard">
+                    <b>Ольга Аркадьевна Ковалёва</b>
+                    <span class="vd-myrs">1978</span>
+                    <span class="vd-mplace">Санкт-Петербург <i>·</i> редактор</span>
+                  </div>
+                  <div class="vd-mcard">
+                    <b>Антон Юрьевич Прохоров</b>
+                    <span class="vd-myrs">1980</span>
+                    <span class="vd-mplace">Псков <i>·</i> зритель</span>
+                  </div>
+                  <div class="vd-mcard vd-mcard--dash">
+                    <b>+ ещё 56 человек IV поколения</b>
+                    <span class="vd-myrs">—</span>
+                    <span class="vd-mplace">показать следующих 20</span>
+                  </div>
+                </div>
+
+                <nav class="vd-mnav" aria-label="Разделы древа">
+                  <a href="#">
+                    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 17v-5M10 12H4.5M10 12h5.5M4.5 12V7M15.5 12V7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path><rect x="2" y="3" width="5" height="4" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.5"></rect><rect x="13" y="3" width="5" height="4" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.5"></rect><rect x="7.5" y="15" width="5" height="4" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.5"></rect></svg>
+                    <b>Древо</b>
+                  </a>
+                  <a href="#" aria-current="page">
+                    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg>
+                    <b>Люди</b>
+                  </a>
+                  <a href="#">
+                    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="1.5"></circle><path d="M10 6.2V10l2.6 1.8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+                    <b>История</b>
+                  </a>
+                </nav>
+              </div>
+            </div>
+          </div>
+          <figcaption><b>Лента людей</b> <code>torlmood.ru/tree/kovalevy/people</code> <span>залипающие фильтры «Все · Муж. · Жен. · Живые», карточки с годами в моноширинном столбце и счётчиками по поколениям</span></figcaption>
+        </figure>
+
+        <!-- ---------- Мобильный 2: досье ---------- -->
+        <figure class="shot">
+          <div class="phone">
+            <div class="notch"></div>
+            <div class="phone-screen">
+              <div class="statusbar"><span>9:41</span><span class="icons"><i class="bars"></i><i class="bat"></i></span></div>
+              <div class="vd-root vd-mob">
+                <div class="vd-mback">
+                  <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" style="flex:none"><path d="M10 3.5 5.5 8 10 12.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                  <div class="vd-mtitle">
+                    <span class="vd-crumb">Люди · III поколение</span>
+                    <b>Аркадий Петрович</b>
+                  </div>
+                  <button class="vd-icon" type="button" aria-label="Действия с карточкой" style="width:34px; height:34px">
+                    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="3.4" r="1.4" fill="currentColor"></circle><circle cx="8" cy="8" r="1.4" fill="currentColor"></circle><circle cx="8" cy="12.6" r="1.4" fill="currentColor"></circle></svg>
+                  </button>
+                </div>
+
+                <div class="vd-mbody">
+                  <div class="vd-msec">
+                    <div class="vd-mhero">
+                      <span class="vd-portrait">
+                        <svg viewBox="0 0 80 80" aria-hidden="true">
+                          <circle cx="40" cy="30" r="14" fill="rgba(247,249,252,.9)"></circle>
+                          <path d="M12 80c0-16 12.5-25 28-25s28 9 28 25Z" fill="rgba(247,249,252,.9)"></path>
+                        </svg>
+                      </span>
+                      <div style="min-width:0">
+                        <h1>Аркадий Петрович Ковалёв</h1>
+                        <div class="vd-lifeline"><b>1947–2011</b><span>63 года</span></div>
+                        <div class="vd-badges">
+                          <span class="vd-badge vd-badge--male"><i class="vd-dot"></i> мужчина</span>
+                          <span class="vd-badge">III</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="vd-msec">
+                    <div class="vd-ph"><h3>Факты</h3><i class="vd-grow"></i><span class="vd-count">7 из 9</span></div>
+                    <dl class="vd-mdl">
+                      <dt>Рождение</dt>
+                      <dd class="vd-mono">14.03.1947 · Ленинград</dd>
+                      <dt>Смерть</dt>
+                      <dd class="vd-mono">02.08.2011 · Санкт-Петербург</dd>
+                      <dt>Супруга</dt>
+                      <dd>Нина Борисовна, в девичестве Верещагина · ⚭ 1971</dd>
+                      <dt>Родители</dt>
+                      <dd>Пётр Григорьевич и Мария Тимофеевна, в девичестве Зайцева</dd>
+                    </dl>
+                  </div>
+
+                  <div class="vd-msec">
+                    <div class="vd-ph"><h3>Документы</h3><i class="vd-grow"></i><span class="vd-count">4</span></div>
+                    <div class="vd-mdocs">
+                      <div class="vd-doccard">
+                        <span class="vd-prev vd-prev--seal">
+                          <svg viewBox="0 0 96 58" aria-hidden="true">
+                            <text x="48" y="26" text-anchor="middle" font-family="Literata, Georgia, serif" font-size="9" fill="#47597a">1947</text>
+                            <path d="M20 36h56M20 44h38" stroke="rgba(10,17,32,.14)" stroke-width="1.6" stroke-linecap="round"></path>
+                          </svg>
+                        </span>
+                        <span class="vd-docmeta"><b>Свидетельство о рождении, 1947</b></span>
+                      </div>
+                      <div class="vd-doccard">
+                        <span class="vd-prev vd-prev--photo">
+                          <svg viewBox="0 0 96 58" aria-hidden="true">
+                            <circle cx="48" cy="24" r="9" fill="rgba(247,249,252,.85)"></circle>
+                            <path d="M28 58c0-11 9-17 20-17s20 6 20 17Z" fill="rgba(247,249,252,.85)"></path>
+                          </svg>
+                        </span>
+                        <span class="vd-docmeta"><b>Фото, 1963</b></span>
+                      </div>
+                      <div class="vd-doccard">
+                        <span class="vd-prev vd-prev--seal">
+                          <svg viewBox="0 0 96 58" aria-hidden="true">
+                            <text x="48" y="24" text-anchor="middle" font-family="Literata, Georgia, serif" font-size="8.5" fill="#47597a">БРАК</text>
+                            <text x="48" y="34" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="7.5" fill="#7487a5">1971</text>
+                            <path d="M22 44h52" stroke="rgba(10,17,32,.14)" stroke-width="1.6" stroke-linecap="round"></path>
+                          </svg>
+                        </span>
+                        <span class="vd-docmeta"><b>Свидетельство о браке, 1971</b></span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="vd-msec">
+                    <div class="vd-ph"><h3>События</h3><i class="vd-grow"></i><span class="vd-count">4 из 6</span><span class="vd-mono" style="font-size:10px; color:var(--ink-400)">история →</span></div>
+                    <ul class="vd-mtl">
+                      <li class="vd-on">
+                        <time>14.03.1947</time>
+                        <div><b>Рождение</b><span>Ленинград</span></div>
+                      </li>
+                      <li>
+                        <time>12.06.1971</time>
+                        <div><b>Брак</b><span>Нина Борисовна Верещагина</span></div>
+                      </li>
+                      <li>
+                        <time>09.05.1974</time>
+                        <div><b>Рождение сына Ильи</b><span>Ленинград</span></div>
+                      </li>
+                      <li>
+                        <time>02.08.2011</time>
+                        <div><b>Смерть</b><span>Санкт-Петербург · 63 года</span></div>
+                      </li>
+                    </ul>
+                  </div>
+
+                </div>
+
+                <nav class="vd-mnav" aria-label="Разделы древа">
+                  <a href="#">
+                    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 17v-5M10 12H4.5M10 12h5.5M4.5 12V7M15.5 12V7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path><rect x="2" y="3" width="5" height="4" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.5"></rect><rect x="13" y="3" width="5" height="4" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.5"></rect><rect x="7.5" y="15" width="5" height="4" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.5"></rect></svg>
+                    <b>Древо</b>
+                  </a>
+                  <a href="#" aria-current="page">
+                    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg>
+                    <b>Люди</b>
+                  </a>
+                  <a href="#">
+                    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="1.5"></circle><path d="M10 6.2V10l2.6 1.8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+                    <b>История</b>
+                  </a>
+                </nav>
+              </div>
+            </div>
+          </div>
+          <figcaption><b>Досье человека</b> <code>torlmood.ru/tree/kovalevy/person/arkady</code> <span>секции «Факты · Документы · События · История правок», каждая со счётчиком; «Откатить» — в последней правке</span></figcaption>
+        </figure>
+
+        <!-- ---------- Мобильный 3: вкладка «Древо» ---------- -->
+        <figure class="shot">
+          <div class="phone">
+            <div class="notch"></div>
+            <div class="phone-screen">
+              <div class="statusbar"><span>9:41</span><span class="icons"><i class="bars"></i><i class="bat"></i></span></div>
+              <div class="vd-root vd-mob">
+                <div class="vd-mobtop">
+                  <div class="vd-mtitle">
+                    <span class="vd-crumb">Ковалёвы и Соколовы</span>
+                    <b>Древо</b>
+                  </div>
+                  <span class="vd-badge vd-badge--brass">ветвь III</span>
+                  <button class="vd-icon" type="button" aria-label="Поиск по древу" style="width:34px; height:34px">
+                    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="6.6" cy="6.6" r="4.6" fill="none" stroke="currentColor" stroke-width="1.5"></circle><path d="M10.2 10.2 14.4 14.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+                  </button>
+                </div>
+
+                <div class="vd-mfilters" style="padding:8px 12px">
+                  <div class="vd-msearch" style="height:32px">
+                    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="6.6" cy="6.6" r="4.6" fill="none" stroke="currentColor" stroke-width="1.5"></circle><path d="M10.2 10.2 14.4 14.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+                    найти человека в древе
+                  </div>
+                </div>
+
+                <div class="vd-mcanvas">
+                  <svg class="vd-msvg" viewBox="0 0 370 470" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Компактное древо ветви: Пётр Григорьевич, его дети и внуки">
+                    <path d="M110 96v30h75v30M110 126h140v30" fill="none" stroke="#7a8ca6" stroke-width="1.3"></path>
+                    <path d="M185 216v30h-47v30M185 246h47v30" fill="none" stroke="#7a8ca6" stroke-width="1.3"></path>
+                    <path d="M138 336v26h-20v20M138 362h47v20" fill="none" stroke="#7a8ca6" stroke-width="1.3"></path>
+
+                    <rect x="20" y="52" width="180" height="44" rx="8" fill="#fff" stroke="#7fa6c9" stroke-width="1.4"></rect>
+                    <rect x="20" y="52" width="3" height="44" rx="1.5" fill="#7fa6c9"></rect>
+                    <text x="32" y="72" font-family="Literata, Georgia, serif" font-size="11.5" fill="#131e33">Пётр Григорьевич</text>
+                    <text x="32" y="87" font-family="'JetBrains Mono', monospace" font-size="9.5" fill="#47597a">1918–1983 · Ленинград</text>
+
+                    <rect x="8" y="156" width="180" height="60" rx="9" fill="#fefbf0" stroke="#c9a227" stroke-width="1.8"></rect>
+                    <rect x="8" y="156" width="3" height="60" rx="1.5" fill="#c9a227"></rect>
+                    <text x="20" y="176" font-family="Literata, Georgia, serif" font-size="11.5" fill="#0f1a2e">Аркадий Петрович</text>
+                    <text x="20" y="191" font-family="'JetBrains Mono', monospace" font-size="9.5" fill="#a3821a">1947–2011</text>
+                    <text x="20" y="205" font-family="'Golos Text', sans-serif" font-size="9" fill="#47597a">4 документа · выбран</text>
+
+                    <rect x="200" y="156" width="162" height="60" rx="9" fill="#fff" stroke="#d1873f" stroke-width="1.4"></rect>
+                    <rect x="200" y="156" width="3" height="60" rx="1.5" fill="#d1873f"></rect>
+                    <text x="211" y="176" font-family="Literata, Georgia, serif" font-size="11" fill="#131e33">Галина Петровна</text>
+                    <text x="211" y="191" font-family="'JetBrains Mono', monospace" font-size="9.5" fill="#47597a">1952</text>
+                    <text x="211" y="205" font-family="'Golos Text', sans-serif" font-size="9" fill="#7487a5">редактор древа</text>
+
+                    <rect x="58" y="276" width="160" height="60" rx="9" fill="#fff" stroke="#7fa6c9" stroke-width="1.4"></rect>
+                    <rect x="58" y="276" width="3" height="60" rx="1.5" fill="#7fa6c9"></rect>
+                    <text x="70" y="296" font-family="Literata, Georgia, serif" font-size="11" fill="#131e33">Илья Аркадьевич</text>
+                    <text x="70" y="311" font-family="'JetBrains Mono', monospace" font-size="9.5" fill="#47597a">1974</text>
+                    <text x="70" y="325" font-family="'Golos Text', sans-serif" font-size="9" fill="#7487a5">владелец · Санкт-Петербург</text>
+
+                    <rect x="228" y="276" width="140" height="60" rx="9" fill="#fff" stroke="#d1873f" stroke-width="1.4"></rect>
+                    <rect x="228" y="276" width="3" height="60" rx="1.5" fill="#d1873f"></rect>
+                    <text x="240" y="296" font-family="Literata, Georgia, serif" font-size="11" fill="#131e33">Ольга Аркадьевна</text>
+                    <text x="240" y="311" font-family="'JetBrains Mono', monospace" font-size="9.5" fill="#47597a">1978</text>
+                    <text x="240" y="325" font-family="'Golos Text', sans-serif" font-size="9" fill="#7487a5">редактор</text>
+
+                    <rect x="20" y="382" width="118" height="52" rx="8" fill="#fff" stroke="#7fa6c9" stroke-width="1.4" stroke-dasharray="5 4"></rect>
+                    <text x="30" y="402" font-family="Literata, Georgia, serif" font-size="10.5" fill="#47597a">Тимур Ильич</text>
+                    <text x="30" y="418" font-family="'JetBrains Mono', monospace" font-size="9" fill="#7487a5">2005</text>
+
+                    <rect x="146" y="382" width="118" height="52" rx="8" fill="#fff" stroke="#d1873f" stroke-width="1.4" stroke-dasharray="5 4"></rect>
+                    <text x="156" y="402" font-family="Literata, Georgia, serif" font-size="10.5" fill="#47597a">Вера Ильинична</text>
+                    <text x="156" y="418" font-family="'JetBrains Mono', monospace" font-size="9" fill="#7487a5">2009</text>
+                  </svg>
+
+                  <div class="vd-mlegend">
+                    <span><i class="vd-lg vd-lg--male"></i> мужчина</span>
+                    <span><i class="vd-lg vd-lg--female"></i> женщина</span>
+                    <span><i class="vd-lg vd-lg--sel"></i> выбран</span>
+                  </div>
+
+                  <div class="vd-mzoom">
+                    <i aria-hidden="true"><svg width="15" height="15" viewBox="0 0 16 16"><path d="M8 3.5v9M3.5 8h9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path></svg></i>
+                    <i aria-hidden="true"><svg width="15" height="15" viewBox="0 0 16 16"><path d="M3.5 8h9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path></svg></i>
+                    <i aria-hidden="true"><svg width="15" height="15" viewBox="0 0 16 16"><path d="M2.5 3h11v10h-11z" fill="none" stroke="currentColor" stroke-width="1.4"></path><path d="M5.5 6h5v4h-5z" fill="currentColor" opacity=".22"></path></svg></i>
+                  </div>
+
+                  <div class="vd-sheet">
+                    <i class="vd-handle"></i>
+                    <h3>Аркадий Петрович Ковалёв</h3>
+                    <p>1947–2011 · III поколение · 4 документа</p>
+                    <div class="vd-acts">
+                      <button class="vd-btn vd-btn--brass" type="button">Открыть досье</button>
+                      <button class="vd-btn" type="button">Добавить родню</button>
+                    </div>
+                  </div>
+                </div>
+
+                <nav class="vd-mnav" aria-label="Разделы древа">
+                  <a href="#" aria-current="page">
+                    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 17v-5M10 12H4.5M10 12h5.5M4.5 12V7M15.5 12V7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path><rect x="2" y="3" width="5" height="4" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.5"></rect><rect x="13" y="3" width="5" height="4" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.5"></rect><rect x="7.5" y="15" width="5" height="4" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.5"></rect></svg>
+                    <b>Древо</b>
+                  </a>
+                  <a href="#">
+                    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg>
+                    <b>Люди</b>
+                  </a>
+                  <a href="#">
+                    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="1.5"></circle><path d="M10 6.2V10l2.6 1.8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+                    <b>История</b>
+                  </a>
+                </nav>
+              </div>
+            </div>
+          </div>
+          <figcaption><b>Вкладка «Древо»</b> <code>torlmood.ru/tree/kovalevy</code> <span>компактный холст ветви III–V поколений, легенда пола и лист выбранного человека снизу — картотека не мешает древу</span></figcaption>
+        </figure>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= ЗАМЕТКИ ================= -->
+  <section class="section" id="notes">
+    <h2><span class="num">03</span>Заметки</h2>
+    <p>Честно о том, что даёт картотека, во что она обойдётся в коде и где она может отпугнуть.</p>
+
+    <div class="notes">
+      <div class="note-card">
+        <h3>Что это даёт семье</h3>
+        <p>Древо перестаёт быть картинкой, по которой надо угадывать, и становится указателем, где всё подписано. Видно 148 человек со годами и местами сразу — можно сверить «а кто это, 1922 года?» не открывая десять карточек. Счётчики отвечают на вопрос «сколько у нас всего и что не заполнено» (18 человек без дат, 6 без родителей). Досье рядом со списком: выбрал — прочитал — вернулся, без потери места в списке. История правок с «Откатить» снимает страх испортить чужое: любую правку видно и можно вернуть.</p>
+      </div>
+
+      <div class="note-card">
+        <h3>Как ложится на код</h3>
+        <ul>
+          <li><code>src/components/person/PersonPage.tsx</code> — станет правой половиной мастер-детали: сейчас это самостоятельная страница, ей нужно уметь жить в колонке ~880px.</li>
+          <li><code>src/components/person/PersonHistory.tsx</code> — компактный список правок с датой, автором и «Откатить» (переиспользуется и в досье, и на <code>/history</code>).</li>
+          <li>Новые <code>PeopleTable.tsx</code> и <code>PersonDossier.tsx</code> — таблица 380px с фильтрами и поиском плюс сборка досье из фактов, документов и таймлайна.</li>
+          <li><code>src/app/(app)/tree/[treeId]/person/[personId]/page.tsx</code> — тот же URL, но рендерит список + досье: глубокая ссылка остаётся рабочей.</li>
+          <li><code>src/app/(app)/tree/[treeId]/history/page.tsx</code> — общая история превращается в ленту правок с фильтром по человеку.</li>
+          <li><code>src/components/tree/TreeCanvas.tsx</code> — переезжает на отдельный маршрут <code>/tree/[treeId]/view</code> (вкладка «Древо»), в проекте это перестановка, а не переписывание.</li>
+          <li><code>src/lib/changes.ts</code> — к записи правки добавляется поле «было → стало» для отката и для строки «Тверь → Рязань».</li>
+          <li><code>src/app/globals.css</code> — нужен слой токенов плотности: высоты строк 44/64, размеры моноширинных цифр, тонкие разделители. Глубина — средняя.</li>
+        </ul>
+      </div>
+
+      <div class="note-card note-card--warn">
+        <h3>Риски и цена</h3>
+        <ul>
+          <li>Таблица шириной 380px плохо живёт на телефоне: на мобильном остаётся только лента карточек, столбцы «Поколение» и «Место» приходится прятать. Это два разных интерфейса, а не один адаптивный.</li>
+          <li>Мастер-деталь ломает привычку «карточка — отдельной страницей»: родственник, который шлёт ссылку на человека, должен получать тот же экран, и досье надо уметь открываться без списка слева.</li>
+          <li>Плотность пугает неподготовленных: 13 строк, счётчики и моноширинные цифры читаются как бухгалтерия, а не как семейный альбом. Части семьи нужен крупный режим.</li>
+          <li>Постоянная панель слева отнимает 380px у холста — на вкладке «Древо» её приходится убирать, и часть работы со списком снова недоступна.</li>
+        </ul>
+      </div>
+
+      <div class="note-card">
+        <h3>Палитра</h3>
+        <p>Ничего нового: архивная бумага, чернила, латунь одним акцентом. Пол — только цветом служебной метки, а не заливкой строки.</p>
+        <div class="swatches">
+          <div class="swatch"><i style="background:#f7f9fc"></i><b>#f7f9fc</b><span>бумага указателя</span></div>
+          <div class="swatch"><i style="background:#ffffff"></i><b>#ffffff</b><span>строки и досье</span></div>
+          <div class="swatch"><i style="background:#0f1a2e"></i><b>#0f1a2e</b><span>чернила, активная вкладка</span></div>
+          <div class="swatch"><i style="background:#c9a227"></i><b>#c9a227</b><span>латунь: выбор, откат</span></div>
+          <div class="swatch"><i style="background:#7fa6c9"></i><b>#7fa6c9</b><span>мужчины</span></div>
+          <div class="swatch"><i style="background:#d1873f"></i><b>#d1873f</b><span>женщины</span></div>
+          <div class="swatch"><i style="background:#c05a4d"></i><b>#c05a4d</b><span>откат правки</span></div>
+        </div>
+      </div>
+    </div>
+
+    <p class="footer">Вариант D из четырёх. Соседние направления: <a href="a-quiet-archive.html">A · Тихий архив</a>, <a href="b-canvas-studio.html">B · Холст-студия</a>, <a href="c-family-atlas.html">C · Атлас рода</a>. Вернуться к <a href="index.html">обзору</a>.</p>
+  </section>
+</div>
+
+</body>
+</html>

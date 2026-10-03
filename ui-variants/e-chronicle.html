@@ -1,0 +1,2043 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Torlmood — вариант E: Хроника</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600;700&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="base.css">
+<style>
+/* =====================================================================
+   Вариант E — «Хроника». Префикс интерфейса: ve-
+   Смена парадигмы: главный экран — не древо, а ЛЕНТА ВРЕМЕНИ.
+   Род читается как поток событий по годам; дерево уходит отдельной
+   вкладкой. Приёмы направления: крупная цифра года как герой группы,
+   полоса «историй» с градиентными кольцами, карточки-сквирклы с цветной
+   иконкой категории, липкий рельс десятилетий, бенто на обзоре,
+   нижний «остров» на телефоне.
+   Классы base.css не переопределяются: всё внутри .ve-app.
+   ===================================================================== */
+
+/* ---------- 01. Локальные имена палитры направления ---------- */
+
+.ve-app {
+  --ve-bg: #08080b;          /* фон приложения */
+  --ve-s1: #101014;          /* поверхность */
+  --ve-s2: #17171d;          /* поверхность 2 */
+  --ve-s3: #1f1f27;          /* поднятая поверхность */
+  --ve-line: rgba(255, 255, 255, .08);
+  --ve-line-2: rgba(255, 255, 255, .14);
+  --ve-lime: #d8ff3e;        /* главный акцент: действие и активное состояние */
+  --ve-coral: #ff6b4a;
+  --ve-violet: #8b5cf6;
+  --ve-sky: #4cc9f0;
+  --ve-text: #f4f4f6;
+  --ve-dim: #9b9ba6;
+  --ve-mute: #6f6f7a;
+
+  --ve-head: "Unbounded", "Manrope", system-ui, sans-serif;
+  --ve-body: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --ve-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* ---------- 02. Каркас экрана: шапка + тело ---------- */
+
+.ve-page {
+  display: flex; flex-direction: column;
+  width: 100%; height: 100%;
+  background: var(--ve-bg); color: var(--ve-text);
+  font-family: var(--ve-body); font-size: 14px; line-height: 1.45;
+  overflow: hidden;
+}
+.ve-app :focus-visible { outline: 2px solid var(--ve-lime); outline-offset: 2px; border-radius: 6px; }
+.ve-app button { font: inherit; color: inherit; }
+
+/* Шапка 72px: бренд, переключатель разделов, поиск, лаймовое действие */
+.ve-top {
+  flex: none; display: flex; align-items: center; gap: 22px;
+  height: 72px; padding: 0 26px;
+  background: var(--ve-s1); border-bottom: 1px solid var(--ve-line);
+}
+.ve-brand { display: flex; align-items: center; gap: 10px; flex: none; }
+.ve-brand i {
+  display: grid; place-items: center;
+  width: 30px; height: 30px; border-radius: 10px;
+  background: var(--ve-lime); color: #0a0a0c;
+  font-family: var(--ve-head); font-size: 15px; font-weight: 700; font-style: normal;
+}
+.ve-brand b {
+  font-family: var(--ve-head); font-size: 16px; font-weight: 600; letter-spacing: -.01em;
+}
+.ve-brand span { font-size: 11.5px; color: var(--ve-mute); }
+
+/* Переключатель «Лента · Древо · Люди» */
+.ve-switch {
+  display: flex; align-items: center; gap: 2px; flex: none;
+  padding: 3px; border: 1px solid var(--ve-line); border-radius: 12px;
+  background: var(--ve-s2);
+}
+.ve-switch span {
+  padding: 6px 15px; border-radius: 9px;
+  font-size: 13px; color: var(--ve-dim); white-space: nowrap;
+}
+.ve-switch .ve-on { background: var(--ve-s3); color: var(--ve-text); font-weight: 500; }
+.ve-switch em {
+  font-style: normal; font-family: var(--ve-mono); font-size: 10.5px;
+  color: var(--ve-mute); margin-left: 5px;
+}
+
+.ve-grow { flex: 1; }
+
+.ve-search {
+  display: flex; align-items: center; gap: 9px; flex: none;
+  width: 246px; height: 36px; padding: 0 14px;
+  border: 1px solid var(--ve-line); border-radius: 12px;
+  background: var(--ve-s2); color: var(--ve-mute); font-size: 13px;
+}
+.ve-search svg { width: 14px; height: 14px; flex: none; }
+.ve-search kbd {
+  margin-left: auto; font-family: var(--ve-mono); font-size: 10.5px;
+  border: 1px solid var(--ve-line); border-radius: 5px; padding: 1px 5px; color: var(--ve-mute);
+}
+
+.ve-btn-lime {
+  display: inline-flex; align-items: center; gap: 8px; flex: none;
+  height: 40px; padding: 0 18px;
+  border: 0; border-radius: 13px; background: var(--ve-lime); color: #0a0a0c;
+  font-size: 13.5px; font-weight: 700; letter-spacing: -.01em; white-space: nowrap;
+}
+.ve-btn-lime svg { width: 14px; height: 14px; }
+.ve-btn-ghost {
+  display: inline-flex; align-items: center; gap: 7px; flex: none;
+  height: 36px; padding: 0 14px;
+  border: 1px solid var(--ve-line); border-radius: 12px; background: var(--ve-s2);
+  color: var(--ve-dim); font-size: 13px; white-space: nowrap;
+}
+.ve-btn-ghost svg { width: 14px; height: 14px; }
+.ve-icon-btn {
+  display: grid; place-items: center; flex: none;
+  width: 36px; height: 36px; border: 1px solid var(--ve-line); border-radius: 12px;
+  background: var(--ve-s2); color: var(--ve-dim);
+}
+.ve-icon-btn svg { width: 16px; height: 16px; }
+.ve-ava-b {
+  display: grid; place-items: center; flex: none;
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 2px solid var(--ve-line-2); background: var(--ve-s3);
+  font-size: 11.5px; font-weight: 700; letter-spacing: .02em; color: var(--ve-text);
+}
+
+/* Тело: три колонки — рельс, лента, боковая */
+.ve-body { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+
+/* ---------- 03. Мелкая типографика: метки, годы, счётчики ---------- */
+
+.ve-cap {
+  margin: 0; font-family: var(--ve-mono); font-size: 10px; font-weight: 500;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--ve-mute);
+}
+.ve-mono { font-family: var(--ve-mono); font-size: 11.5px; color: var(--ve-dim); font-variant-numeric: tabular-nums; }
+.ve-num { font-family: var(--ve-mono); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.ve-h {
+  margin: 0; font-family: var(--ve-head); font-weight: 600;
+  letter-spacing: -.02em; line-height: 1.1;
+}
+
+/* ---------- 04. Иконки, аватары, кольца историй ---------- */
+
+.ve-ic { display: grid; place-items: center; flex: none; }
+.ve-ic svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.ve-ic--s svg { width: 14px; height: 14px; }
+.ve-ic--filled svg { fill: currentColor; stroke: none; }
+
+/* Цветная плитка категории: цвет всегда продублирован подписью */
+.ve-tile { display: grid; place-items: center; flex: none; border-radius: 12px; }
+.ve-tile svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.ve-tile--lime { background: rgba(216, 255, 62, .13); color: var(--ve-lime); }
+.ve-tile--coral { background: rgba(255, 107, 74, .14); color: var(--ve-coral); }
+.ve-tile--violet { background: rgba(139, 92, 246, .18); color: #b79bff; }
+.ve-tile--sky { background: rgba(76, 201, 240, .14); color: var(--ve-sky); }
+.ve-tile--dim { background: rgba(255, 255, 255, .07); color: var(--ve-dim); }
+
+/* Аватар: силуэт фигурой, без растровых картинок */
+.ve-ava {
+  position: relative; display: block; flex: none; overflow: hidden;
+  border-radius: 50%; background: linear-gradient(180deg, #262631, #17171d);
+}
+.ve-ava::before { /* голова */
+  content: ""; position: absolute; left: 50%; top: 20%;
+  width: 30%; height: 30%; transform: translateX(-50%);
+  border-radius: 50%; background: #4a4a56;
+}
+.ve-ava::after { /* плечи */
+  content: ""; position: absolute; left: 50%; bottom: -2%;
+  width: 62%; height: 44%; transform: translateX(-50%);
+  border-radius: 50% 50% 0 0; background: #4a4a56;
+}
+.ve-ava--f::before, .ve-ava--f::after { background: #6b5f4d; }
+.ve-ava--m::before, .ve-ava--m::after { background: #4a5b6b; }
+
+/* Кольцо «истории»: градиент лайм → коралл */
+.ve-ring {
+  display: grid; place-items: center; flex: none;
+  border-radius: 50%; padding: 2.5px;
+  background: linear-gradient(150deg, var(--ve-lime), var(--ve-coral));
+}
+.ve-ring > * { border-radius: 50%; border: 2.5px solid var(--ve-bg); }
+.ve-ring--seen { background: rgba(255, 255, 255, .16); }
+.ve-ring--add { background: rgba(255, 255, 255, .1); }
+.ve-ring--add i {
+  display: grid; place-items: center; width: 100%; height: 100%;
+  border-radius: 50%; background: var(--ve-s2); border: 2.5px solid var(--ve-bg);
+  color: var(--ve-lime); font-size: 17px; font-weight: 500; font-style: normal;
+}
+
+/* ---------- 05. Полоса «историй» ---------- */
+
+.ve-stories {
+  flex: none; display: flex; align-items: flex-start; gap: 18px;
+  padding: 16px 26px 12px;
+  border-bottom: 1px solid var(--ve-line);
+}
+.ve-story { width: 74px; text-align: center; overflow: hidden; }
+.ve-story .ve-ring { margin: 0 auto; }
+.ve-story b {
+  display: block; margin-top: 7px; font-size: 11.5px; font-weight: 500; color: var(--ve-text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ve-story span {
+  display: block; font-family: var(--ve-mono); font-size: 10px; color: var(--ve-mute);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ve-story--on b { color: var(--ve-lime); }
+.ve-stories-more {
+  align-self: center; margin-left: auto; flex: none;
+  font-family: var(--ve-mono); font-size: 11px; color: var(--ve-mute); white-space: nowrap;
+}
+
+/* ---------- 06. Рабочая область: рельс + лента + боковая колонка ---------- */
+
+.ve-canvas {
+  flex: 1; min-height: 0; display: flex; align-items: stretch;
+  padding: 0 26px 0 14px; overflow: hidden;
+}
+
+/* --- 06.1 Липкий рельс десятилетий --- */
+.ve-rail {
+  flex: none; width: 132px; padding: 20px 0 16px;
+  border-right: 1px solid var(--ve-line);
+}
+.ve-rail ul { list-style: none; margin: 14px 0 0; padding: 0; position: relative; }
+.ve-rail li {
+  position: relative; display: flex; align-items: center; justify-content: space-between;
+  height: 37px; padding-right: 14px;
+}
+.ve-rail li::before { /* линия рельса */
+  content: ""; position: absolute; left: 47px; top: 0; bottom: 0; width: 1px;
+  background: var(--ve-line);
+}
+.ve-rail li:first-child::before { top: 50%; }
+.ve-rail li:last-child::before { bottom: 50%; }
+.ve-rail i { /* точка десятилетия */
+  position: absolute; left: 43px; top: 50%; transform: translateY(-50%);
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--ve-s3); box-shadow: 0 0 0 3px var(--ve-bg);
+}
+.ve-rail .ve-year {
+  width: 40px; text-align: right;
+  font-family: var(--ve-mono); font-size: 11px; color: var(--ve-dim); white-space: nowrap;
+}
+.ve-rail .ve-count {
+  font-family: var(--ve-mono); font-size: 10.5px; color: var(--ve-dim);
+  min-width: 16px; text-align: right;
+}
+.ve-rail .ve-dec--on .ve-year { color: var(--ve-text); font-weight: 500; }
+.ve-rail .ve-dec--on i { background: var(--ve-lime); box-shadow: 0 0 0 3px var(--ve-bg), 0 0 12px rgba(216, 255, 62, .55); }
+.ve-rail .ve-dec--on .ve-count { color: var(--ve-lime); }
+.ve-rail .ve-dec--key i { background: var(--ve-coral); }
+.ve-rail .ve-dec--key .ve-count { color: var(--ve-coral); }
+.ve-rail-note {
+  margin: 12px 0 0; font-size: 10.5px; line-height: 1.35; color: var(--ve-mute);
+}
+
+/* --- 06.2 Лента: поток по годам --- */
+.ve-stream { flex: 1; min-width: 0; padding: 20px 24px 0; overflow: hidden; }.ve-stream-head { display: flex; align-items: baseline; gap: 10px; }
+.ve-stream-head b { font-size: 13.5px; font-weight: 600; }
+.ve-scrollhint { margin-left: auto; font-family: var(--ve-mono); font-size: 10.5px; color: var(--ve-mute); }
+
+.ve-group { margin-top: 14px; }
+.ve-yhead { display: flex; align-items: flex-end; gap: 12px; }
+.ve-yhead .ve-bigyear {
+  font-family: var(--ve-head); font-weight: 700; font-size: 52px; line-height: .92;
+  letter-spacing: -.05em; color: var(--ve-text);
+}
+.ve-group--now .ve-bigyear { color: var(--ve-lime); }
+.ve-yhead .ve-yside { padding-bottom: 7px; white-space: nowrap; }
+.ve-yhead .ve-yside b {
+  display: block; font-family: var(--ve-mono); font-size: 11px; font-weight: 500;
+  color: var(--ve-dim); letter-spacing: .02em;
+}
+.ve-yhead .ve-yside span {
+  display: block; font-family: var(--ve-mono); font-size: 10px; color: var(--ve-mute);
+}
+.ve-events { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+
+/* Карточка-сквиркл: радиус 22px, линия 1px, почти без тени */
+.ve-card {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px 10px 11px;
+  border: 1px solid var(--ve-line); border-radius: 22px; background: var(--ve-s1);
+}
+.ve-card--on {
+  background: var(--ve-s2); border-color: rgba(216, 255, 62, .38);
+  box-shadow: 0 0 0 1px rgba(216, 255, 62, .12), 0 10px 26px -18px rgba(216, 255, 62, .6);
+}
+.ve-card .ve-tile { border-radius: 14px; }
+.ve-cbody { min-width: 0; flex: 1; overflow: hidden; }
+.ve-cbody b { display: block; font-size: 13.5px; font-weight: 600; letter-spacing: -.01em; }
+.ve-cbody p {
+  margin: 1px 0 0; font-size: 11.5px; color: var(--ve-dim);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ve-cat { font-family: var(--ve-mono); font-size: 10px; }
+.ve-cat--lime { color: var(--ve-lime); }
+.ve-cat--coral { color: var(--ve-coral); }
+.ve-cat--violet { color: #b79bff; }
+.ve-cat--sky { color: var(--ve-sky); }
+.ve-cat--dim { color: var(--ve-dim); }
+.ve-cdate {
+  flex: none; text-align: right; font-family: var(--ve-mono); font-size: 11.5px; color: var(--ve-text);
+}
+.ve-cdate > span { display: block; font-size: 10px; color: var(--ve-mute); }
+/* --- 06.3 Боковая колонка --- */
+.ve-side { flex: none; width: 292px; padding: 18px 0 16px 22px; }
+.ve-side h2 { margin: 0 0 10px; }
+.ve-scard {
+  border: 1px solid var(--ve-line); border-radius: 20px; background: var(--ve-s1);
+  padding: 13px 14px; margin-bottom: 10px;
+}
+.ve-scard .ve-cap { margin-bottom: 9px; }
+.ve-scard b { font-size: 14px; font-weight: 600; letter-spacing: -.01em; }
+.ve-scard p { margin: 6px 0 0; font-size: 11.5px; color: var(--ve-dim); }
+.ve-now { display: flex; align-items: center; gap: 12px; }
+.ve-now .ve-tile { width: 40px; height: 40px; border-radius: 13px; }
+.ve-now-meta { min-width: 0; }
+.ve-now-meta b { display: block; }
+.ve-now-meta span { display: block; font-family: var(--ve-mono); font-size: 10.5px; color: var(--ve-coral); }
+.ve-bar { height: 6px; border-radius: 99px; background: rgba(255, 255, 255, .09); margin-top: 11px; overflow: hidden; }
+.ve-bar i { display: block; height: 100%; border-radius: 99px; background: var(--ve-lime); }
+.ve-bar--sky i { background: var(--ve-sky); }
+.ve-stat { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.ve-stat b { font-family: var(--ve-head); font-size: 19px; font-weight: 600; letter-spacing: -.035em; }
+.ve-stat span { font-size: 11.5px; color: var(--ve-dim); }
+.ve-srow {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-top: 10px; font-size: 11.5px; color: var(--ve-dim);
+}
+.ve-srow b { font-family: var(--ve-mono); font-size: 11.5px; color: var(--ve-text); font-weight: 500; }
+.ve-link-lime {
+  display: inline-flex; align-items: center; gap: 5px; margin-top: 10px;
+  color: var(--ve-lime); font-size: 11.5px; font-weight: 600;
+}
+.ve-link-lime svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.ve-inv { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.ve-inv-dots { display: flex; gap: 3px; }
+.ve-inv-dots i { width: 13px; height: 5px; border-radius: 99px; background: rgba(255, 255, 255, .12); }
+.ve-inv-dots .ve-on { background: var(--ve-violet); }
+
+/* ---------- 07. Экран «Человек» ---------- */
+
+.ve-crumbs { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ve-mute); }
+.ve-crumbs b { font-weight: 500; color: var(--ve-text); }
+.ve-back {
+  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px 0 9px;
+  border: 1px solid var(--ve-line); border-radius: 10px; background: var(--ve-s2);
+  color: var(--ve-dim); font-size: 12.5px;
+}
+.ve-back svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+
+.ve-hero {
+  flex: none; display: flex; align-items: flex-start; gap: 26px;
+  padding: 18px 26px 16px; border-bottom: 1px solid var(--ve-line);
+}
+.ve-hero-l { flex: none; width: 420px; }
+.ve-hero-l h1 {
+  margin: 0; font-family: var(--ve-head); font-weight: 600; font-size: 34px;
+  line-height: 1.06; letter-spacing: -.04em;
+}
+.ve-hero-meta {
+  margin: 10px 0 0; display: flex; align-items: center; gap: 9px;
+  font-family: var(--ve-mono); font-size: 12px; color: var(--ve-dim);
+}
+.ve-hero-meta .ve-sep { color: var(--ve-mute); }
+.ve-chip-lime {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 9px; border-radius: 99px;
+  background: rgba(216, 255, 62, .12); color: var(--ve-lime);
+  font-family: var(--ve-mono); font-size: 10.5px;
+}
+.ve-rel { flex: 1; min-width: 0; }
+.ve-rel-row { display: flex; gap: 4px; margin-top: 13px; }
+.ve-rel-i { width: 103px; text-align: center; }
+.ve-rel-i b { display: block; margin-top: 7px; font-size: 10.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ve-rel-i span { display: block; font-family: var(--ve-mono); font-size: 9.5px; color: var(--ve-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.ve-cols { flex: 1; min-height: 0; display: flex; padding: 0 26px; }
+
+/* --- 07.1 Вертикальный таймлайн жизни --- */
+/* Липкий рельс оставлен слева от ленты: внутри .ve-canvas он не скроллится,
+   а поток событий обрезается рамкой экрана — так в макете видно реальное
+   состояние «лента длиннее экрана». */
+.ve-life { flex: 1; min-width: 0; padding: 18px 22px 0 0; overflow: hidden; }
+.ve-life > .ve-cap { margin-bottom: 4px; }
+/* Сетка: год · зазор с точкой на линии · тело записи.
+   Зазор задан колонкой, а не отступом, поэтому точка не наезжает на год. */
+.ve-tl { list-style: none; margin: 12px 0 0; padding: 0; }
+.ve-tl li {
+  position: relative; display: grid; grid-template-columns: 44px 26px 1fr;
+  align-items: start; padding-bottom: 12px;
+}
+.ve-tl li::before {
+  content: ""; position: absolute; left: 57px; top: 13px; bottom: -2px; width: 1px; background: var(--ve-line);
+}
+.ve-tl li:last-child { padding-bottom: 0; }
+.ve-tl li:last-child::before { display: none; }
+.ve-tl .ve-tyear {
+  text-align: right; padding-top: 2px;
+  font-family: var(--ve-mono); font-size: 12.5px; color: var(--ve-text); font-weight: 500;
+}
+.ve-tl .ve-tdot {
+  position: relative; justify-self: center; margin-top: 6px;
+  width: 11px; height: 11px; border-radius: 50%; background: var(--ve-s3);
+  box-shadow: 0 0 0 3px var(--ve-bg); z-index: 1;
+}
+.ve-tl .ve-tdot--lime { background: var(--ve-lime); box-shadow: 0 0 0 3px var(--ve-bg), 0 0 12px rgba(216, 255, 62, .5); }
+.ve-tl .ve-tdot--coral { background: var(--ve-coral); }
+.ve-tl .ve-tdot--sky { background: var(--ve-sky); }
+.ve-tl .ve-tdot--violet { background: var(--ve-violet); }
+.ve-tbody { min-width: 0; }
+.ve-tbody b { display: block; font-size: 13.5px; font-weight: 600; letter-spacing: -.01em; }
+.ve-tbody p { margin: 2px 0 0; font-size: 11.5px; color: var(--ve-dim); }
+.ve-tmeta { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
+.ve-tmeta span {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 8px; border: 1px solid var(--ve-line); border-radius: 99px;
+  font-family: var(--ve-mono); font-size: 10px; color: var(--ve-dim); background: var(--ve-s2);
+}
+.ve-tmeta svg { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 1.7; }
+
+/* На телефоне таймлайн плотнее: шесть лет жизни должны читаться на одном экране */
+.ve-tl--p li { grid-template-columns: 40px 24px 1fr; padding-bottom: 9px; }
+.ve-tl--p li::before { left: 52px; top: 12px; }
+.ve-tl--p .ve-tdot { width: 10px; height: 10px; margin-top: 5px; }
+.ve-tl--p .ve-tyear { font-size: 12px; }
+.ve-tl--p .ve-tbody b { font-size: 12.5px; }
+.ve-tl--p .ve-tbody p { margin-top: 1px; font-size: 11px; }
+
+/* --- 07.2 Правая колонка «Человека» --- */
+.ve-pcol { flex: none; width: 340px; padding: 20px 0 16px 22px; border-left: 1px solid var(--ve-line); }
+.ve-facts { display: flex; flex-direction: column; gap: 9px; }
+.ve-fact { display: flex; justify-content: space-between; gap: 12px; font-size: 11.5px; }
+.ve-fact span { color: var(--ve-mute); flex: none; }
+.ve-fact b { font-weight: 500; color: var(--ve-text); text-align: right; }
+.ve-docs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.ve-doc {
+  display: grid; place-items: center; gap: 5px; height: 62px;
+  border: 1px solid var(--ve-line); border-radius: 13px; background: var(--ve-s2);
+  color: var(--ve-dim);
+}
+.ve-doc svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; }
+.ve-doc i { font-family: var(--ve-mono); font-size: 9px; font-style: normal; }
+.ve-memo { display: flex; gap: 10px; padding: 10px 0; border-top: 1px solid var(--ve-line); }
+.ve-memo:first-of-type { border-top: 0; padding-top: 0; }
+.ve-memo .ve-ava { width: 28px; height: 28px; }
+.ve-memo b { font-size: 12px; font-weight: 600; }
+.ve-memo span { font-family: var(--ve-mono); font-size: 9.5px; color: var(--ve-mute); margin-left: 6px; }
+.ve-memo p { margin: 2px 0 0; font-size: 11.5px; color: var(--ve-dim); }
+
+/* ---------- 08. Экран «Обзор»: бенто-сетка ---------- */
+/* Три ряда заданной высоты: последний ряд садится на низ экрана,
+   поэтому плитки не «висят» в воздухе и обзор читается как один экран. */
+
+.ve-bento {
+  flex: 1; min-height: 0; display: grid; gap: 14px;
+  grid-template-columns: repeat(10, 1fr);
+  grid-template-rows: 206px 172px 206px;
+  padding: 18px 26px 16px; align-content: start;
+}
+.ve-t {
+  border: 1px solid var(--ve-line); border-radius: 24px; background: var(--ve-s1);
+  padding: 15px 18px; min-width: 0; overflow: hidden;
+}
+.ve-t--bg { grid-column: span 10; display: flex; flex-direction: column; }
+/* «Род в цифрах» — карточка с графиком: текст слева, прирост по десятилетиям справа */
+.ve-bg-row { display: flex; align-items: stretch; gap: 30px; flex: 1; min-height: 0; margin-top: 6px; }
+.ve-bg-left { flex: none; display: flex; flex-direction: column; justify-content: center; width: 400px; }
+.ve-bg-chart { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; }
+.ve-chart--grow { flex: 1; min-height: 0; margin-top: 0; }
+.ve-t--geo { grid-column: span 5; }
+.ve-t--line { grid-column: span 5; }
+.ve-t--gap { grid-column: span 4; }
+.ve-t--people { grid-column: span 4; }
+.ve-t--store { grid-column: span 2; }
+.ve-t .ve-cap { margin-bottom: 10px; }
+.ve-bignum {
+  font-family: var(--ve-head); font-weight: 700; font-size: 46px; line-height: .88;
+  letter-spacing: -.045em; color: var(--ve-text);
+}
+.ve-bignum em { font-style: normal; font-size: 17px; font-weight: 500; letter-spacing: -.02em; color: var(--ve-dim); margin-left: 8px; }
+.ve-sub { margin: 7px 0 0; font-size: 11.5px; color: var(--ve-dim); }
+.ve-chart { display: flex; align-items: flex-end; gap: 5px; flex: 1; min-height: 54px; margin-top: 10px; }
+.ve-chart i {
+  flex: 1; border-radius: 4px 4px 2px 2px;
+  background: linear-gradient(180deg, var(--ve-lime), rgba(216, 255, 62, .35));
+}
+.ve-chart .ve-cbar--now { background: linear-gradient(180deg, var(--ve-coral), rgba(255, 107, 74, .4)); }
+.ve-chart-x { display: flex; gap: 5px; margin-top: 7px; }
+.ve-chart-x span {
+  flex: 1; text-align: center; font-family: var(--ve-mono); font-size: 8px; color: var(--ve-mute);
+  white-space: nowrap; overflow: hidden;
+}
+.ve-chips-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.ve-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 12px; border: 1px solid var(--ve-line); border-radius: 99px;
+  background: var(--ve-s2); font-size: 12px; color: var(--ve-text);
+}
+.ve-chip b { font-family: var(--ve-mono); font-size: 10.5px; font-weight: 500; color: var(--ve-dim); }
+.ve-longline { display: flex; align-items: center; gap: 14px; }
+.ve-longline .ve-ava { width: 44px; height: 44px; }
+.ve-longline b { display: block; font-size: 14.5px; font-weight: 600; letter-spacing: -.015em; }
+.ve-longline p { margin: 3px 0 0; font-size: 11.5px; color: var(--ve-dim); }
+.ve-gaplist { display: flex; flex-direction: column; gap: 9px; }
+.ve-gaprow { display: flex; align-items: center; gap: 9px; font-size: 11.5px; color: var(--ve-dim); }
+.ve-gaprow i {
+  width: 6px; height: 6px; border-radius: 50%; flex: none; background: var(--ve-coral);
+}
+.ve-gaprow i.ve-dot--sky { background: var(--ve-sky); }
+.ve-gaprow i.ve-dot--violet { background: var(--ve-violet); }
+.ve-gaprow b { margin-left: auto; font-family: var(--ve-mono); font-size: 11.5px; font-weight: 500; color: var(--ve-text); }
+.ve-people { display: flex; flex-direction: column; gap: 9px; }
+.ve-prow { display: flex; align-items: center; gap: 10px; }
+.ve-prow .ve-ava { width: 30px; height: 30px; }
+.ve-prow b { font-size: 12.5px; font-weight: 600; }
+.ve-prow span { display: block; font-family: var(--ve-mono); font-size: 9.5px; color: var(--ve-mute); }
+.ve-role {
+  margin-left: auto; padding: 2px 9px; border-radius: 99px;
+  font-family: var(--ve-mono); font-size: 9.5px; white-space: nowrap;
+  border: 1px solid var(--ve-line); color: var(--ve-dim);
+}
+.ve-role--own { background: rgba(216, 255, 62, .12); border-color: transparent; color: var(--ve-lime); }
+.ve-role--ed { background: rgba(139, 92, 246, .16); border-color: transparent; color: #b79bff; }
+.ve-role--view { background: rgba(255, 255, 255, .06); border-color: transparent; color: var(--ve-dim); }
+.ve-store { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.ve-store div { border: 1px solid var(--ve-line); border-radius: 14px; background: var(--ve-s2); padding: 9px 10px; }
+.ve-store b { display: block; font-family: var(--ve-head); font-size: 17px; font-weight: 600; letter-spacing: -.03em; }
+.ve-store span { display: block; margin-top: 3px; font-size: 10.5px; color: var(--ve-mute); }
+
+/* ---------- 09. Телефон: шапка, строки состояния, нижний «остров» ---------- */
+
+.ve-status {
+  flex: none; display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 24px 0; height: 46px; color: var(--ve-text);
+  font-family: var(--ve-mono); font-size: 12.5px;
+}
+.ve-status-ic { display: flex; align-items: flex-end; gap: 5px; }
+.ve-bars { display: flex; align-items: flex-end; gap: 2px; }
+.ve-bars i { display: block; width: 3px; border-radius: 1px; background: currentColor; }
+.ve-bars i:nth-child(1) { height: 4px; }
+.ve-bars i:nth-child(2) { height: 6px; }
+.ve-bars i:nth-child(3) { height: 8px; }
+.ve-bars i:nth-child(4) { height: 10px; }
+.ve-bat {
+  position: relative; width: 21px; height: 11px; border-radius: 3px;
+  border: 1.4px solid currentColor;
+}
+.ve-bat::after { content: ""; position: absolute; inset: 1.6px 6px 1.6px 1.6px; border-radius: 1px; background: currentColor; }
+
+.ve-phead {
+  flex: none; display: flex; align-items: center; gap: 10px;
+  height: 54px; padding: 0 18px;
+  background: var(--ve-s1); border-bottom: 1px solid var(--ve-line);
+}
+.ve-phead .ve-brand i { width: 26px; height: 26px; border-radius: 9px; font-size: 13px; }
+.ve-phead .ve-brand b { font-size: 14px; }
+.ve-phead-title { font-size: 14px; font-weight: 600; letter-spacing: -.01em; }
+.ve-phead .ve-icon-btn { width: 32px; height: 32px; border-radius: 10px; margin-left: auto; }
+
+.ve-pbody { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+.ve-pscroll { flex: 1; min-height: 0; overflow: hidden; }
+/* Бенто на обзоре уходит под шит: экран фиксированный, поэтому контент обрезается
+   по нижнему краю, а не растягивает шит и его кнопку. */
+.ve-pscroll--bento { flex: none; max-height: 556px; }
+
+/* Залипший год над лентой */
+.ve-stickyyear {
+  display: flex; align-items: flex-end; gap: 10px;
+  padding: 14px 16px 10px;
+  background: linear-gradient(180deg, var(--ve-bg) 72%, rgba(8, 8, 11, 0));
+}
+.ve-stickyyear .ve-bigyear {
+  font-family: var(--ve-head); font-weight: 700; font-size: 38px; line-height: .92;
+  letter-spacing: -.05em; color: var(--ve-lime);
+}
+.ve-stickyyear span { padding-bottom: 5px; font-family: var(--ve-mono); font-size: 10.5px; color: var(--ve-mute); }
+
+.ve-pstories { display: flex; gap: 10px; padding: 4px 16px 14px; overflow: hidden; }
+.ve-pstory { flex: none; width: 54px; text-align: center; overflow: hidden; }
+.ve-pstory b { display: block; margin-top: 6px; font-size: 10px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ve-pstory span { display: block; font-family: var(--ve-mono); font-size: 9px; color: var(--ve-mute); }
+
+.ve-pgroup { display: flex; align-items: flex-end; gap: 9px; margin: 12px 0 9px; }
+.ve-pgroup .ve-bigyear {
+  font-family: var(--ve-head); font-weight: 700; font-size: 30px; line-height: .95;
+  letter-spacing: -.05em;
+}
+.ve-pgroup span { padding-bottom: 4px; font-family: var(--ve-mono); font-size: 10px; color: var(--ve-mute); }
+.ve-peat { display: flex; flex-direction: column; gap: 8px; }
+
+.ve-card--p { border-radius: 18px; padding: 9px 11px; gap: 10px; }
+.ve-card--p .ve-tile { width: 34px; height: 34px; border-radius: 12px; }
+.ve-card--p .ve-cbody b { font-size: 12.5px; }
+.ve-card--p .ve-cbody p { font-size: 10.5px; }
+.ve-card--p .ve-cdate { font-size: 10.5px; }
+
+/* Нижний «остров»: пилюля навигации и отдельная кнопка действия */
+.ve-island {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 20;
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 16px 22px;
+  background: linear-gradient(180deg, rgba(8, 8, 11, 0), var(--ve-bg) 42%);
+}
+.ve-pill {
+  flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between;
+  height: 58px; padding: 0 8px;
+  border: 1px solid var(--ve-line-2); border-radius: 22px;
+  background: rgba(23, 23, 29, .94);
+  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, .9);
+}
+.ve-pnav { display: grid; place-items: center; gap: 3px; width: 50px; color: var(--ve-mute); }
+.ve-pnav svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.ve-pnav i { font-family: var(--ve-mono); font-size: 8px; font-style: normal; }
+.ve-pnav--on { color: var(--ve-lime); }
+.ve-fab {
+  display: grid; place-items: center; flex: none;
+  width: 58px; height: 58px; border: 0; border-radius: 20px;
+  background: var(--ve-lime); color: #0a0a0c;
+  box-shadow: 0 16px 34px -14px rgba(216, 255, 62, .5);
+}
+.ve-fab svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.1; stroke-linecap: round; }
+
+/* ---------- 10. Телефон: «Человек» ---------- */
+
+.ve-phero { flex: none; padding: 12px 16px 12px; }
+.ve-pava { display: flex; align-items: center; gap: 14px; }
+.ve-pava .ve-ava { width: 56px; height: 56px; }
+.ve-phero h1 {
+  margin: 10px 0 0; font-family: var(--ve-head); font-weight: 600;
+  font-size: 24px; line-height: 1.08; letter-spacing: -.035em;
+}
+.ve-phero-meta {
+  margin: 8px 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 7px;
+  font-family: var(--ve-mono); font-size: 11px; color: var(--ve-dim);
+}
+.ve-chipbar {
+  display: flex; align-items: center; gap: 6px; flex: none;
+  padding: 10px 18px; border-top: 1px solid var(--ve-line); border-bottom: 1px solid var(--ve-line);
+  background: var(--ve-s1);
+}
+.ve-chipbar span {
+  padding: 4px 9px; border: 1px solid var(--ve-line); border-radius: 99px;
+  font-family: var(--ve-mono); font-size: 10px; color: var(--ve-dim); white-space: nowrap;
+}
+.ve-chipbar .ve-on { background: rgba(216, 255, 62, .12); border-color: transparent; color: var(--ve-lime); }
+
+/* ---------- 11. Телефон: «Обзор» и шит добавления события ---------- */
+
+.ve-pbento { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px 0; }
+.ve-pt {
+  border: 1px solid var(--ve-line); border-radius: 20px; background: var(--ve-s1); padding: 12px 14px;
+}
+.ve-pt .ve-cap { margin-bottom: 8px; }
+.ve-pt .ve-bignum { font-size: 34px; }
+.ve-pt .ve-bignum em { font-size: 13px; }
+.ve-psheet {
+  flex: none; min-width: 0; margin-top: 10px; padding: 10px 16px 16px;
+  border-top: 1px solid var(--ve-line-2); border-radius: 24px 24px 0 0;
+  background: var(--ve-s2); box-shadow: 0 -22px 44px -26px rgba(0, 0, 0, .95);
+}
+.ve-handle { width: 42px; height: 4px; border-radius: 99px; background: rgba(255, 255, 255, .2); margin: 0 auto 10px; }
+.ve-psheet h2 { margin: 0; font-family: var(--ve-head); font-size: 15px; font-weight: 600; letter-spacing: -.02em; }
+.ve-cats { display: flex; gap: 6px; margin-top: 12px; min-width: 0; }
+.ve-cat-i { width: 42px; flex: none; text-align: center; }
+.ve-cat-i .ve-tile { width: 38px; height: 38px; border-radius: 13px; margin: 0 auto; }
+.ve-cat-i .ve-tile svg { width: 17px; height: 17px; }
+.ve-cat-i i { display: block; margin-top: 5px; font-family: var(--ve-mono); font-size: 8px; font-style: normal; color: var(--ve-mute); white-space: nowrap; }
+.ve-cat-i--on .ve-tile { background: var(--ve-lime); color: #0a0a0c; }
+.ve-cat-i--on i { color: var(--ve-lime); }
+.ve-input {
+  display: flex; align-items: center; gap: 9px; height: 40px; margin-top: 12px; padding: 0 12px;
+  border: 1px solid var(--ve-line); border-radius: 14px; background: var(--ve-s1);
+  color: var(--ve-mute); font-size: 12px; white-space: nowrap; overflow: hidden;
+}
+.ve-input svg { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; }
+.ve-pactions { display: flex; align-items: center; gap: 6px; margin-top: 11px; min-width: 0; }
+.ve-pactions .ve-btn-lime {
+  flex: 1; min-width: 0; justify-content: center; height: 44px; border-radius: 15px;
+  padding: 0 10px; font-size: 13px; overflow: hidden;
+}
+/* Кнопка даты — компактный чип: в паре с лаймовой она должна влезать в 338px */
+.ve-pactions .ve-btn-ghost {
+  flex: none; height: 44px; border-radius: 15px; padding: 0 13px; font-size: 12.5px;
+}
+
+/* ---------- 12. Только интерфейс варианта: без чужих классов ---------- */
+.ve-app button, .ve-app a { -webkit-tap-highlight-color: transparent; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand"><i>T</i> Torlmood · тестовые варианты интерфейса</div>
+  <nav aria-label="Варианты интерфейса">
+    <a href="index.html">Все варианты</a>
+    <a href="a-quiet-archive.html">A · Тихий архив</a>
+    <a href="b-canvas-studio.html">B · Холст-студия</a>
+    <a href="c-family-atlas.html">C · Атлас рода</a>
+    <a href="d-card-catalog.html">D · Картотека</a>
+    <a href="e-chronicle.html" aria-current="page">E · Хроника</a>
+  </nav>
+</div>
+
+<div class="wrap">
+  <header class="doc-head">
+    <p class="eyebrow">Вариант E</p>
+    <h1>Хроника</h1>
+    <p class="lead">
+      Главный экран&nbsp;— не древо, а <b>лента времени</b>: род читается как поток событий,
+      разложенный по годам. Дерево не исчезает&nbsp;— оно становится одной из вкладок рядом с
+      лентой и людьми. Крупная цифра года открывает каждую группу событий, полоса «историй»
+      показывает, что в роду произошло только что, а липкий рельс десятилетий отвечает на
+      вопрос «а что было раньше» одним движением. Направление для семьи, которая заходит
+      в сервис не настраивать, а вспоминать: открыл&nbsp;— увидел, что нового,&nbsp;— добавил событие
+      в три касания с телефона.
+    </p>
+    <div class="chips">
+      <span class="chip"><b>Главный экран</b>&nbsp;— лента событий по годам, не холст</span>
+      <span class="chip"><b>Дерево</b>&nbsp;— отдельная вкладка «Древо»</span>
+      <span class="chip"><b>Год</b>&nbsp;— герой группы: Unbounded 52px</span>
+      <span class="chip"><b>Рельс</b> десятилетий с плотностью событий</span>
+      <span class="chip"><b>Категории</b>&nbsp;— цвет и иконка у каждого события</span>
+    </div>
+  </header>
+
+  <div class="rule"></div>
+
+  <!-- ================= ДЕСКТОП ================= -->
+  <section class="section" id="desktop">
+    <h2><span class="num">01</span>Десктоп</h2>
+    <p>
+      Три экрана: лента рода, страница человека и обзор. Носитель смысла&nbsp;— время:
+      год, десятилетие и событие; пространство древа уходит на второй план.
+    </p>
+
+    <div class="stage">
+      <div class="stage-row">
+
+        <!-- ---------- Экран 1: Лента рода ---------- -->
+        <figure class="shot">
+          <div class="frame">
+            <div class="browser">
+              <div class="dots"><i></i><i></i><i></i></div>
+              <div class="addr">torlmood.ru/stream</div>
+              <div class="tabs">Torlmood</div>
+            </div>
+            <div class="screen">
+              <div class="ve-app ve-page">
+
+                <header class="ve-top">
+                  <div class="ve-brand"><i>T</i><b>Torlmood</b><span>Ковалёвы и Соколовы</span></div>
+                  <div class="ve-switch" role="tablist" aria-label="Разделы древа">
+                    <span class="ve-on" role="tab" aria-selected="true">Лента</span>
+                    <span role="tab" aria-selected="false">Древо</span>
+                    <span role="tab" aria-selected="false">Люди<em>148</em></span>
+                  </div>
+                  <div class="ve-grow"></div>
+                  <div class="ve-search">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.6"/><path d="m13.4 13.4 3.1 3.1"/></svg>
+                    <span>Человек, место, событие</span>
+                    <kbd>⌘K</kbd>
+                  </div>
+                  <span class="ve-ava-b">ИК</span>
+                  <button class="ve-btn-lime" type="button">
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg>
+                    Добавить событие
+                  </button>
+                </header>
+
+                <div class="ve-body">
+
+                  <!-- Полоса «историй» -->
+                  <div class="ve-stories">
+                    <div class="ve-story">
+                      <span class="ve-ring ve-ring--add" style="width:74px;height:74px"><i>+</i></span>
+                      <b>Своё</b><span>событие</span>
+                    </div>
+                    <div class="ve-story ve-story--on">
+                      <span class="ve-ring" style="width:74px;height:74px"><span class="ve-ava ve-ava--m" style="width:69px;height:69px"></span></span>
+                      <b>Илья</b><span>1974</span>
+                    </div>
+                    <div class="ve-story">
+                      <span class="ve-ring" style="width:74px;height:74px"><span class="ve-ava ve-ava--f" style="width:69px;height:69px"></span></span>
+                      <b>Ольга</b><span>1978</span>
+                    </div>
+                    <div class="ve-story">
+                      <span class="ve-ring" style="width:74px;height:74px"><span class="ve-ava ve-ava--f" style="width:69px;height:69px"></span></span>
+                      <b>Нина Борисовна</b><span>1950</span>
+                    </div>
+                    <div class="ve-story">
+                      <span class="ve-ring" style="width:74px;height:74px"><span class="ve-ava ve-ava--m" style="width:69px;height:69px"></span></span>
+                      <b>Тимур</b><span>2005</span>
+                    </div>
+                    <div class="ve-story">
+                      <span class="ve-ring" style="width:74px;height:74px"><span class="ve-ava ve-ava--f" style="width:69px;height:69px"></span></span>
+                      <b>Вера</b><span>2009</span>
+                    </div>
+                    <div class="ve-story">
+                      <span class="ve-ring ve-ring--seen" style="width:74px;height:74px"><span class="ve-ava ve-ava--m" style="width:69px;height:69px"></span></span>
+                      <b>Галина</b><span>1952</span>
+                    </div>
+                    <span class="ve-stories-more">+34 человека за месяц →</span>
+                  </div>
+
+                  <div class="ve-canvas">
+
+                    <!-- Липкий рельс десятилетий -->
+                    <aside class="ve-rail" aria-label="Десятилетия">
+                      <p class="ve-cap">1880-е → 2020-е</p>
+                      <ul>
+                        <li class="ve-dec"><span class="ve-year">1880-е</span><i></i><span class="ve-count">1</span></li>
+                        <li class="ve-dec"><span class="ve-year">1890-е</span><i></i><span class="ve-count">2</span></li>
+                        <li class="ve-dec"><span class="ve-year">1900-е</span><i></i><span class="ve-count">0</span></li>
+                        <li class="ve-dec"><span class="ve-year">1910-е</span><i></i><span class="ve-count">3</span></li>
+                        <li class="ve-dec"><span class="ve-year">1920-е</span><i></i><span class="ve-count">1</span></li>
+                        <li class="ve-dec"><span class="ve-year">1930-е</span><i></i><span class="ve-count">0</span></li>
+                        <li class="ve-dec ve-dec--key"><span class="ve-year">1940-е</span><i></i><span class="ve-count">8</span></li>
+                        <li class="ve-dec"><span class="ve-year">1950-е</span><i></i><span class="ve-count">3</span></li>
+                        <li class="ve-dec"><span class="ve-year">1960-е</span><i></i><span class="ve-count">2</span></li>
+                        <li class="ve-dec"><span class="ve-year">1970-е</span><i></i><span class="ve-count">4</span></li>
+                        <li class="ve-dec"><span class="ve-year">1980-е</span><i></i><span class="ve-count">2</span></li>
+                        <li class="ve-dec"><span class="ve-year">1990-е</span><i></i><span class="ve-count">1</span></li>
+                        <li class="ve-dec"><span class="ve-year">2000-е</span><i></i><span class="ve-count">2</span></li>
+                        <li class="ve-dec ve-dec--on"><span class="ve-year">2010-е</span><i></i><span class="ve-count">5</span></li>
+                        <li class="ve-dec"><span class="ve-year">2020-е</span><i></i><span class="ve-count">2</span></li>
+                      </ul>
+                      <p class="ve-rail-note">Плотность&nbsp;— число событий за десятилетие.</p>
+                    </aside>
+
+                    <!-- Поток по годам -->
+                    <div class="ve-stream">
+                      <div class="ve-stream-head">
+                        <b>Лента рода</b>
+                        <span class="ve-mono">33 события · 9 лет на экране</span>
+                        <span class="ve-scrollhint">прокрутка ↓</span>
+                      </div>
+
+                      <div class="ve-group ve-group--now">
+                        <div class="ve-yhead">
+                          <span class="ve-bigyear">2011</span>
+                          <span class="ve-yside"><b>8 событий</b><span>год смерти Аркадия</span></span>
+                        </div>
+                        <div class="ve-events">
+                          <article class="ve-card ve-card--on">
+                            <span class="ve-tile ve-tile--dim" style="width:38px;height:38px"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="6.4"/><path d="M10 3.6v12.8"/></svg></span>
+                            <span class="ve-cbody">
+                              <b>Умер Аркадий Петрович Ковалёв</b>
+                              <p>Ленинград · <span class="ve-cat ve-cat--dim">воспоминание</span></p>
+                            </span>
+                            <span class="ve-cdate">12 ноября<span>2011</span></span>
+                          </article>
+                          <article class="ve-card">
+                            <span class="ve-tile ve-tile--coral" style="width:38px;height:38px"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="5" width="14" height="11" rx="2.4"/><circle cx="10" cy="10.5" r="2.6"/><path d="M7 5l1.2-1.8h3.6L13 5"/></svg></span>
+                            <span class="ve-cbody">
+                              <b>Ольга добавила 12 фотографий из семейного альбома</b>
+                              <p>Ленинград · <span class="ve-cat ve-cat--coral">фотография</span></p>
+                            </span>
+                            <span class="ve-cdate">3 августа<span>2011</span></span>
+                          </article>
+                          <article class="ve-card">
+                            <span class="ve-tile ve-tile--dim" style="width:38px;height:38px"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 3.4h5.4L15 7v9.6H6z"/><path d="M11.2 3.4V7H15"/></svg></span>
+                            <span class="ve-cbody">
+                              <b>Найдена выписка из домовой книги</b>
+                              <p>Ленинград · <span class="ve-cat ve-cat--dim">документ</span></p>
+                            </span>
+                            <span class="ve-cdate">17 июня<span>2011</span></span>
+                          </article>
+                          <article class="ve-card">
+                            <span class="ve-tile ve-tile--dim" style="width:38px;height:38px"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16V8.6l6-4.6 6 4.6V16z"/><path d="M8.4 16v-4.6h3.2V16"/></svg></span>
+                            <span class="ve-cbody">
+                              <b>Семья переехала в Санкт-Петербург</b>
+                              <p>Ленинград · <span class="ve-cat ve-cat--dim">переезд</span></p>
+                            </span>
+                            <span class="ve-cdate">4 марта<span>2011</span></span>
+                          </article>
+                          <article class="ve-card">
+                            <span class="ve-tile ve-tile--violet" style="width:38px;height:38px"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3.4l2 4.4 4.6.5-3.4 3.2.9 4.6L10 13.8l-4.1 2.3.9-4.6L3.4 8.3l4.6-.5z"/></svg></span>
+                            <span class="ve-cbody">
+                              <b>Аркадий награждён памятной медалью</b>
+                              <p>Ленинград · <span class="ve-cat ve-cat--violet">служба</span></p>
+                            </span>
+                            <span class="ve-cdate">23 февраля<span>2011</span></span>
+                          </article>
+                        </div>
+                      </div>
+
+                      <div class="ve-group">
+                        <div class="ve-yhead">
+                          <span class="ve-bigyear">2009</span>
+                          <span class="ve-yside"><b>4 события</b><span>год рождения Веры</span></span>
+                        </div>
+                        <div class="ve-events">
+                          <article class="ve-card">
+                            <span class="ve-tile ve-tile--lime" style="width:38px;height:38px"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v8"/><path d="M6.6 7.4h6.8"/><path d="M4.6 12.4a5.4 5.4 0 0 0 10.8 0"/></svg></span>
+                            <span class="ve-cbody">
+                              <b>Родилась Вера Ильинична Ковалёва</b>
+                              <p>Санкт-Петербург · <span class="ve-cat ve-cat--lime">рождение</span></p>
+                            </span>
+                            <span class="ve-cdate">19 мая<span>2009</span></span>
+                          </article>
+                          <article class="ve-card ve-card--on">
+                            <span class="ve-tile ve-tile--sky" style="width:38px;height:38px"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15.6V8.4a5 5 0 0 1 10 0v7.2"/><path d="M3.4 15.6h13.2"/></svg></span>
+                            <span class="ve-cbody">
+                              <b>Илья принял присягу</b>
+                              <p>Санкт-Петербург · <span class="ve-cat ve-cat--sky">служба</span></p>
+                            </span>
+                            <span class="ve-cdate">9 мая<span>2009</span></span>
+                          </article>
+                          <article class="ve-card">
+                            <span class="ve-tile ve-tile--coral" style="width:38px;height:38px"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="5" width="14" height="11" rx="2.4"/><circle cx="10" cy="10.5" r="2.6"/><path d="M7 5l1.2-1.8h3.6L13 5"/></svg></span>
+                            <span class="ve-cbody">
+                              <b>Снят первый семейный портрет вчетвером</b>
+                              <p>Санкт-Петербург · <span class="ve-cat ve-cat--coral">фотография</span></p>
+                            </span>
+                            <span class="ve-cdate">2 мая<span>2009</span></span>
+                          </article>
+                          <article class="ve-card">
+                            <span class="ve-tile ve-tile--dim" style="width:38px;height:38px"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 3.4h5.4L15 7v9.6H6z"/><path d="M11.2 3.4V7H15"/></svg></span>
+                            <span class="ve-cbody">
+                              <b>Получено свидетельство о рождении</b>
+                              <p>Санкт-Петербург · <span class="ve-cat ve-cat--dim">документ</span></p>
+                            </span>
+                            <span class="ve-cdate">26 мая<span>2009</span></span>
+                          </article>
+                        </div>
+                      </div>
+
+                      <div class="ve-group">
+                        <div class="ve-yhead">
+                          <span class="ve-bigyear">2005</span>
+                          <span class="ve-yside"><b>4 события</b><span>год рождения Тимура</span></span>
+                        </div>
+                        <div class="ve-events">
+                          <article class="ve-card">
+                            <span class="ve-tile ve-tile--lime" style="width:38px;height:38px"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v8"/><path d="M6.6 7.4h6.8"/><path d="M4.6 12.4a5.4 5.4 0 0 0 10.8 0"/></svg></span>
+                            <span class="ve-cbody">
+                              <b>Родился Тимур Ильич Ковалёв</b>
+                              <p>Санкт-Петербург · <span class="ve-cat ve-cat--lime">рождение</span></p>
+                            </span>
+                            <span class="ve-cdate">14 июня<span>2005</span></span>
+                          </article>
+                          <article class="ve-card">
+                            <span class="ve-tile ve-tile--dim" style="width:38px;height:38px"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 3.4h5.4L15 7v9.6H6z"/><path d="M11.2 3.4V7H15"/></svg></span>
+                            <span class="ve-cbody">
+                              <b>Крестины в церкви Смоленской иконы</b>
+                              <p>Санкт-Петербург · <span class="ve-cat ve-cat--dim">документ</span></p>
+                            </span>
+                            <span class="ve-cdate">27 августа<span>2005</span></span>
+                          </article>
+                          <article class="ve-card">
+                            <span class="ve-tile ve-tile--violet" style="width:38px;height:38px"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3.4l2 4.4 4.6.5-3.4 3.2.9 4.6L10 13.8l-4.1 2.3.9-4.6L3.4 8.3l4.6-.5z"/></svg></span>
+                            <span class="ve-cbody">
+                              <b>Илья перешёл на новую работу</b>
+                              <p>Санкт-Петербург · <span class="ve-cat ve-cat--violet">служба</span></p>
+                            </span>
+                            <span class="ve-cdate">1 сентября<span>2005</span></span>
+                          </article>
+                          <article class="ve-card">
+                            <span class="ve-tile ve-tile--coral" style="width:38px;height:38px"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="5" width="14" height="11" rx="2.4"/><circle cx="10" cy="10.5" r="2.6"/><path d="M7 5l1.2-1.8h3.6L13 5"/></svg></span>
+                            <span class="ve-cbody">
+                              <b>Первые фотографии Тимура</b>
+                              <p>Санкт-Петербург · <span class="ve-cat ve-cat--coral">фотография</span></p>
+                            </span>
+                            <span class="ve-cdate">20 июня<span>2005</span></span>
+                          </article>
+                        </div>
+                      </div>
+
+                      <div class="ve-group">
+                        <div class="ve-yhead">
+                          <span class="ve-bigyear">1980</span>
+                          <span class="ve-yside"><b>2 события</b><span>год рождения Антона</span></span>
+                        </div>
+                        <div class="ve-events">
+                          <article class="ve-card">
+                            <span class="ve-tile ve-tile--lime" style="width:38px;height:38px"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v8"/><path d="M6.6 7.4h6.8"/><path d="M4.6 12.4a5.4 5.4 0 0 0 10.8 0"/></svg></span>
+                            <span class="ve-cbody">
+                              <b>Родился Антон Юрьевич Прохоров</b>
+                              <p>Ленинград · <span class="ve-cat ve-cat--lime">рождение</span></p>
+                            </span>
+                            <span class="ve-cdate">22 февраля<span>1980</span></span>
+                          </article>
+                          <article class="ve-card">
+                            <span class="ve-tile ve-tile--dim" style="width:38px;height:38px"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16V8.6l6-4.6 6 4.6V16z"/><path d="M8.4 16v-4.6h3.2V16"/></svg></span>
+                            <span class="ve-cbody">
+                              <b>Обмен квартиры на Васильевском острове</b>
+                              <p>Ленинград · <span class="ve-cat ve-cat--dim">переезд</span></p>
+                            </span>
+                            <span class="ve-cdate">7 октября<span>1980</span></span>
+                          </article>
+                        </div>
+                      </div>
+
+                      <div class="ve-group">
+                        <div class="ve-yhead">
+                          <span class="ve-bigyear">1978</span>
+                          <span class="ve-yside"><b>2 события</b><span>год рождения Ольги</span></span>
+                        </div>
+                        <div class="ve-events">
+                          <article class="ve-card">
+                            <span class="ve-tile ve-tile--lime" style="width:38px;height:38px"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v8"/><path d="M6.6 7.4h6.8"/><path d="M4.6 12.4a5.4 5.4 0 0 0 10.8 0"/></svg></span>
+                            <span class="ve-cbody">
+                              <b>Родилась Ольга Аркадьевна Ковалёва</b>
+                              <p>Ленинград · <span class="ve-cat ve-cat--lime">рождение</span></p>
+                            </span>
+                            <span class="ve-cdate">30 июля<span>1978</span></span>
+                          </article>
+                          <article class="ve-card">
+                            <span class="ve-tile ve-tile--sky" style="width:38px;height:38px"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15.6V8.4a5 5 0 0 1 10 0v7.2"/><path d="M3.4 15.6h13.2"/></svg></span>
+                            <span class="ve-cbody">
+                              <b>Аркадий переведён на завод «Красный выборжец»</b>
+                              <p>Ленинград · <span class="ve-cat ve-cat--sky">служба</span></p>
+                            </span>
+                            <span class="ve-cdate">1 сентября<span>1978</span></span>
+                          </article>
+                        </div>
+                      </div>
+
+                      <div class="ve-group">
+                        <div class="ve-yhead">
+                          <span class="ve-bigyear">1974</span>
+                          <span class="ve-yside"><b>2 события</b><span>год рождения Ильи</span></span>
+                        </div>
+                        <div class="ve-events">
+                          <article class="ve-card">
+                            <span class="ve-tile ve-tile--lime" style="width:38px;height:38px"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v8"/><path d="M6.6 7.4h6.8"/><path d="M4.6 12.4a5.4 5.4 0 0 0 10.8 0"/></svg></span>
+                            <span class="ve-cbody">
+                              <b>Родился Илья Аркадьевич Ковалёв&nbsp;— владелец древа</b>
+                              <p>Ленинград · <span class="ve-cat ve-cat--lime">рождение</span></p>
+                            </span>
+                            <span class="ve-cdate">5 апреля<span>1974</span></span>
+                          </article>
+                          <article class="ve-card">
+                            <span class="ve-tile ve-tile--coral" style="width:38px;height:38px"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="5" width="14" height="11" rx="2.4"/><circle cx="10" cy="10.5" r="2.6"/><path d="M7 5l1.2-1.8h3.6L13 5"/></svg></span>
+                            <span class="ve-cbody">
+                              <b>Семейная фотография у дома на Лиговском</b>
+                              <p>Ленинград · <span class="ve-cat ve-cat--coral">фотография</span></p>
+                            </span>
+                            <span class="ve-cdate">4 мая<span>1974</span></span>
+                          </article>
+                        </div>
+                      </div>
+
+                      <div class="ve-group">
+                        <div class="ve-yhead">
+                          <span class="ve-bigyear">1971</span>
+                          <span class="ve-yside"><b>2 события</b><span>свадьба Аркадия и Нины</span></span>
+                        </div>
+                        <div class="ve-events">
+                          <article class="ve-card">
+                            <span class="ve-tile ve-tile--coral" style="width:38px;height:38px"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M9.2 11.4a3.4 3.4 0 0 1 4.4-4.4l1.8-1.8a3.4 3.4 0 0 1-4.8-4.8"/><path d="M10.8 8.6a3.4 3.4 0 0 1-4.4 4.4l-1.8 1.8a3.4 3.4 0 0 1 4.8 4.8"/></svg></span>
+                            <span class="ve-cbody">
+                              <b>Аркадий Петрович женился на Нине Борисовне Верещагиной</b>
+                              <p>Ленинград · <span class="ve-cat ve-cat--coral">брак</span></p>
+                            </span>
+                            <span class="ve-cdate">6 ноября<span>1971</span></span>
+                          </article>
+                          <article class="ve-card">
+                            <span class="ve-tile ve-tile--dim" style="width:38px;height:38px"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 3.4h5.4L15 7v9.6H6z"/><path d="M11.2 3.4V7H15"/></svg></span>
+                            <span class="ve-cbody">
+                              <b>Запись в книге регистрации брака</b>
+                              <p>Ленинград · <span class="ve-cat ve-cat--dim">документ</span></p>
+                            </span>
+                            <span class="ve-cdate">6 ноября<span>1971</span></span>
+                          </article>
+                        </div>
+                      </div>
+
+                      <div class="ve-group">
+                        <div class="ve-yhead">
+                          <span class="ve-bigyear">1965</span>
+                          <span class="ve-yside"><b>2 события</b><span>школа Аркадия</span></span>
+                        </div>
+                        <div class="ve-events">
+                          <article class="ve-card">
+                            <span class="ve-tile ve-tile--sky" style="width:38px;height:38px"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 5.2 3.4 8.4 10 11.6l6.6-3.2z"/><path d="M6.2 9.8v3.6c0 1 1.7 1.8 3.8 1.8s3.8-.8 3.8-1.8V9.8"/></svg></span>
+                            <span class="ve-cbody">
+                              <b>Аркадий пошёл в первый класс</b>
+                              <p>Ленинград · <span class="ve-cat ve-cat--sky">служба</span></p>
+                            </span>
+                            <span class="ve-cdate">1 сентября<span>1965</span></span>
+                          </article>
+                          <article class="ve-card">
+                            <span class="ve-tile ve-tile--coral" style="width:38px;height:38px"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="5" width="14" height="11" rx="2.4"/><circle cx="10" cy="10.5" r="2.6"/><path d="M7 5l1.2-1.8h3.6L13 5"/></svg></span>
+                            <span class="ve-cbody">
+                              <b>Школьная фотография, 3-й «Б»</b>
+                              <p>Ленинград · <span class="ve-cat ve-cat--coral">фотография</span></p>
+                            </span>
+                            <span class="ve-cdate">1 сентября<span>1965</span></span>
+                          </article>
+                        </div>
+                      </div>
+
+                      <div class="ve-group">
+                        <div class="ve-yhead">
+                          <span class="ve-bigyear">1947</span>
+                          <span class="ve-yside"><b>8 событий</b><span>год рождения Аркадия</span></span>
+                        </div>
+                        <div class="ve-events">
+                          <article class="ve-card">
+                            <span class="ve-tile ve-tile--lime" style="width:38px;height:38px"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v8"/><path d="M6.6 7.4h6.8"/><path d="M4.6 12.4a5.4 5.4 0 0 0 10.8 0"/></svg></span>
+                            <span class="ve-cbody">
+                              <b>Родился Аркадий Петрович Ковалёв</b>
+                              <p>Ленинград · <span class="ve-cat ve-cat--lime">рождение</span></p>
+                            </span>
+                            <span class="ve-cdate">9 марта<span>1947</span></span>
+                          </article>
+                          <article class="ve-card">
+                            <span class="ve-tile ve-tile--coral" style="width:38px;height:38px"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M9.2 11.4a3.4 3.4 0 0 1 4.4-4.4l1.8-1.8a3.4 3.4 0 0 1-4.8-4.8"/><path d="M10.8 8.6a3.4 3.4 0 0 1-4.4 4.4l-1.8 1.8a3.4 3.4 0 0 1 4.8 4.8"/></svg></span>
+                            <span class="ve-cbody">
+                              <b>Пётр Григорьевич и Мария Тимофеевна вернулись в Ленинград</b>
+                              <p>Ленинград · <span class="ve-cat ve-cat--coral">переезд</span></p>
+                            </span>
+                            <span class="ve-cdate">2 января<span>1947</span></span>
+                          </article>
+                          <article class="ve-card">
+                            <span class="ve-tile ve-tile--dim" style="width:38px;height:38px"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 3.4h5.4L15 7v9.6H6z"/><path d="M11.2 3.4V7H15"/></svg></span>
+                            <span class="ve-cbody">
+                              <b>Восстановлена карточка Петра Григорьевича</b>
+                              <p>Ленинград · <span class="ve-cat ve-cat--dim">документ</span></p>
+                            </span>
+                            <span class="ve-cdate">18 февраля<span>1947</span></span>
+                          </article>
+                        </div>
+                      </div>
+
+                    </div>
+
+                    <!-- Боковая колонка -->
+                    <aside class="ve-side" aria-label="Сводка по роду">
+                      <h2 class="ve-cap">Сейчас в роду</h2>
+                      <div class="ve-scard">
+                        <div class="ve-now">
+                          <span class="ve-tile ve-tile--coral"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16V8.6l6-4.6 6 4.6V16z"/><path d="M8.4 16v-4.6h3.2V16"/></svg></span>
+                          <span class="ve-now-meta">
+                            <b>2 октября&nbsp;— 75 лет</b>
+                            <span>Нине Борисовне · через 12 дней</span>
+                          </span>
+                        </div>
+                        <p>Именинница&nbsp;— супруга Аркадия Петровича, в девичестве Верещагина, Тверь.</p>
+                      </div>
+
+                      <div class="ve-scard">
+                        <p class="ve-cap">Пробелы в данных</p>
+                        <div class="ve-stat"><b>14 / 23</b><span>карточек без места рождения</span></div>
+                        <span class="ve-bar"><i style="width:61%"></i></span>
+                        <div class="ve-srow"><span>Из них без даты</span><b>6</b></div>
+                        <div class="ve-srow"><span>Старше 1900 года</span><b>4</b></div>
+                        <span class="ve-link-lime">заполнить
+                          <svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7h8M7.4 3.4 11 7l-3.6 3.6"/></svg>
+                        </span>
+                      </div>
+
+                      <div class="ve-scard">
+                        <p class="ve-cap">Пригласить родственника</p>
+                        <div class="ve-stat"><b>3 из 10</b><span>переходов по ссылке</span></div>
+                        <span class="ve-bar ve-bar--sky"><i style="width:30%"></i></span>
+                        <div class="ve-inv">
+                          <span class="ve-inv-dots"><i class="ve-on"></i><i class="ve-on"></i><i class="ve-on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+                          <span class="ve-mono">осталось 14 дней</span>
+                        </div>
+                      </div>
+
+                      <div class="ve-scard">
+                        <p class="ve-cap">История правок</p>
+                        <div class="ve-srow"><span>Ольга: место рождения</span><b>2 ч</b></div>
+                        <div class="ve-srow"><span>Илья: карточка Веры</span><b>вчера</b></div>
+                        <div class="ve-srow"><span>Дмитрий присоединился</span><b>3 дня</b></div>
+                        <div class="ve-srow"><span>Импорт GEDCOM</span><b>неделю</b></div>
+                      </div>
+                    </aside>
+
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+          <figcaption>
+            <b>Лента рода</b> <code>torlmood.ru/stream</code>
+            <span>Год открывает группу событий, слева&nbsp;— рельс десятилетий, справа&nbsp;— что происходит в роду сейчас.</span>
+          </figcaption>
+        </figure>
+
+        <!-- ---------- Экран 2: Человек ---------- -->
+        <figure class="shot">
+          <div class="frame">
+            <div class="browser">
+              <div class="dots"><i></i><i></i><i></i></div>
+              <div class="addr">torlmood.ru/person/arkady</div>
+              <div class="tabs">Torlmood</div>
+            </div>
+            <div class="screen">
+              <div class="ve-app ve-page">
+
+                <header class="ve-top">
+                  <div class="ve-brand"><i>T</i><b>Torlmood</b><span>Ковалёвы и Соколовы</span></div>
+                  <div class="ve-switch" role="tablist" aria-label="Разделы древа">
+                    <span class="ve-on" role="tab" aria-selected="true">Лента</span>
+                    <span role="tab" aria-selected="false">Древо</span>
+                    <span role="tab" aria-selected="false">Люди<em>148</em></span>
+                  </div>
+                  <div class="ve-grow"></div>
+                  <div class="ve-search">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.6"/><path d="m13.4 13.4 3.1 3.1"/></svg>
+                    <span>Аркадий Петрович</span>
+                    <kbd>⌘K</kbd>
+                  </div>
+                  <button class="ve-icon-btn" type="button" aria-label="Поделиться карточкой">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="6" cy="10" r="2.4"/><circle cx="14.4" cy="5.4" r="2.4"/><circle cx="14.4" cy="14.6" r="2.4"/><path d="m8.2 8.8 4-2.2M8.2 11.2l4 2.2"/></svg>
+                  </button>
+                  <span class="ve-ava-b">ИК</span>
+                </header>
+
+                <div class="ve-body">
+
+                  <div class="ve-hero">
+                    <div class="ve-hero-l">
+                      <nav class="ve-crumbs" aria-label="Путь">
+                        <span>Ковалёвы</span><span>→</span><span>Пётр Григорьевич</span><span>→</span><b>Аркадий Петрович</b>
+                      </nav>
+                      <h1>Аркадий Петрович Ковалёв</h1>
+                      <p class="ve-hero-meta">
+                        <span>1947–2011</span><span class="ve-sep">·</span><span>63 года</span>
+                        <span class="ve-sep">·</span><span>Ленинград</span>
+                        <span class="ve-chip-lime">5 поколение · III</span>
+                      </p>
+                    </div>
+                    <div class="ve-rel">
+                      <div class="ve-back">
+                        <svg viewBox="0 0 14 14" aria-hidden="true"><path d="M11 7H3M6.6 3.4 3 7l3.6 3.6"/></svg>
+                        Ближайшие родственники
+                      </div>
+                      <div class="ve-rel-row">
+                        <div class="ve-rel-i">
+                          <span class="ve-ring" style="width:68px;height:68px"><span class="ve-ava ve-ava--m" style="width:63px;height:63px"></span></span>
+                          <b>Пётр Григорьевич</b><span>отец · 1918–1983</span>
+                        </div>
+                        <div class="ve-rel-i">
+                          <span class="ve-ring" style="width:68px;height:68px"><span class="ve-ava ve-ava--f" style="width:63px;height:63px"></span></span>
+                          <b>Мария Т.</b><span>мать · 1922–2004</span>
+                        </div>
+                        <div class="ve-rel-i">
+                          <span class="ve-ring" style="width:68px;height:68px"><span class="ve-ava ve-ava--f" style="width:63px;height:63px"></span></span>
+                          <b>Нина Борисовна</b><span>супруга · 1950</span>
+                        </div>
+                        <div class="ve-rel-i">
+                          <span class="ve-ring ve-ring--seen" style="width:68px;height:68px"><span class="ve-ava ve-ava--m" style="width:63px;height:63px"></span></span>
+                          <b>Илья</b><span>сын · 1974</span>
+                        </div>
+                        <div class="ve-rel-i">
+                          <span class="ve-ring ve-ring--seen" style="width:68px;height:68px"><span class="ve-ava ve-ava--f" style="width:63px;height:63px"></span></span>
+                          <b>Ольга</b><span>дочь · 1978</span>
+                        </div>
+                        <div class="ve-rel-i">
+                          <span class="ve-ring ve-ring--seen" style="width:68px;height:68px"><span class="ve-ava ve-ava--m" style="width:63px;height:63px"></span></span>
+                          <b>Галина</b><span>сестра · 1952</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="ve-cols">
+
+                    <div class="ve-life">
+                      <p class="ve-cap">Жизнь по годам · 6 событий из 8</p>
+                      <ul class="ve-tl ve-tl--p" style="margin:12px 16px 0">
+                        <li>
+                          <span class="ve-tyear">1947</span><span class="ve-tdot ve-tdot--lime"></span>
+                          <span class="ve-tbody">
+                            <b>Рождение&nbsp;— Аркадий Петрович Ковалёв</b>
+                            <p>Ленинград · третий ребёнок в семье Петра Григорьевича и Марии Тимофеевны</p>
+                            <span class="ve-tmeta">
+                              <span><svg viewBox="0 0 14 14" aria-hidden="true"><path d="M7 2.6c2 0 3.6 1.6 3.6 3.6 0 2.6-3.6 5.6-3.6 5.6S3.4 8.8 3.4 6.2C3.4 4.2 5 2.6 7 2.6Z"/><circle cx="7" cy="6.2" r="1.3"/></svg>Ленинград</span>
+                              <span><svg viewBox="0 0 14 14" aria-hidden="true"><rect x="2" y="3.4" width="10" height="7.6" rx="1.6"/><circle cx="7" cy="7.2" r="1.8"/></svg>фотография · 1947</span>
+                            </span>
+                          </span>
+                        </li>
+                        <li>
+                          <span class="ve-tyear">1965</span><span class="ve-tdot ve-tdot--sky"></span>
+                          <span class="ve-tbody">
+                            <b>Школа № 189, первый класс</b>
+                            <p>Ленинград · сохранилась школьная фотография третьего «Б»</p>
+                            <span class="ve-tmeta">
+                              <span><svg viewBox="0 0 14 14" aria-hidden="true"><path d="M7 2.6c2 0 3.6 1.6 3.6 3.6 0 2.6-3.6 5.6-3.6 5.6S3.4 8.8 3.4 6.2C3.4 4.2 5 2.6 7 2.6Z"/><circle cx="7" cy="6.2" r="1.3"/></svg>Ленинград</span>
+                              <span><svg viewBox="0 0 14 14" aria-hidden="true"><rect x="2" y="3.4" width="10" height="7.6" rx="1.6"/><circle cx="7" cy="7.2" r="1.8"/></svg>фотография · 1963</span>
+                            </span>
+                          </span>
+                        </li>
+                        <li>
+                          <span class="ve-tyear">1971</span><span class="ve-tdot ve-tdot--coral"></span>
+                          <span class="ve-tbody">
+                            <b>Брак с Ниной Борисовной Верещагиной</b>
+                            <p>Ленинград · запись в книге регистрации брака сохранилась</p>
+                            <span class="ve-tmeta">
+                              <span><svg viewBox="0 0 14 14" aria-hidden="true"><path d="M7 2.6c2 0 3.6 1.6 3.6 3.6 0 2.6-3.6 5.6-3.6 5.6S3.4 8.8 3.4 6.2C3.4 4.2 5 2.6 7 2.6Z"/><circle cx="7" cy="6.2" r="1.3"/></svg>Ленинград</span>
+                              <span><svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3.4 2.6h4.2L10.6 5.6v5.8H3.4z"/><path d="M7.6 2.6v3h3"/></svg>документ</span>
+                            </span>
+                          </span>
+                        </li>
+                        <li>
+                          <span class="ve-tyear">1974</span><span class="ve-tdot ve-tdot--lime"></span>
+                          <span class="ve-tbody">
+                            <b>Родился сын Илья Аркадьевич</b>
+                            <p>Ленинград · владелец этого древа, добавил 42 карточки</p>
+                            <span class="ve-tmeta">
+                              <span><svg viewBox="0 0 14 14" aria-hidden="true"><path d="M7 2.6c2 0 3.6 1.6 3.6 3.6 0 2.6-3.6 5.6-3.6 5.6S3.4 8.8 3.4 6.2C3.4 4.2 5 2.6 7 2.6Z"/><circle cx="7" cy="6.2" r="1.3"/></svg>Ленинград</span>
+                              <span><svg viewBox="0 0 14 14" aria-hidden="true"><rect x="2" y="3.4" width="10" height="7.6" rx="1.6"/><circle cx="7" cy="7.2" r="1.8"/></svg>фотография · 1974</span>
+                            </span>
+                          </span>
+                        </li>
+                        <li>
+                          <span class="ve-tyear">1978</span><span class="ve-tdot ve-tdot--lime"></span>
+                          <span class="ve-tbody">
+                            <b>Родилась дочь Ольга Аркадьевна</b>
+                            <p>Ленинград · редактор древа, ведёт ленту с 2019 года</p>
+                            <span class="ve-tmeta">
+                              <span><svg viewBox="0 0 14 14" aria-hidden="true"><path d="M7 2.6c2 0 3.6 1.6 3.6 3.6 0 2.6-3.6 5.6-3.6 5.6S3.4 8.8 3.4 6.2C3.4 4.2 5 2.6 7 2.6Z"/><circle cx="7" cy="6.2" r="1.3"/></svg>Ленинград</span>
+                            </span>
+                          </span>
+                        </li>
+                        <li>
+                          <span class="ve-tyear">2011</span><span class="ve-tdot"></span>
+                          <span class="ve-tbody">
+                            <b>Смерть&nbsp;— 12 ноября 2011 года</b>
+                            <p>Ленинград · похоронен на Серафимовском кладбище</p>
+                          </span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <aside class="ve-pcol" aria-label="Факты о человеке">
+                      <div class="ve-scard">
+                        <p class="ve-cap">Факты</p>
+                        <div class="ve-facts">
+                          <span class="ve-fact"><span>Полное имя</span><b>Аркадий Петрович Ковалёв</b></span>
+                          <span class="ve-fact"><span>Годы жизни</span><b>1947–2011 · 63 года</b></span>
+                          <span class="ve-fact"><span>Место рождения</span><b>Ленинград</b></span>
+                          <span class="ve-fact"><span>Поколение</span><b>III из V · Ковалёвы</b></span>
+                          <span class="ve-fact"><span>Супруга</span><b>Нина Борисовна, 1950</b></span>
+                          <span class="ve-fact"><span>Дети</span><b>Илья, 1974 · Ольга, 1978</b></span>
+                        </div>
+                      </div>
+
+                      <div class="ve-scard">
+                        <div class="ve-stat"><b>4 файла</b><span>· 18 МБ · папка «Аркадий»</span></div>
+                        <div class="ve-docs" style="margin-top:11px">
+                          <span class="ve-doc"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="5" width="14" height="11" rx="2.4"/><circle cx="10" cy="10.5" r="2.6"/><path d="M7 5l1.2-1.8h3.6L13 5"/></svg><i>JPG</i></span>
+                          <span class="ve-doc"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="5" width="14" height="11" rx="2.4"/><circle cx="10" cy="10.5" r="2.6"/><path d="M7 5l1.2-1.8h3.6L13 5"/></svg><i>JPG</i></span>
+                          <span class="ve-doc"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 3.4h5.4L15 7v9.6H6z"/><path d="M11.2 3.4V7H15"/></svg><i>PDF</i></span>
+                          <span class="ve-doc"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 3.4h5.4L15 7v9.6H6z"/><path d="M11.2 3.4V7H15"/></svg><i>PDF</i></span>
+                        </div>
+                      </div>
+
+                      <div class="ve-scard">
+                        <p class="ve-cap">Воспоминания</p>
+                        <div class="ve-memo">
+                          <span class="ve-ava ve-ava--m"></span>
+                          <span>
+                            <b>Илья</b><span>1974 · сын</span>
+                            <p>«Он собирал марки и заставлял меня подписывать каждую. Теперь я подписываю карточки в этом древе».</p>
+                          </span>
+                        </div>
+                        <div class="ve-memo">
+                          <span class="ve-ava ve-ava--f"></span>
+                          <span>
+                            <b>Нина Борисовна</b><span>1950 · супруга</span>
+                            <p>«Каждое 9 мая мы шли к Серафимовскому&nbsp;— он говорил, что память любит порядок».</p>
+                          </span>
+                        </div>
+                      </div>
+                    </aside>
+
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+          <figcaption>
+            <b>Человек</b> <code>torlmood.ru/person/arkady</code>
+            <span>Крупное имя, кольца родственников и жизнь по годам; справа&nbsp;— факты, документы и воспоминания.</span>
+          </figcaption>
+        </figure>
+
+        <!-- ---------- Экран 3: Обзор ---------- -->
+        <figure class="shot">
+          <div class="frame">
+            <div class="browser">
+              <div class="dots"><i></i><i></i><i></i></div>
+              <div class="addr">torlmood.ru/overview</div>
+              <div class="tabs">Torlmood</div>
+            </div>
+            <div class="screen">
+              <div class="ve-app ve-page">
+
+                <header class="ve-top">
+                  <div class="ve-brand"><i>T</i><b>Torlmood</b><span>Ковалёвы и Соколовы</span></div>
+                  <div class="ve-switch" role="tablist" aria-label="Разделы древа">
+                    <span class="ve-on" role="tab" aria-selected="true">Лента</span>
+                    <span role="tab" aria-selected="false">Древо</span>
+                    <span role="tab" aria-selected="false">Люди<em>148</em></span>
+                  </div>
+                  <div class="ve-grow"></div>
+                  <div class="ve-search">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.6"/><path d="m13.4 13.4 3.1 3.1"/></svg>
+                    <span>Что заполнить в роду</span>
+                    <kbd>⌘K</kbd>
+                  </div>
+                  <button class="ve-btn-ghost" type="button">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 10.4V2.8M5.2 5.6 8 2.8l2.8 2.8M3 10.6v2.6h10v-2.6"/></svg>
+                    Экспорт
+                  </button>
+                  <span class="ve-ava-b">ИК</span>
+                </header>
+
+                <div class="ve-body">
+                  <div class="ve-bento">
+
+                    <section class="ve-t ve-t--bg">
+                      <p class="ve-cap">Род в цифрах</p>
+                      <div class="ve-bg-row">
+                        <div class="ve-bg-left">
+                          <div class="ve-bignum">148 <em>человек · 5 поколений</em></div>
+                          <p class="ve-sub">Ковалёвы и Соколовы · 1889–2009 · регион Рязань → Ленинград</p>
+                          <p class="ve-sub">Род вырос вчетверо после 1940-х: 34 человека к 1940 году и 148 сегодня.</p>
+                        </div>
+                        <div class="ve-bg-chart">
+                          <p class="ve-cap">Прирост по десятилетиям</p>
+                          <div class="ve-chart ve-chart--grow">
+                            <i style="height:4%"></i><i style="height:5%"></i><i style="height:4%"></i>
+                            <i style="height:9%"></i><i style="height:6%"></i><i style="height:16%"></i>
+                            <i style="height:36%"></i><i style="height:58%"></i><i style="height:61%"></i>
+                            <i style="height:72%"></i><i style="height:78%"></i><i style="height:82%"></i>
+                            <i style="height:86%"></i><i style="height:92%"></i><i class="ve-cbar--now" style="height:100%"></i>
+                          </div>
+                          <div class="ve-chart-x">
+                            <span>1880</span><span>1890</span><span>1900</span><span>1910</span><span>1920</span>
+                            <span>1930</span><span>1940</span><span>1950</span><span>1960</span><span>1970</span>
+                            <span>1980</span><span>1990</span><span>2000</span><span>2010</span><span>2020</span>
+                          </div>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section class="ve-t ve-t--geo">
+                      <p class="ve-cap">География</p>
+                      <div class="ve-chips-row">
+                        <span class="ve-chip">Рязань <b>38</b></span>
+                        <span class="ve-chip">Ленинград <b>61</b></span>
+                        <span class="ve-chip">Тверь <b>9</b></span>
+                        <span class="ve-chip">Псков <b>4</b></span>
+                      </div>
+                      <p class="ve-sub">48 человек без места рождения&nbsp;— самый большой пробел в древе.</p>
+                    </section>
+
+                    <section class="ve-t ve-t--line">
+                      <p class="ve-cap">Самая длинная линия</p>
+                      <div class="ve-longline">
+                        <span class="ve-ava ve-ava--m"></span>
+                        <span>
+                          <b>Ковалёвы&nbsp;— ветвь Петра</b>
+                          <p>42 человека · от Григория Ильича (1889) до Веры Ильиничны (2009) · 120 лет</p>
+                        </span>
+                      </div>
+                    </section>
+
+                    <section class="ve-t ve-t--gap">
+                      <p class="ve-cap">Что заполнить</p>
+                      <div class="ve-gaplist">
+                        <span class="ve-gaprow"><i></i>Нет места рождения<b>14</b></span>
+                        <span class="ve-gaprow"><i class="ve-dot--sky"></i>Нет даты события<b>9</b></span>
+                        <span class="ve-gaprow"><i class="ve-dot--violet"></i>Нет фотографии<b>21</b></span>
+                      </div>
+                      <span class="ve-link-lime">открыть список
+                        <svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7h8M7.4 3.4 11 7l-3.6 3.6"/></svg>
+                      </span>
+                    </section>
+
+                    <section class="ve-t ve-t--people">
+                      <p class="ve-cap">Участники</p>
+                      <div class="ve-people">
+                        <span class="ve-prow">
+                          <span class="ve-ava ve-ava--m"></span>
+                          <span><b>Илья Ковалёв</b><span>добавил 42 карточки</span></span>
+                          <span class="ve-role ve-role--own">владелец</span>
+                        </span>
+                        <span class="ve-prow">
+                          <span class="ve-ava ve-ava--f"></span>
+                          <span><b>Ольга Ковалёва</b><span>ведёт ленту и фотографии</span></span>
+                          <span class="ve-role ve-role--ed">редактор</span>
+                        </span>
+                        <span class="ve-prow">
+                          <span class="ve-ava ve-ava--f"></span>
+                          <span><b>Галина Прохорова</b><span>внесла ветвь Прохоровых</span></span>
+                          <span class="ve-role ve-role--ed">редактор</span>
+                        </span>
+                        <span class="ve-prow">
+                          <span class="ve-ava ve-ava--m"></span>
+                          <span><b>Дмитрий Соколов</b><span>смотрит, 2 захода за неделю</span></span>
+                          <span class="ve-role ve-role--view">зритель</span>
+                        </span>
+                      </div>
+                    </section>
+
+                    <section class="ve-t ve-t--store">
+                      <p class="ve-cap">Хранилище</p>
+                      <div class="ve-store">
+                        <div><b>61</b><span>связь</span></div>
+                        <div><b>12</b><span>событий</span></div>
+                        <div><b>4</b><span>документа</span></div>
+                      </div>
+                      <p class="ve-sub">2 приглашения · последнее изменение 2 часа назад.</p>
+                    </section>
+
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+          <figcaption>
+            <b>Обзор</b> <code>torlmood.ru/overview</code>
+            <span>Бенто вместо дашборда: цифры рода, прирост по десятилетиям, география и участники.</span>
+          </figcaption>
+        </figure>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= МОБИЛЬНЫЙ ================= -->
+  <section class="section" id="mobile">
+    <h2><span class="num">02</span>Мобильный</h2>
+    <p>
+      Три телефона: лента, человек и обзор с шитом добавления события. На телефоне лента —
+      это первое, что видно: залипший год, истории родственников и события, а действие
+      живёт в нижнем «острове» под большим пальцем.
+    </p>
+
+    <div class="stage">
+      <div class="stage-row stage-row--center">
+
+        <!-- ---------- Мобильная лента ---------- -->
+        <figure class="shot">
+          <div class="phone">
+            <div class="notch"></div>
+            <div class="phone-screen">
+              <div class="ve-app ve-page">
+
+                <div class="ve-status">
+                  <span>9:41</span>
+                  <span class="ve-status-ic">
+                    <i class="ve-bars"><i></i><i></i><i></i><i></i></i>
+                    <i class="ve-bat"></i>
+                  </span>
+                </div>
+
+                <header class="ve-phead">
+                  <span class="ve-brand"><i>T</i><b>Torlmood</b></span>
+                  <span class="ve-phead-title">Лента рода</span>
+                  <button class="ve-icon-btn" type="button" aria-label="Поиск по роду">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="9" cy="9" r="5.6"/><path d="m13.4 13.4 3.1 3.1"/></svg>
+                  </button>
+                </header>
+
+                <div class="ve-pbody">
+                  <div class="ve-pscroll">
+
+                    <div class="ve-stickyyear">
+                      <span class="ve-bigyear">2011</span>
+                      <span>8 событий · год смерти Аркадия</span>
+                    </div>
+
+                    <div class="ve-pstories">
+                      <div class="ve-pstory">
+                        <span class="ve-ring ve-ring--add" style="width:50px;height:50px"><i>+</i></span>
+                        <b>Своё</b><span>событие</span>
+                      </div>
+                      <div class="ve-pstory">
+                        <span class="ve-ring" style="width:50px;height:50px"><span class="ve-ava ve-ava--m" style="width:45px;height:45px"></span></span>
+                        <b>Илья</b><span>1974</span>
+                      </div>
+                      <div class="ve-pstory">
+                        <span class="ve-ring" style="width:50px;height:50px"><span class="ve-ava ve-ava--f" style="width:45px;height:45px"></span></span>
+                        <b>Ольга</b><span>1978</span>
+                      </div>
+                      <div class="ve-pstory">
+                        <span class="ve-ring" style="width:50px;height:50px"><span class="ve-ava ve-ava--f" style="width:45px;height:45px"></span></span>
+                        <b>Нина</b><span>1950</span>
+                      </div>
+                      <div class="ve-pstory">
+                        <span class="ve-ring ve-ring--seen" style="width:50px;height:50px"><span class="ve-ava ve-ava--m" style="width:45px;height:45px"></span></span>
+                        <b>Тимур</b><span>2005</span>
+                      </div>
+                    </div>
+
+                    <div class="ve-peat" style="padding:0 16px">
+                      <article class="ve-card ve-card--p ve-card--on">
+                        <span class="ve-tile ve-tile--dim" style="width:34px;height:34px"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="6.4"/><path d="M10 3.6v12.8"/></svg></span>
+                        <span class="ve-cbody">
+                          <b>Умер Аркадий Петрович</b>
+                          <p>Ленинград</p>
+                        </span>
+                        <span class="ve-cdate">12 ноя<span>2011</span></span>
+                      </article>
+                      <article class="ve-card ve-card--p">
+                        <span class="ve-tile ve-tile--coral" style="width:34px;height:34px"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="5" width="14" height="11" rx="2.4"/><circle cx="10" cy="10.5" r="2.6"/><path d="M7 5l1.2-1.8h3.6L13 5"/></svg></span>
+                        <span class="ve-cbody">
+                          <b>Ольга добавила 12 фотографий</b>
+                          <p>Ленинград · фотография</p>
+                        </span>
+                        <span class="ve-cdate">3 авг<span>2011</span></span>
+                      </article>
+                      <article class="ve-card ve-card--p">
+                        <span class="ve-tile ve-tile--dim" style="width:34px;height:34px"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 3.4h5.4L15 7v9.6H6z"/><path d="M11.2 3.4V7H15"/></svg></span>
+                        <span class="ve-cbody">
+                          <b>Найдена выписка из домовой книги</b>
+                          <p>Ленинград · документ</p>
+                        </span>
+                        <span class="ve-cdate">17 июн<span>2011</span></span>
+                      </article>
+                    </div>
+
+                    <div class="ve-pgroup" style="margin:12px 16px 9px">
+                      <span class="ve-bigyear">2009</span>
+                      <span>4 события · год рождения Веры</span>
+                    </div>
+                    <div class="ve-peat" style="padding:0 16px">
+                      <article class="ve-card ve-card--p">
+                        <span class="ve-tile ve-tile--lime" style="width:34px;height:34px"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v8"/><path d="M6.6 7.4h6.8"/><path d="M4.6 12.4a5.4 5.4 0 0 0 10.8 0"/></svg></span>
+                        <span class="ve-cbody">
+                          <b>Родилась Вера Ильинична</b>
+                          <p>Санкт-Петербург · рождение</p>
+                        </span>
+                        <span class="ve-cdate">19 мая<span>2009</span></span>
+                      </article>
+                      <article class="ve-card ve-card--p">
+                        <span class="ve-tile ve-tile--sky" style="width:34px;height:34px"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15.6V8.4a5 5 0 0 1 10 0v7.2"/><path d="M3.4 15.6h13.2"/></svg></span>
+                        <span class="ve-cbody">
+                          <b>Илья принял присягу</b>
+                          <p>Санкт-Петербург · служба</p>
+                        </span>
+                        <span class="ve-cdate">9 мая<span>2009</span></span>
+                      </article>
+                    </div>
+
+                  </div>
+
+                  <!-- Нижний «остров» -->
+                  <div class="ve-island">
+                    <nav class="ve-pill" aria-label="Разделы">
+                      <span class="ve-pnav ve-pnav--on">
+                        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.6 6.4h12.8M3.6 10h12.8M3.6 13.6h8.4"/></svg>
+                        <i>Лента</i>
+                      </span>
+                      <span class="ve-pnav">
+                        <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="4.8" r="2.2"/><circle cx="4.8" cy="15" r="2.2"/><circle cx="15.2" cy="15" r="2.2"/><path d="M9 6.6 5.8 12.9M11 6.6l3.2 6.3M7 15h6"/></svg>
+                        <i>Древо</i>
+                      </span>
+                      <span class="ve-pnav">
+                        <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="7" r="3"/><path d="M4.4 16.4a5.6 5.6 0 0 1 11.2 0"/></svg>
+                        <i>Люди</i>
+                      </span>
+                      <span class="ve-pnav">
+                        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 15.4V9.6a6 6 0 0 1 12 0v5.8"/><path d="M2.6 15.4h14.8"/></svg>
+                        <i>Обзор</i>
+                      </span>
+                    </nav>
+                    <button class="ve-fab" type="button" aria-label="Добавить событие">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+          <figcaption>
+            <b>Лента</b> <code>torlmood.ru/stream</code>
+            <span>Залипший год, истории родственников и нижний «остров»: пилюля навигации и кнопка «+».</span>
+          </figcaption>
+        </figure>
+
+        <!-- ---------- Мобильный человек ---------- -->
+        <figure class="shot">
+          <div class="phone">
+            <div class="notch"></div>
+            <div class="phone-screen">
+              <div class="ve-app ve-page">
+
+                <div class="ve-status">
+                  <span>9:41</span>
+                  <span class="ve-status-ic">
+                    <i class="ve-bars"><i></i><i></i><i></i><i></i></i>
+                    <i class="ve-bat"></i>
+                  </span>
+                </div>
+
+                <header class="ve-phead">
+                  <button class="ve-icon-btn" type="button" aria-label="Назад к ленте">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12.4 4.6 7 10l5.4 5.4"/></svg>
+                  </button>
+                  <span class="ve-phead-title">Аркадий Петрович</span>
+                  <button class="ve-icon-btn" type="button" aria-label="Ещё действия">
+                    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><circle cx="5" cy="10" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="15" cy="10" r="1.5"/></svg>
+                  </button>
+                </header>
+
+                <div class="ve-pbody">
+                  <div class="ve-pscroll">
+
+                    <div class="ve-phero">
+                      <div class="ve-pava">
+                        <span class="ve-ring" style="width:58px;height:58px"><span class="ve-ava ve-ava--m" style="width:53px;height:53px"></span></span>
+                        <span>
+                          <span class="ve-chip-lime">III · 5 поколение</span>
+                          <p class="ve-hero-meta" style="margin-top:8px">
+                            <span>1947–2011</span><span class="ve-sep">·</span><span>63 года</span>
+                          </p>
+                        </span>
+                      </div>
+                      <h1>Аркадий Петрович Ковалёв</h1>
+                      <p class="ve-phero-meta">
+                        <span>Ленинград</span><span class="ve-sep">·</span><span>8 событий</span>
+                        <span class="ve-sep">·</span><span>4 файла</span>
+                      </p>
+                    </div>
+
+                    <div class="ve-pstories" style="padding-bottom:18px">
+                      <div class="ve-pstory">
+                        <span class="ve-ring" style="width:46px;height:46px"><span class="ve-ava ve-ava--m" style="width:41px;height:41px"></span></span>
+                        <b>Пётр</b><span>отец</span>
+                      </div>
+                      <div class="ve-pstory">
+                        <span class="ve-ring" style="width:46px;height:46px"><span class="ve-ava ve-ava--f" style="width:41px;height:41px"></span></span>
+                        <b>Мария</b><span>мать</span>
+                      </div>
+                      <div class="ve-pstory">
+                        <span class="ve-ring" style="width:46px;height:46px"><span class="ve-ava ve-ava--f" style="width:41px;height:41px"></span></span>
+                        <b>Нина</b><span>супруга</span>
+                      </div>
+                      <div class="ve-pstory">
+                        <span class="ve-ring ve-ring--seen" style="width:46px;height:46px"><span class="ve-ava ve-ava--m" style="width:41px;height:41px"></span></span>
+                        <b>Илья</b><span>сын</span>
+                      </div>
+                      <div class="ve-pstory">
+                        <span class="ve-ring ve-ring--seen" style="width:46px;height:46px"><span class="ve-ava ve-ava--f" style="width:41px;height:41px"></span></span>
+                        <b>Ольга</b><span>дочь</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="ve-chipbar">
+                    <span class="ve-cap" style="margin-right:4px">Годы</span>
+                    <span class="ve-on">Все годы</span>
+                    <span>1940-е</span>
+                    <span>1960-е</span>
+                    <span>1970-е</span>
+                    <span>2010-е</span>
+                  </div>
+
+                  <div class="ve-pscroll" style="padding-top:6px">
+                    <ul class="ve-tl">
+                      <li>
+                        <span class="ve-tyear">1947</span><span class="ve-tdot ve-tdot--lime"></span>
+                        <span class="ve-tbody">
+                          <b>Рождение</b>
+                          <p>Ленинград</p>
+                        </span>
+                      </li>
+                      <li>
+                        <span class="ve-tyear">1965</span><span class="ve-tdot ve-tdot--sky"></span>
+                        <span class="ve-tbody">
+                          <b>Школа № 189</b>
+                          <p>Ленинград · <span class="ve-mono">фотография · 1963</span></p>
+                        </span>
+                      </li>
+                      <li>
+                        <span class="ve-tyear">1971</span><span class="ve-tdot ve-tdot--coral"></span>
+                        <span class="ve-tbody">
+                          <b>Брак с Ниной Борисовной</b>
+                          <p>Ленинград</p>
+                        </span>
+                      </li>
+                      <li>
+                        <span class="ve-tyear">1974</span><span class="ve-tdot ve-tdot--lime"></span>
+                        <span class="ve-tbody">
+                          <b>Родился сын Илья</b>
+                          <p>Ленинград</p>
+                        </span>
+                      </li>
+                      <li>
+                        <span class="ve-tyear">1978</span><span class="ve-tdot ve-tdot--lime"></span>
+                        <span class="ve-tbody">
+                          <b>Родилась дочь Ольга</b>
+                          <p>Ленинград</p>
+                        </span>
+                      </li>
+                      <li>
+                        <span class="ve-tyear">2011</span><span class="ve-tdot"></span>
+                        <span class="ve-tbody">
+                          <b>Смерть</b>
+                          <p>Ленинград · 12 ноября 2011</p>
+                        </span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+          <figcaption>
+            <b>Человек</b> <code>torlmood.ru/person/arkady</code>
+            <span>Крупное имя, кольца родственников, залипшая полоса десятилетий и таймлайн жизни.</span>
+          </figcaption>
+        </figure>
+
+        <!-- ---------- Мобильный обзор и шит ---------- -->
+        <figure class="shot">
+          <div class="phone">
+            <div class="notch"></div>
+            <div class="phone-screen">
+              <div class="ve-app ve-page">
+
+                <div class="ve-status">
+                  <span>9:41</span>
+                  <span class="ve-status-ic">
+                    <i class="ve-bars"><i></i><i></i><i></i><i></i></i>
+                    <i class="ve-bat"></i>
+                  </span>
+                </div>
+
+                <header class="ve-phead">
+                  <span class="ve-brand"><i>T</i><b>Torlmood</b></span>
+                  <span class="ve-phead-title">Обзор рода</span>
+                  <button class="ve-icon-btn" type="button" aria-label="Ещё действия">
+                    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><circle cx="5" cy="10" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="15" cy="10" r="1.5"/></svg>
+                  </button>
+                </header>
+
+                <div class="ve-pbody">
+                  <div class="ve-pscroll ve-pscroll--bento">
+                    <div class="ve-pbento">
+                      <section class="ve-pt">
+                        <p class="ve-cap">Род в цифрах</p>
+                        <div class="ve-bignum">148 <em>человек · 5 поколений</em></div>
+                        <div class="ve-chart" style="height:56px">
+                          <i style="height:6%"></i><i style="height:9%"></i><i style="height:16%"></i>
+                          <i style="height:36%"></i><i style="height:58%"></i><i style="height:72%"></i>
+                          <i style="height:82%"></i><i style="height:92%"></i><i class="ve-cbar--now" style="height:100%"></i>
+                        </div>
+                        <div class="ve-chart-x">
+                          <span>1880</span><span>1920</span><span>1940</span><span>1960</span>
+                          <span>1980</span><span>1990</span><span>2000</span><span>2010</span><span>2020</span>
+                        </div>
+                      </section>
+                      <section class="ve-pt">
+                        <p class="ve-cap">География</p>
+                        <div class="ve-chips-row">
+                          <span class="ve-chip">Рязань <b>38</b></span>
+                          <span class="ve-chip">Ленинград <b>61</b></span>
+                          <span class="ve-chip">Тверь <b>9</b></span>
+                          <span class="ve-chip">Псков <b>4</b></span>
+                        </div>
+                      </section>
+                      <section class="ve-pt">
+                        <p class="ve-cap">Что заполнить</p>
+                        <div class="ve-gaplist">
+                          <span class="ve-gaprow"><i></i>Нет места рождения<b>14</b></span>
+                          <span class="ve-gaprow"><i class="ve-dot--sky"></i>Нет даты события<b>9</b></span>
+                        </div>
+                      </section>
+                    </div>
+                  </div>
+
+                  <!-- Шит «Добавить событие» -->
+                  <div class="ve-psheet">
+                    <div class="ve-handle"></div>
+                    <h2>Добавить событие</h2>
+                    <div class="ve-cats">
+                      <div class="ve-cat-i ve-cat-i--on">
+                        <span class="ve-tile ve-tile--lime"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v8"/><path d="M6.6 7.4h6.8"/><path d="M4.6 12.4a5.4 5.4 0 0 0 10.8 0"/></svg></span>
+                        <i>рожд.</i>
+                      </div>
+                      <div class="ve-cat-i">
+                        <span class="ve-tile ve-tile--coral"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M9.2 11.4a3.4 3.4 0 0 1 4.4-4.4l1.8-1.8a3.4 3.4 0 0 1-4.8-4.8"/><path d="M10.8 8.6a3.4 3.4 0 0 1-4.4 4.4l-1.8 1.8a3.4 3.4 0 0 1 4.8 4.8"/></svg></span>
+                        <i>брак</i>
+                      </div>
+                      <div class="ve-cat-i">
+                        <span class="ve-tile ve-tile--dim"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16V8.6l6-4.6 6 4.6V16z"/><path d="M8.4 16v-4.6h3.2V16"/></svg></span>
+                        <i>переезд</i>
+                      </div>
+                      <div class="ve-cat-i">
+                        <span class="ve-tile ve-tile--violet"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3.4l2 4.4 4.6.5-3.4 3.2.9 4.6L10 13.8l-4.1 2.3.9-4.6L3.4 8.3l4.6-.5z"/></svg></span>
+                        <i>служба</i>
+                      </div>
+                      <div class="ve-cat-i">
+                        <span class="ve-tile ve-tile--coral"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="5" width="14" height="11" rx="2.4"/><circle cx="10" cy="10.5" r="2.6"/><path d="M7 5l1.2-1.8h3.6L13 5"/></svg></span>
+                        <i>фото</i>
+                      </div>
+                      <div class="ve-cat-i">
+                        <span class="ve-tile ve-tile--dim"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 3.4h5.4L15 7v9.6H6z"/><path d="M11.2 3.4V7H15"/></svg></span>
+                        <i>докум.</i>
+                      </div>
+                      <div class="ve-cat-i">
+                        <span class="ve-tile ve-tile--violet"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.6 5.2h10.8v9.6H4.6z"/><path d="M7.4 8h5.2M7.4 10.4h5.2M7.4 12.8h3"/></svg></span>
+                        <i>память</i>
+                      </div>
+                    </div>
+                    <div class="ve-input">
+                      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11.4 2.6 13.4 4.6 6 12H4v-2z"/></svg>
+                      Название · «Родилась Вера Ильинична»
+                    </div>
+                    <div class="ve-pactions">
+                      <button class="ve-btn-lime" type="button">
+                        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg>
+                        В ленту
+                      </button>
+                      <button class="ve-btn-ghost" type="button" aria-label="Выбрать дату события" style="padding:0 12px">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="2.4" y="3.6" width="11.2" height="10" rx="2"/><path d="M2.4 6.6h11.2M5.6 2.4v2.4M10.4 2.4v2.4"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+          <figcaption>
+            <b>Обзор и добавление</b> <code>torlmood.ru/overview</code>
+            <span>Бенто в одну колонку, внизу&nbsp;— шит добавления события с выбором категории в ряд.</span>
+          </figcaption>
+        </figure>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= ЗАМЕТКИ ================= -->
+  <section class="section" id="notes">
+    <h2><span class="num">03</span>Заметки</h2>
+    <p>Что «Хроника» даёт семье, во что ложится в коде и где можно промахнуться.</p>
+
+    <div class="notes">
+      <article class="note-card">
+        <h3>Что это даёт семье</h3>
+        <p>
+          Род перестаёт быть схемой и читается как история: открыл сервис&nbsp;— сверху видно,
+          что случилось в семье за последние дни, ниже&nbsp;— год за годом, до 1880-х.
+          Событие добавляется в три касания с телефона: кнопка «+» в нижнем «острове»,
+          категория в ряд, название. И сразу видно, что ещё не заполнено&nbsp;— «14 из 23 карточек
+          без места рождения», «заполнить →».
+        </p>
+        <ul>
+          <li>Бабушке и дедушке понятен год: он крупнее всего на экране, ничего не надо масштабировать.</li>
+          <li>Полоса «историй» отвечает на «что нового у родни» без уведомлений и чатов.</li>
+          <li>«Сейчас в роду» держит ближайшую дату: 2 октября&nbsp;— Нине Борисовне 75 лет.</li>
+        </ul>
+      </article>
+
+      <article class="note-card">
+        <h3>Как ложится на код</h3>
+        <ul>
+          <li>Нужна новая таблица событий рода: в проекте уже есть <code>tree_events</code> и <code>person_changes</code>, но здесь нужен уровень «событие рода» с датой, местом, категорией и участниками&nbsp;— иначе лента не соберётся из карточек людей.</li>
+          <li>Новая страница <code style="overflow-wrap:anywhere">src/app/(app)/tree/[treeId]/stream/page.tsx</code>&nbsp;— лента становится главным экраном древа, а не холст.</li>
+          <li>Компоненты <code style="overflow-wrap:anywhere">src/components/stream/*</code>: <code>StreamFeed</code>, <code>YearGroup</code>, <code>EventCard</code>, <code>DecadeRail</code>, <code>StoryStrip</code>, <code>AddEventSheet</code>.</li>
+          <li>Слой данных <code>src/lib/stream.ts</code>&nbsp;— группировка по годам и десятилетиям, счётчики плотности, «пробелы в данных».</li>
+          <li>Токены направления (лайм, коралл, фиолетовый, небесный, тёмные поверхности)&nbsp;— в <code>src/app/globals.css</code>; шрифты Unbounded, Manrope, IBM Plex Mono подключаются там же.</li>
+          <li>Realtime&nbsp;— на таблицу событий: новое событие появляется в ленте без перезагрузки, как история в соцсети.</li>
+          <li><code style="overflow-wrap:anywhere">src/components/tree/TreeCanvas.tsx</code> остаётся вкладкой «Древо» и не переписывается&nbsp;— это главное преимущество направления.</li>
+        </ul>
+      </article>
+
+      <article class="note-card note-card--warn">
+        <h3>Риски и цена</h3>
+        <ul>
+          <li>У большинства семей есть только имена и годы: лента быстро вырождается в длинный список однотипных строк и требует дисциплины заполнения&nbsp;— без неё она пустая и скучная.</li>
+          <li>Продукт меняет суть: древо уходит на второй план, а это главная ценность сервиса. Часть семьи пришла именно за холстом и может его не найти.</li>
+          <li>Плотность событий у старших поколений низкая: до 1930-х в ленте почти пусто, и это выглядит как пробел продукта, а не архива.</li>
+          <li>Фото и документы придётся показывать в ленте аккуратно: превью в каждой карточке превращают её в тяжёлую галерею и замедляют телефон.</li>
+          <li>Тёмная тема на солнце: у ленты нет светлого варианта, а читать её будут в том числе на даче и на кладбище.</li>
+          <li>Категории кодируются цветом&nbsp;— цвет обязан дублироваться подписью, иначе смысл теряется для 8% мужчин с дальтонизмом.</li>
+        </ul>
+      </article>
+
+      <article class="note-card">
+        <h3>Палитра</h3>
+        <p>Своя, тёмная и насыщенная: фон и две поверхности, лайм как единственный акцент действия, три цвета категорий. Из <code>src/app/globals.css</code> не берётся ничего.</p>
+        <div class="swatches">
+          <div class="swatch"><i style="background:#08080b"></i><b>Фон</b><span>#08080b · лента</span></div>
+          <div class="swatch"><i style="background:#101014"></i><b>Поверхность</b><span>#101014 · карточки</span></div>
+          <div class="swatch"><i style="background:#d8ff3e"></i><b>Лайм</b><span>#d8ff3e · действие и год</span></div>
+          <div class="swatch"><i style="background:#ff6b4a"></i><b>Коралл</b><span>#ff6b4a · кольца и брак</span></div>
+          <div class="swatch"><i style="background:#8b5cf6"></i><b>Фиолетовый</b><span>#8b5cf6 · служба</span></div>
+          <div class="swatch"><i style="background:#4cc9f0"></i><b>Небесный</b><span>#4cc9f0 · школа, приглашения</span></div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <p class="footer">
+    Вариант E из пяти: <a href="index.html">к списку вариантов</a> ·
+    <a href="a-quiet-archive.html">A · Тихий архив</a> ·
+    <a href="b-canvas-studio.html">B · Холст-студия</a> ·
+    <a href="c-family-atlas.html">C · Атлас рода</a> ·
+    <a href="d-card-catalog.html">D · Картотека</a>
+  </p>
+</div>
+
+<script>
+/* Единственный скрипт варианта: выбор категории события в шите на телефоне.
+   Никаких библиотек&nbsp;— только переключение класса ve-cat-i--on. */
+(function () {
+  var cats = document.querySelectorAll('.ve-cats');
+  cats.forEach(function (row) {
+    var items = row.querySelectorAll('.ve-cat-i');
+    items.forEach(function (item) {
+      item.addEventListener('click', function () {
+        items.forEach(function (i) { i.classList.remove('ve-cat-i--on'); });
+        item.classList.add('ve-cat-i--on');
+      });
+    });
+  });
+})();
+</script>
+
+</body>
+</html>

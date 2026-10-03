@@ -3,16 +3,15 @@
 import { useState } from "react";
 import { useFormStatus } from "react-dom";
 import { createTree } from "@/app/actions/trees";
-import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { Sheet } from "@/components/ui/sheet";
 
 function Submit() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending} className="w-full">
+    <button type="submit" disabled={pending} className="btn-accent h-11 w-full">
       {pending ? "Создаём…" : "Создать древо"}
-    </Button>
+    </button>
   );
 }
 
@@ -21,10 +20,15 @@ export function NewTreeForm() {
 
   return (
     <>
-      <Button onClick={() => setOpen(true)}>Новое древо</Button>
+      <button type="button" onClick={() => setOpen(true)} className="btn-accent h-10 px-4">
+        <span aria-hidden="true" className="text-[16px] leading-none">
+          ＋
+        </span>
+        Новое древо
+      </button>
 
       <Sheet open={open} onClose={() => setOpen(false)} title="Новое древо">
-        <form action={createTree} className="space-y-4">
+        <form action={createTree} className="space-y-5">
           <Field label="Название" hint="Например, «Ковалёвы и Лебедевы»">
             <Input name="title" required autoFocus placeholder="Наше древо" />
           </Field>
@@ -33,9 +37,9 @@ export function NewTreeForm() {
             <Textarea name="description" placeholder="Потомки Петра Ковалёва из Вологды" />
           </Field>
 
-          <p className="text-sm leading-relaxed text-ink-500">
-            Вы станете владельцем древа. Первая карточка создастся на ваше имя — её можно
-            будет дополнить.
+          <p className="rounded-xl border border-[var(--p-line)] bg-[var(--p-row-bg)] px-3.5 py-3 text-[13px] leading-relaxed text-ink-500">
+            Вы станете владельцем древа. Первая карточка создастся на ваше имя — её
+            можно будет дополнить.
           </p>
 
           <Submit />

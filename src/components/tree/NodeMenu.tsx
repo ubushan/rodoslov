@@ -55,7 +55,7 @@ export function NodeMenu({
       ref={ref}
       role="menu"
       style={{ left, top: y, width, transform: above ? "translateY(-100%)" : undefined }}
-      className="fixed z-[1000] rounded-xl border border-mist-200 bg-surface p-1 shadow-plate"
+      className="glass fixed z-[1000] p-1"
     >
       {children}
     </div>,
@@ -89,12 +89,12 @@ export function MenuItem({
         if (disabled) return;
         onClick?.();
       }}
-      className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-[13px] ${
+      className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-[13px] transition-colors ${
         disabled
           ? "cursor-default text-ink-300"
           : muted
-            ? "text-ink-400 hover:bg-mist-100"
-            : "text-ink-700 hover:bg-mist-100"
+            ? "text-ink-400 hover:bg-[var(--p-hover-bg)]"
+            : "text-ink-700 hover:bg-[var(--p-hover-bg)]"
       }`}
     >
       {label}

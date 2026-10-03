@@ -3,10 +3,10 @@ import type { Person, Relationship } from "./types";
 /**
  * Где встанет новая карточка. Раскладка берёт реальные размеры из DOM, но новая
  * карточка ставится ещё до отрисовки — поэтому здесь константы, совпадающие
- * с классами w-[236px] и min-h-[104px] в PersonNode.
+ * с классами w-[176px] и h-[100px] в PersonNode (размер карточки прототипа).
  */
-export const CARD_W = 236;
-export const CARD_H = 104;
+export const CARD_W = 176;
+export const CARD_H = 100;
 
 const SIDE_GAP = 46; // зазор между карточками в одном ряду — как NODE_GAP в раскладке
 const ROW_GAP = 128; // зазор между поколениями

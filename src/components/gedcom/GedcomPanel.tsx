@@ -9,6 +9,7 @@ import { exportTree, importGedcom } from "@/app/actions/gedcom";
 /**
  * Обмен древами в формате GEDCOM: скачать файл или загрузить уже готовый.
  * Экспорт доступен всем участникам, импорт — владельцу и редакторам.
+ * Поверхность (.panel) и заголовок раздела даёт страница настроек.
  */
 export function GedcomPanel({ treeId, canEdit }: { treeId: string; canEdit: boolean }) {
   const router = useRouter();
@@ -55,44 +56,59 @@ export function GedcomPanel({ treeId, canEdit }: { treeId: string; canEdit: bool
     });
   }
 
-  return (
-    <div className="mt-4 grid gap-4 rounded-2xl border border-mist-200 bg-surface p-5">
-      <p className="max-w-[62ch] text-sm leading-relaxed text-ink-500">
-        GEDCOM — общий формат для обмена генеалогией: его понимают и другие программы.
-        Скачанный файл можно открыть в них, а готовый — загрузить сюда.
-      </p>
+  const disabled = busy !== null || pending;
 
-      <div className="flex flex-wrap items-center gap-2">
-        <Button variant="secondary" size="sm" disabled={busy !== null || pending} onClick={runExport}>
+  return (
+    <div className="grid gap-5 sm:grid-cols-2 sm:gap-6">
+      {/* Скачать */}
+      <section className="flex min-w-0 flex-col">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-[15px] text-ink-800">Скачать древо</h3>
+          <span className="studio-chip">экспорт</span>
+        </div>
+        <p className="mt-2 text-[13px] leading-relaxed text-ink-500">
+          Файл можно открыть в другой генеалогической программе или сохранить как резервную
+          копию.
+        </p>
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={disabled}
+          onClick={runExport}
+          className="mt-4 w-full sm:mt-auto sm:w-auto sm:self-start"
+        >
           {busy === "export" ? "Собираем…" : "Скачать GEDCOM"}
         </Button>
+      </section>
 
-        {canEdit && (
-          <>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".ged,text/plain"
-              className="hidden"
-              onChange={onFile}
-            />
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={busy !== null || pending}
-              onClick={() => fileRef.current?.click()}
-            >
-              {busy === "import" ? "Импортируем…" : "Импорт из GEDCOM"}
-            </Button>
-          </>
-        )}
-      </div>
-
+      {/* Загрузить */}
       {canEdit && (
-        <p className="text-[12px] leading-relaxed text-ink-400">
-          При импорте новые карточки добавляются к существующим, связи переносятся как есть.
-          Если файл очень большой, это может занять несколько секунд.
-        </p>
+        <section className="flex min-w-0 flex-col border-t border-[var(--p-line)] pt-5 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-[15px] text-ink-800">Загрузить из GEDCOM</h3>
+            <span className="studio-chip">импорт</span>
+          </div>
+          <p className="mt-2 text-[13px] leading-relaxed text-ink-500">
+            Новые карточки добавятся к существующим, связи переносятся как есть. Большой файл
+            может занять несколько секунд.
+          </p>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".ged,text/plain"
+            className="hidden"
+            onChange={onFile}
+          />
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={disabled}
+            onClick={() => fileRef.current?.click()}
+            className="mt-4 w-full sm:mt-auto sm:w-auto sm:self-start"
+          >
+            {busy === "import" ? "Импортируем…" : "Импорт из GEDCOM"}
+          </Button>
+        </section>
       )}
     </div>
   );

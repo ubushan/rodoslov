@@ -2,7 +2,10 @@
 
 import { useEffect } from "react";
 
-/** Боковая панель редактирования. На узких экранах занимает весь экран. */
+/**
+ * Панель редактирования: на десктопе — боковая, на телефоне — нижний лист
+ * с ручкой (как в остальных оверлеях студии).
+ */
 export function Sheet({
   open,
   onClose,
@@ -25,31 +28,36 @@ export function Sheet({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-stretch sm:justify-end">
       <button
         aria-label="Закрыть панель"
         onClick={onClose}
-        className="absolute inset-0 bg-ink-900/35 backdrop-blur-[2px]"
+        className="absolute inset-0 bg-scrim backdrop-blur-[2px]"
       />
       <aside
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="relative flex h-full w-full max-w-[420px] flex-col bg-surface shadow-plate sm:border-l sm:border-mist-200"
+        className="relative flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-[22px] border border-b-0 border-[var(--p-line)] bg-surface shadow-plate sm:h-full sm:max-h-none sm:max-w-[420px] sm:rounded-none sm:border-y-0 sm:border-r-0 sm:border-l"
       >
-        <header className="flex items-center justify-between border-b border-mist-200 px-5 py-4">
-          <h2 className="text-lg text-ink-800">{title}</h2>
-          <button
-            onClick={onClose}
-            className="grid h-8 w-8 place-items-center rounded-lg text-ink-400 hover:bg-mist-100 hover:text-ink-700"
-            aria-label="Закрыть"
-          >
+        <span aria-hidden="true" className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-mist-300 sm:hidden" />
+
+        <header className="flex items-center justify-between gap-3 px-5 pb-3 pt-3 sm:border-b sm:border-[var(--p-line)] sm:py-4">
+          <h2 className="font-display text-lg text-ink-800">{title}</h2>
+          <button onClick={onClose} className="icon-btn" aria-label="Закрыть">
             ✕
           </button>
         </header>
-        <div className="flex-1 overflow-y-auto px-5 py-5">{children}</div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">{children}</div>
+
         {footer && (
-          <footer className="border-t border-mist-200 bg-mist-50 px-5 py-4">{footer}</footer>
+          <footer
+            className="border-t border-[var(--p-line)] bg-mist-50 px-5 py-4"
+            style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
+          >
+            {footer}
+          </footer>
         )}
       </aside>
     </div>

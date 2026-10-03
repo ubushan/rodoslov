@@ -1,0 +1,2226 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Torlmood — вариант C: Атлас рода</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Literata:wght@400;500;600&family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="base.css">
+<style>
+/* =====================================================================
+   ВАРИАНТ C · «АТЛАС РОДА» — префикс vc-
+   Древо как карта: полосы поколений, путь от корня, навигатор-ветви.
+   Все селекторы — только с префиксом vc- (или служебные внутри .vc-*),
+   общие классы base.css (.frame/.screen/.phone/.shot/.notes/.chip/…)
+   здесь не переопределяются.
+   ===================================================================== */
+
+/* ---------- 01. Токены и ключевые размеры ---------- */
+
+.vc-doc,
+.vc-root {
+  --vc-canvas: #eaedf3;
+  --vc-band-1: rgba(255, 255, 255, .78);
+  --vc-band-2: rgba(222, 234, 243, .78);
+  --vc-band-3: rgba(201, 217, 232, .74);
+  --vc-band-4: rgba(226, 216, 200, .68);
+  --vc-band-5: rgba(238, 236, 228, .76);
+  --vc-line: #8e9cae;
+  --vc-line-soft: #b4bfcd;
+  --vc-ring: #c9a227;
+  --vc-paper: #fff;
+  --vc-rail-w: 216px;
+  --vc-path-w: 300px;
+  --vc-band-h: 126px;
+}
+
+/* ---------- 02. Общие мелкие детали интерфейса варианта ---------- */
+
+.vc-root {
+  position: absolute; inset: 0; /* .screen уже задаёт 1280×820 и overflow: hidden */
+  display: flex; flex-direction: column;
+  background: var(--mist-50);
+  color: var(--ink-800);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.vc-root *, .vc-root *::before, .vc-root *::after { box-sizing: border-box; }
+.vc-root p, .vc-root h1, .vc-root h2, .vc-root h3, .vc-root h4,
+.vc-root ul, .vc-root ol, .vc-root dl, .vc-root dd, .vc-root figure { margin: 0; }
+.vc-root ul, .vc-root ol { padding: 0; list-style: none; }
+.vc-root button {
+  font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer;
+}
+.vc-num { font-variant-numeric: tabular-nums; }
+.vc-maiden { color: var(--ink-400); font-weight: 400; }
+
+/* ---------- 03. Кнопки ---------- */
+
+.vc-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  height: 34px; padding: 0 13px;
+  border: 1px solid var(--mist-300); border-radius: 9px;
+  background: #fff; color: var(--ink-700);
+  font-size: 12.5px; font-weight: 500; white-space: nowrap;
+  transition: border-color .15s ease, background .15s ease;
+}
+.vc-btn:hover { border-color: var(--ink-300); }
+.vc-btn svg { flex: none; }
+.vc-btn--brass {
+  background: var(--vc-ring); border-color: var(--vc-ring); color: var(--ink-900);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .35) inset;
+}
+.vc-btn--brass:hover { background: var(--brass-400); border-color: var(--brass-400); }
+.vc-btn--sm { height: 28px; padding: 0 10px; font-size: 11.5px; border-radius: 8px; }
+.vc-btn--block { width: 100%; }
+
+/* ---------- 04. Аватары-силуэты (только CSS, без растров) ---------- */
+
+.vc-mini {
+  position: relative; flex: none;
+  width: 42px; height: 42px; border-radius: 11px; overflow: hidden;
+  background: linear-gradient(160deg, #dfe6ef, #c3cedd);
+}
+.vc-mini i, .vc-mini b { position: absolute; display: block; }
+.vc-mini i { /* голова */
+  left: 50%; transform: translateX(-50%); top: 8px;
+  width: 13px; height: 13px; border-radius: 50%; background: #ffffff;
+}
+.vc-mini b { /* плечи */
+  left: 50%; transform: translateX(-50%); bottom: 0;
+  width: 28px; height: 16px;
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+  background: #ffffff;
+}
+.vc-mini--m { background: linear-gradient(160deg, #a9c6df, #7fa6c9); }
+.vc-mini--f { background: linear-gradient(160deg, #e0a469, #d1873f); }
+.vc-mini--dim i, .vc-mini--dim b { background: #f4f6f9; }
+
+.vc-ring {
+  display: grid; place-items: center; flex: none;
+  border-radius: 50%; background: #fff;
+  box-shadow: 0 0 0 2px var(--vc-ring), 0 0 0 6px rgba(201, 162, 39, .16);
+}
+.vc-ring--sm { width: 84px; height: 84px; }
+.vc-ring--md { width: 108px; height: 108px; }
+
+/* ---------- 05. Верхняя полоса приложения и крошки-путь ---------- */
+
+.vc-appbar {
+  flex: none; height: 56px;
+  display: flex; align-items: center; gap: 18px;
+  padding: 0 16px;
+  background-image:
+    radial-gradient(120% 90% at 4% -20%, rgba(201, 162, 39, .2), transparent 55%),
+    linear-gradient(180deg, var(--ink-700), var(--ink-900));
+  color: var(--mist-50);
+}
+.vc-brand { display: flex; align-items: center; gap: 9px; }
+.vc-brand i {
+  display: grid; place-items: center; width: 26px; height: 26px;
+  border-radius: 8px; font-style: normal; font-size: 13px; color: var(--brass-400);
+  border: 1px solid rgba(201, 162, 39, .55);
+  background: radial-gradient(120% 120% at 20% 0, rgba(201, 162, 39, .3), transparent 60%);
+}
+.vc-brand b { font-family: var(--serif); font-weight: 500; font-size: 15.5px; }
+.vc-appbar-meta { flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.vc-people {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 999px;
+  border: 1px solid rgba(201, 162, 39, .45);
+  background: rgba(201, 162, 39, .12);
+  color: var(--brass-400); font-size: 12px; white-space: nowrap;
+}
+.vc-who { display: inline-flex; align-items: center; gap: 6px; color: #c8d2e2; font-size: 12.5px; }
+.vc-role {
+  padding: 3px 8px; border-radius: 7px; font-size: 11px; font-weight: 500;
+  background: rgba(201, 162, 39, .18); color: var(--brass-400);
+  border: 1px solid rgba(201, 162, 39, .4);
+}
+.vc-rowact { display: flex; align-items: center; gap: 8px; }
+.vc-btn--onDark { background: rgba(255, 255, 255, .07); border-color: rgba(200, 210, 226, .32); color: var(--mist-50); }
+.vc-btn--onDark:hover { background: rgba(255, 255, 255, .14); border-color: rgba(200, 210, 226, .5); }
+.vc-iconbtn {
+  display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px;
+  border: 1px solid rgba(200, 210, 226, .28); color: #c8d2e2;
+}
+.vc-iconbtn:hover { color: #fff; border-color: rgba(200, 210, 226, .5); }
+
+.vc-crumbbar {
+  flex: none; height: 44px;
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  padding: 0 16px;
+  background: #fff; border-bottom: 1px solid var(--mist-200);
+}
+.vc-crumbs { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--ink-400); min-width: 0; }
+.vc-crumbs a { color: var(--ink-500); text-decoration: none; }
+.vc-crumbs a:hover { color: var(--ink-800); }
+.vc-crumb--now { color: var(--ink-800); font-weight: 500; }
+.vc-crumbs .vc-sep { color: var(--mist-300); }
+.vc-crumb-meta { display: flex; align-items: center; gap: 14px; color: var(--ink-400); font-size: 12px; white-space: nowrap; }
+.vc-crumb-meta b { color: var(--ink-500); font-weight: 500; }
+.vc-linkbrass { color: var(--brass-600); text-decoration: none; font-size: 12.5px; }
+.vc-linkbrass:hover { text-decoration: underline; }
+
+/* ---------- 06. Рабочая область: левая рейка · холст · панель пути ---------- */
+
+.vc-body { flex: 1; min-height: 0; display: flex; gap: 10px; padding: 10px 10px 10px 12px; background: var(--mist-100); }
+.vc-rail, .vc-side {
+  flex: none; align-self: stretch;
+  display: flex; flex-direction: column; gap: 8px;
+  min-height: 0;
+}
+.vc-rail { width: var(--vc-rail-w); }
+.vc-side { width: var(--vc-path-w); }
+.vc-rail > .vc-card-body { padding: 10px 12px; }
+
+.vc-card {
+  display: flex; flex-direction: column; min-height: 0;
+  border: 1px solid var(--mist-200); border-radius: 13px;
+  background: var(--vc-paper); overflow: hidden;
+}
+.vc-card--grow { flex: 1; }
+.vc-card-h {
+  flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 10px 12px; border-bottom: 1px solid var(--mist-100);
+}
+.vc-card-h b { font-family: var(--serif); font-weight: 500; font-size: 13.5px; }
+.vc-card-h span { font-size: 11.5px; color: var(--ink-400); }
+.vc-card-h em { font-style: normal; font-size: 11px; color: var(--ink-400); }
+.vc-card-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 8px; }
+.vc-card-scroll::-webkit-scrollbar { width: 8px; }
+.vc-card-scroll::-webkit-scrollbar-thumb { background: var(--mist-300); border-radius: 8px; }
+.vc-card-body { padding: 10px 12px; }
+
+/* поиск */
+.vc-searchbox {
+  display: flex; align-items: center; gap: 8px;
+  height: 36px; padding: 0 11px;
+  border: 1px solid var(--mist-300); border-radius: 10px; background: #fff;
+  color: var(--ink-400);
+}
+.vc-searchbox input {
+  flex: 1; min-width: 0; border: 0; outline: none; background: none;
+  font: inherit; font-size: 13px; color: var(--ink-800);
+}
+.vc-searchbox input::placeholder { color: var(--ink-300); }
+.vc-searchbox kbd {
+  font-family: var(--mono); font-size: 10.5px; color: var(--ink-400);
+  border: 1px solid var(--mist-200); border-radius: 5px; padding: 1px 5px; background: var(--mist-50);
+}
+.vc-searchbox--float {
+  position: absolute; left: 14px; top: 14px; z-index: 8; width: 286px;
+  box-shadow: var(--lift);
+}
+
+.vc-mine { display: flex; align-items: center; gap: 10px; }
+.vc-mine-txt { min-width: 0; }
+.vc-mine-txt b { display: block; font-family: var(--serif); font-weight: 500; font-size: 13.5px; }
+.vc-mine-txt span { display: block; font-size: 11.5px; color: var(--ink-400); }
+.vc-role-sm {
+  display: inline-block; margin-top: 3px; padding: 2px 7px; border-radius: 6px;
+  font-size: 10.5px; font-weight: 500; color: var(--brass-600);
+  border: 1px solid rgba(201, 162, 39, .45); background: #fdf8e8;
+}
+
+/* списки людей и ветвей */
+.vc-plist { display: flex; flex-direction: column; gap: 2px; }
+.vc-prow {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 6px 7px; border-radius: 9px; text-align: left;
+}
+.vc-prow:hover { background: var(--mist-50); }
+.vc-prow--on { background: var(--mist-100); box-shadow: inset 0 0 0 1px var(--mist-200); }
+.vc-prow-txt { min-width: 0; }
+.vc-prow-txt b { display: block; font-size: 12.5px; font-weight: 500; color: var(--ink-700); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vc-prow-txt span { display: block; font-size: 11px; color: var(--ink-400); }
+.vc-prow-txt .vc-num { color: var(--brass-600); }
+
+.vc-branch {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  padding: 8px 9px; border-radius: 10px; text-align: left;
+  border: 1px solid transparent;
+}
+.vc-branch:hover { background: var(--mist-50); border-color: var(--mist-200); }
+.vc-branch--on { background: #fdf8e8; border-color: rgba(201, 162, 39, .45); }
+.vc-branch-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.vc-branch--k .vc-branch-dot { background: var(--male); }
+.vc-branch--s .vc-branch-dot { background: var(--female); }
+.vc-branch--p .vc-branch-dot { background: var(--brass-600); }
+.vc-branch-txt { flex: 1; min-width: 0; }
+.vc-branch-txt b { display: block; font-size: 12.5px; font-weight: 500; }
+.vc-branch-txt span { display: block; font-size: 11px; color: var(--ink-400); }
+.vc-fly {
+  flex: none; display: inline-flex; align-items: center; gap: 4px;
+  height: 24px; padding: 0 8px; border-radius: 7px;
+  border: 1px solid var(--mist-300); background: #fff;
+  font-size: 11px; color: var(--ink-500);
+}
+.vc-fly:hover { border-color: var(--brass); color: var(--brass-600); }
+
+/* ---------- 07. Холст: полосы поколений ---------- */
+
+.vc-canvas {
+  position: relative; flex: 1; min-width: 0;
+  border: 1px solid var(--mist-200); border-radius: 13px; overflow: hidden;
+  background:
+    radial-gradient(circle at 1px 1px, rgba(122, 140, 166, .28) 1px, transparent 0) 0 0 / 22px 22px,
+    var(--vc-canvas);
+}
+.vc-bands {
+  position: absolute; left: 0; right: 0; top: 62px; bottom: 10px; z-index: 2;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.vc-band {
+  position: relative; flex: 1; min-height: 0;
+  display: flex; align-items: center;
+  padding-right: 12px;
+  border-radius: 0 10px 10px 0;
+}
+.vc-band::after { /* засечка-граница карты */
+  content: ""; position: absolute; left: 0; right: 0; bottom: -3px; height: 1px;
+  background: linear-gradient(90deg, rgba(142, 156, 174, .5), rgba(142, 156, 174, .06));
+}
+.vc-band:last-child::after { content: none; }
+.vc-band--g1 { background: var(--vc-band-1); }
+.vc-band--g2 { background: var(--vc-band-2); }
+.vc-band--g3 { background: var(--vc-band-3); }
+.vc-band--g4 { background: var(--vc-band-4); }
+.vc-band--g5 { background: var(--vc-band-5); }
+.vc-band-lab {
+  flex: none; width: 88px; padding-left: 12px;
+  border-right: 1px solid rgba(142, 156, 174, .35);
+  align-self: stretch; display: flex; flex-direction: column; justify-content: center; gap: 2px;
+}
+.vc-band-lab b {
+  font-size: 11.5px; font-weight: 600; letter-spacing: .1em; color: var(--ink-500);
+  font-variant-numeric: tabular-nums;
+}
+.vc-band-lab span { font-size: 10.5px; color: var(--ink-400); font-variant-numeric: tabular-nums; }
+.vc-band-lab i { font-style: normal; font-size: 10px; color: var(--ink-400); }
+.vc-band--on .vc-band-lab b { color: var(--brass-600); }
+.vc-band--on .vc-band-lab { border-right-color: rgba(201, 162, 39, .5); }
+
+.vc-band-people { flex: 1; min-width: 0; display: flex; gap: 7px; align-items: center; padding-left: 3px; }
+
+/* связи: SVG-слой под медальонами */
+.vc-wires { position: absolute; left: 0; right: 0; top: 62px; bottom: 10px; z-index: 3; pointer-events: none; }
+.vc-wires path { fill: none; }
+.vc-wire { stroke: var(--vc-line-soft); stroke-width: 1.3; stroke-linecap: round; }
+.vc-wire--off { stroke: var(--vc-line-soft); stroke-width: 1.1; }
+.vc-wire--on { stroke: var(--vc-ring); stroke-width: 2.2; }
+.vc-wire-dot { fill: #fff; stroke: var(--vc-line-soft); stroke-width: 1.2; }
+.vc-wire-dot--on { fill: var(--vc-ring); stroke: #fff; stroke-width: 1.4; }
+.vc-canvas--nopath .vc-wire--off { opacity: .85; }
+
+/* ярлык-указатель пути */
+.vc-pathbadge {
+  position: absolute; right: 14px; top: 14px; z-index: 8;
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 11px; border-radius: 999px;
+  border: 1px solid rgba(201, 162, 39, .5); background: rgba(253, 248, 232, .95);
+  box-shadow: var(--lift);
+  font-size: 11.5px; color: var(--brass-600);
+}
+.vc-pathbadge svg { flex: none; }
+.vc-pathbadge b { font-weight: 500; color: var(--ink-700); }
+
+/* подсказки-чипы по краям карты */
+.vc-canvas-hint {
+  position: absolute; left: 14px; bottom: 16px; z-index: 8;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 11px; border-radius: 999px;
+  background: rgba(255, 255, 255, .86); border: 1px solid var(--mist-200);
+  font-size: 11px; color: var(--ink-400);
+}
+.vc-legend {
+  position: absolute; right: 14px; bottom: 16px; z-index: 8;
+  display: flex; align-items: center; gap: 12px;
+  padding: 7px 11px; border-radius: 10px;
+  background: rgba(255, 255, 255, .9); border: 1px solid var(--mist-200);
+  font-size: 10.5px; color: var(--ink-500);
+}
+.vc-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.vc-legend i { width: 9px; height: 9px; border-radius: 50%; }
+.vc-legend .vc-lg-m { background: var(--male); }
+.vc-legend .vc-lg-f { background: var(--female); }
+.vc-legend .vc-lg-r { background: #fff; box-shadow: 0 0 0 2px var(--vc-ring); }
+
+/* ---------- 08. Медальон человека ---------- */
+
+.vc-med {
+  position: relative; z-index: 4; flex: none;
+  display: flex; align-items: center; gap: 8px;
+  width: 142px; height: 46px; padding: 6px 9px;
+  border: 1px solid #c9d3e0; border-radius: 11px;
+  background: #fff;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .7) inset, 0 6px 14px -10px rgba(10, 17, 32, .5);
+  text-align: left;
+}
+.vc-med::before { /* дуга пола: тонкая полоса слева */
+  content: ""; position: absolute; left: 0; top: 7px; bottom: 7px; width: 2.5px;
+  border-radius: 0 3px 3px 0;
+}
+.vc-med--m::before { background: var(--male); }
+.vc-med--f::before { background: var(--female); }
+.vc-med-txt { min-width: 0; }
+.vc-med-txt b {
+  display: block; font-size: 12px; font-weight: 500; color: var(--ink-800);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.vc-band-people .vc-med-txt span { font-size: 10.5px; }
+.vc-med-txt span {
+  display: block; font-size: 10.5px; color: var(--ink-400); font-variant-numeric: tabular-nums;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.vc-med--sel {
+  border-color: var(--vc-ring);
+  box-shadow: 0 0 0 2px rgba(201, 162, 39, .35), 0 10px 20px -12px rgba(10, 17, 32, .5);
+}
+.vc-med--onpath { border-color: #b9982a; }
+.vc-med--dim { opacity: .35; filter: saturate(.55); }
+.vc-canvas--nopath .vc-med--dim { opacity: 1; filter: none; }
+
+/* ---------- 09. Панель «Путь» ---------- */
+
+.vc-steps { display: flex; flex-direction: column; }
+.vc-path-scroll { padding: 4px 8px; }
+.vc-step { position: relative; display: flex; gap: 9px; padding: 5px 10px 5px 12px; border-radius: 10px; }
+.vc-step + .vc-step { margin-top: 1px; }
+.vc-step:not(:last-child)::after {
+  content: ""; position: absolute; left: 22px; top: 28px; bottom: -6px; width: 1px;
+  background: linear-gradient(180deg, var(--mist-300), rgba(198, 207, 221, 0));
+}
+.vc-step-n {
+  flex: none; display: grid; place-items: center;
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 1px solid var(--mist-300); background: #fff;
+  font-size: 10.5px; color: var(--ink-400); font-variant-numeric: tabular-nums;
+}
+.vc-step--on { background: #fdf8e8; }
+.vc-step--on .vc-step-n { background: var(--vc-ring); border-color: var(--vc-ring); color: var(--ink-900); font-weight: 600; }
+.vc-step-txt { min-width: 0; }
+.vc-step-txt b { display: block; font-size: 12.5px; font-weight: 500; line-height: 1.35; }
+.vc-step-txt span { display: block; font-size: 11px; line-height: 1.3; color: var(--ink-400); font-variant-numeric: tabular-nums; }
+.vc-step-txt em { display: block; margin-top: 1px; font-style: normal; font-size: 10.5px; line-height: 1.3; color: var(--ink-400); }
+.vc-steps-note { padding: 4px 12px 8px; font-size: 11px; color: var(--ink-400); }
+.vc-steps-note b { color: var(--ink-600); font-weight: 500; }
+.vc-path-btn { display: block; padding: 6px 10px 8px; border-top: 1px solid var(--mist-100); }
+
+.vc-more {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 52px; height: 30px; padding: 0; border-radius: 8px;
+  border: 1px dashed var(--mist-300); color: var(--ink-400); font-size: 10.5px;
+  white-space: nowrap;
+}
+
+/* ---------- 10. Дашборд: карта семей ---------- */
+
+.vc-dash { flex: 1; min-height: 0; padding: 12px; display: flex; gap: 10px; background: var(--mist-100); }
+.vc-dash-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.vc-banner {
+  position: relative; flex: none; overflow: hidden;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 14px 16px; border-radius: 14px;
+  background-image:
+    radial-gradient(120% 90% at 6% -20%, rgba(201, 162, 39, .22), transparent 58%),
+    linear-gradient(180deg, var(--ink-700), var(--ink-900));
+  color: var(--mist-50);
+}
+.vc-banner h2 { font-family: var(--serif); font-weight: 500; font-size: 19px; letter-spacing: -.01em; }
+.vc-banner p { margin-top: 4px; font-size: 12px; color: var(--ink-300); font-variant-numeric: tabular-nums; }
+.vc-banner .vc-btn--brass { height: 36px; }
+
+.vc-block { display: flex; flex-direction: column; min-height: 0; }
+.vc-block-h { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.vc-block-h b { font-family: var(--serif); font-weight: 500; font-size: 14.5px; }
+.vc-block-h span { font-size: 11.5px; color: var(--ink-400); }
+
+.vc-fams { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.vc-fam {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 12px; border-radius: 13px;
+  border: 1px solid var(--mist-200); background: #fff; text-align: left;
+  box-shadow: 0 1px 2px rgba(10, 17, 32, .04);
+}
+.vc-fam:hover { border-color: var(--vc-ring); }
+.vc-fam-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.vc-fam-h b { font-family: var(--serif); font-weight: 500; font-size: 14px; }
+.vc-fam-count {
+  font-size: 11.5px; color: var(--brass-600); font-variant-numeric: tabular-nums;
+  border: 1px solid rgba(201, 162, 39, .45); background: #fdf8e8;
+  border-radius: 999px; padding: 2px 8px; white-space: nowrap;
+}
+.vc-fam-map {
+  position: relative; height: 62px; border-radius: 9px; overflow: hidden;
+  background: var(--vc-canvas);
+  border: 1px solid var(--mist-200);
+}
+.vc-fam-map i { position: absolute; border-radius: 50%; }
+.vc-fam-map .vc-bar { border-radius: 2px; }
+.vc-fam-map--k { background: linear-gradient(180deg, #eef3f8, #dde7f0); }
+.vc-fam-map--s { background: linear-gradient(180deg, #f7efe6, #ecdfd0); }
+.vc-fam-map--p { background: linear-gradient(180deg, #f2f1e9, #e6e3d6); }
+.vc-fam-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--ink-400); }
+.vc-fam-foot b { color: var(--ink-500); font-weight: 500; }
+.vc-avas { display: flex; align-items: center; }
+.vc-avas > * { display: block; margin-left: -6px; box-shadow: 0 0 0 2px #fff; }
+.vc-avas > *:first-child { margin-left: 0; }
+.vc-avas .vc-mini { width: 26px; height: 26px; border-radius: 8px; }
+.vc-avas .vc-mini i { width: 8px; height: 8px; top: 5px; }
+.vc-avas .vc-mini b { width: 17px; height: 10px; }
+.vc-ava-more {
+  display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px;
+  background: var(--mist-100); color: var(--ink-400); font-size: 10.5px;
+  box-shadow: 0 0 0 2px #fff;
+}
+
+/* «продолжить с того места» */
+.vc-continue {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; border-radius: 13px;
+  border: 1px solid var(--mist-200); background: #fff;
+}
+.vc-continue-txt { flex: 1; min-width: 0; }
+.vc-continue-txt b { display: block; font-family: var(--serif); font-weight: 500; font-size: 15px; }
+.vc-continue-txt span { display: block; margin-top: 2px; font-size: 11.5px; color: var(--ink-400); font-variant-numeric: tabular-nums; }
+.vc-continue-acts { display: flex; align-items: center; gap: 8px; }
+
+/* правая колонка дашборда */
+.vc-dash-side { width: 288px; flex: none; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.vc-panel { display: flex; flex-direction: column; min-height: 0; border: 1px solid var(--mist-200); border-radius: 13px; background: #fff; overflow: hidden; }
+.vc-panel-h { flex: none; padding: 8px 12px; border-bottom: 1px solid var(--mist-100); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.vc-panel-h b { font-family: var(--serif); font-weight: 500; font-size: 13.5px; }
+.vc-panel-h span { font-size: 11px; color: var(--ink-400); }
+.vc-panel-body { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 10px; }
+.vc-panel-body::-webkit-scrollbar { width: 8px; }
+.vc-panel-body::-webkit-scrollbar-thumb { background: var(--mist-300); border-radius: 8px; }
+
+.vc-date {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 9px; border-radius: 10px; border: 1px solid rgba(201, 162, 39, .4); background: #fdf8e8;
+}
+.vc-date-day {
+  flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px;
+  background: #fff; border: 1px solid rgba(201, 162, 39, .45); color: var(--brass-600);
+  font-variant-numeric: tabular-nums;
+}
+.vc-date-day b { font-family: var(--serif); font-weight: 600; font-size: 15px; line-height: 1; }
+.vc-date-day i { font-style: normal; font-size: 10px; }
+.vc-date-txt b { display: block; font-size: 12.5px; font-weight: 500; }
+.vc-date-txt span { display: block; font-size: 11px; color: var(--ink-400); }
+
+.vc-feed { display: flex; flex-direction: column; gap: 1px; }
+.vc-feed li { display: flex; gap: 9px; padding: 6px 4px; border-radius: 9px; }
+.vc-feed li:hover { background: var(--mist-50); }
+.vc-feed i {
+  flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 8px;
+  background: var(--mist-100); color: var(--ink-400); font-style: normal; font-size: 11px;
+}
+.vc-feed b { display: block; font-size: 12px; font-weight: 500; color: var(--ink-700); }
+.vc-feed span { display: block; margin-top: 1px; font-size: 11px; color: var(--ink-400); }
+.vc-feed em { font-style: normal; color: var(--ink-400); }
+
+.vc-invite { padding: 10px 12px 12px; }
+.vc-invite-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--ink-400); }
+.vc-invite-line b { color: var(--ink-700); font-weight: 500; font-variant-numeric: tabular-nums; }
+.vc-track { height: 5px; margin: 8px 0 9px; border-radius: 999px; background: var(--mist-200); overflow: hidden; }
+.vc-track i { display: block; height: 100%; width: 30%; border-radius: 999px; background: var(--vc-ring); }
+.vc-tasks { display: flex; flex-direction: column; gap: 4px; }
+.vc-task { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--ink-500); }
+.vc-task i { flex: none; width: 14px; height: 14px; border-radius: 4px; border: 1px solid var(--mist-300); display: grid; place-items: center; font-style: normal; font-size: 9px; color: #fff; }
+.vc-task--done i { background: var(--ok); border-color: var(--ok); }
+.vc-task--done { color: var(--ink-400); text-decoration: line-through; }
+
+/* ---------- 11. Карточка человека ---------- */
+
+.vc-hero { flex: none; padding: 12px 16px; display: flex; gap: 14px; align-items: flex-start; }
+.vc-hero-id { display: flex; gap: 14px; align-items: flex-start; width: 340px; flex: none; }
+.vc-hero-id h2 { font-family: var(--serif); font-weight: 500; font-size: 20px; line-height: 1.15; letter-spacing: -.01em; }
+.vc-hero-sub { margin-top: 5px; font-size: 12px; color: var(--ink-400); font-variant-numeric: tabular-nums; }
+.vc-hero-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.vc-hero-facts { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 10px; }
+.vc-factline { border-left: 2px solid var(--mist-200); padding-left: 9px; }
+.vc-factline span { display: block; font-size: 10.5px; color: var(--ink-400); }
+.vc-factline b { display: block; margin-top: 2px; font-size: 12.5px; font-weight: 500; color: var(--ink-700); }
+.vc-factline b .vc-maiden { font-size: 11px; }
+.vc-hero-path {
+  width: 268px; flex: none;
+  border: 1px solid rgba(201, 162, 39, .4); border-radius: 12px; background: #fdf8e8;
+  display: flex; flex-direction: column;
+}
+.vc-hero-path .vc-card-h { border-bottom-color: rgba(201, 162, 39, .28); }
+.vc-hero-path .vc-step--on { background: rgba(255, 255, 255, .75); }
+.vc-hero-path .vc-path-btn { border-top-color: rgba(201, 162, 39, .28); }
+
+.vc-tabs { flex: none; display: flex; align-items: center; gap: 4px; padding: 0 14px; border-bottom: 1px solid var(--mist-200); background: #fff; }
+.vc-tab {
+  height: 38px; padding: 0 12px; display: inline-flex; align-items: center; gap: 7px;
+  border-bottom: 2px solid transparent; color: var(--ink-400); font-size: 12.5px;
+}
+.vc-tab:hover { color: var(--ink-700); }
+.vc-tab--on { color: var(--ink-800); border-bottom-color: var(--vc-ring); font-weight: 500; }
+.vc-tab em { font-style: normal; font-size: 11px; color: var(--ink-400); font-variant-numeric: tabular-nums; }
+.vc-tabs-hint { margin-left: auto; font-size: 11px; color: var(--ink-400); }
+
+.vc-cols { flex: 1; min-height: 0; display: flex; gap: 10px; padding: 10px 14px 12px; }
+.vc-col { display: flex; flex-direction: column; gap: 5px; min-height: 0; }
+.vc-col--a { overflow-y: auto; }
+.vc-col--a { width: 560px; flex: none; }
+.vc-col--b { flex: 1; min-width: 0; }
+.vc-col--c { width: var(--vc-path-w); flex: none; }
+.vc-scrollbody { padding: 8px 10px; overflow-y: auto; min-height: 0; }
+.vc-path-scroll { flex: 1; min-height: 0; }
+
+.vc-sect { display: flex; align-items: center; gap: 9px; margin-bottom: 8px; }
+.vc-sect i { flex: 1; height: 1px; background: var(--mist-200); }
+.vc-sect b { font-size: 10.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-400); white-space: nowrap; }
+
+.vc-dl { display: grid; grid-template-columns: 132px 1fr; }
+.vc-dl > div { display: contents; }
+.vc-dl dt { padding: 5px 0; font-size: 12px; color: var(--ink-400); border-top: 1px solid var(--mist-100); }
+.vc-dl dd { padding: 5px 0; font-size: 12.5px; color: var(--ink-800); border-top: 1px solid var(--mist-100); font-variant-numeric: tabular-nums; }
+.vc-dl > div:first-child dt, .vc-dl > div:first-child dd { border-top: 0; }
+
+.vc-timeline { display: flex; flex-direction: column; }
+.vc-tl { position: relative; display: flex; gap: 10px; padding: 5px 0; }
+.vc-tl-y { flex: none; width: 46px; text-align: right; font-size: 11.5px; color: var(--ink-400); font-variant-numeric: tabular-nums; padding-top: 1px; }
+.vc-tl-rail { position: relative; flex: none; width: 11px; display: flex; justify-content: center; }
+.vc-tl-rail::before { content: ""; position: absolute; top: 0; bottom: -12px; width: 1px; background: var(--mist-200); }
+.vc-tl:last-child .vc-tl-rail::before { bottom: 50%; }
+.vc-tl-rail i {
+  position: relative; z-index: 1; margin-top: 4px;
+  width: 9px; height: 9px; border-radius: 50%; background: #fff;
+  border: 1.5px solid var(--mist-300);
+}
+.vc-tl--on .vc-tl-rail i { border-color: var(--vc-ring); background: var(--vc-ring); }
+.vc-tl-txt { min-width: 0; }
+.vc-tl-txt b { display: block; font-size: 12.5px; font-weight: 500; }
+.vc-tl-txt span { display: block; font-size: 11px; color: var(--ink-400); }
+.vc-tl-badge {
+  display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 6px;
+  font-size: 10px; font-weight: 400; color: var(--brass-600);
+  border: 1px solid rgba(201, 162, 39, .45); background: #fdf8e8;
+}
+
+
+.vc-kids { display: flex; flex-direction: column; gap: 5px; }
+.vc-kid {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 5px 8px; border-radius: 9px; border: 1px solid var(--mist-200); background: #fff;
+}
+.vc-kid-txt { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.vc-kid-txt b { font-size: 12.5px; font-weight: 500; }
+.vc-kid-txt span { font-size: 11px; color: var(--ink-400); font-variant-numeric: tabular-nums; }
+.vc-kid em { font-style: normal; font-size: 10.5px; color: var(--ink-400); }
+
+.vc-files { display: flex; flex-direction: column; gap: 4px; }
+.vc-file { display: flex; align-items: center; gap: 9px; font-size: 11.5px; color: var(--ink-500); }
+.vc-file i {
+  flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px;
+  background: var(--mist-100); color: var(--ink-400); font-style: normal; font-size: 11px;
+}
+.vc-file b { display: block; font-weight: 500; color: var(--ink-700); font-size: 12px; }
+.vc-file span { display: block; color: var(--ink-400); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+
+.vc-history { display: flex; flex-direction: column; gap: 5px; }
+.vc-hist { display: flex; gap: 9px; }
+.vc-hist i {
+  flex: none; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--mist-100); color: var(--ink-400); font-style: normal; font-size: 10px;
+}
+.vc-hist b { display: block; font-size: 12px; font-weight: 500; line-height: 1.3; }
+.vc-hist span { display: block; font-size: 10.5px; line-height: 1.25; color: var(--ink-400); }
+.vc-card .vc-scrollbody .vc-history { gap: 4px; }
+.vc-hist .vc-old { color: var(--danger); }
+.vc-hist .vc-new { color: var(--ok); }
+
+/* ---------- 12. Мобильные экраны ---------- */
+
+.vc-phone { position: absolute; inset: 0; overflow: hidden; display: flex; flex-direction: column; background: var(--mist-50); color: var(--ink-800); font-size: 13px; }
+.vc-phone *, .vc-phone *::before, .vc-phone *::after { box-sizing: border-box; }
+.vc-phone p, .vc-phone h1, .vc-phone h2, .vc-phone h3, .vc-phone ul, .vc-phone dl, .vc-phone dd { margin: 0; }
+.vc-phone ul { padding: 0; list-style: none; }
+.vc-phone button, .vc-phone input { font: inherit; color: inherit; background: none; border: 0; padding: 0; }
+
+.vc-m-head {
+  flex: none; padding: 44px 16px 8px;
+  background-image:
+    radial-gradient(120% 90% at 6% -30%, rgba(201, 162, 39, .2), transparent 55%),
+    linear-gradient(180deg, var(--ink-700), var(--ink-900));
+  color: var(--mist-50);
+}
+.vc-m-head-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.vc-m-head h2 { font-family: var(--serif); font-weight: 500; font-size: 18px; }
+.vc-m-head p { margin-top: 3px; font-size: 11.5px; color: #b9c4d6; font-variant-numeric: tabular-nums; }
+.vc-m-head--light { background: #fff; color: var(--ink-800); border-bottom: 1px solid var(--mist-200); }
+.vc-m-head--light p { color: var(--ink-400); }
+.vc-m-back {
+  display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px;
+  border: 1px solid rgba(200, 210, 226, .3); color: #d5deea;
+}
+.vc-m-head--light .vc-m-back { border-color: var(--mist-200); color: var(--ink-500); }
+
+.vc-m-body { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 12px 14px 20px; }
+.vc-m-body::-webkit-scrollbar { width: 0; }
+
+.vc-m-search { display: flex; align-items: center; gap: 9px; height: 44px; padding: 0 13px; border: 1px solid var(--mist-300); border-radius: 12px; background: #fff; color: var(--ink-400); }
+.vc-m-search input { flex: 1; min-width: 0; outline: none; font-size: 14px; color: var(--ink-800); }
+.vc-m-search input::placeholder { color: var(--ink-300); }
+.vc-m-hint { margin: 9px 2px 0; font-size: 11.5px; color: var(--ink-400); }
+.vc-m-hint b { color: var(--ink-600); font-weight: 500; }
+
+.vc-m-sect { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 16px 2px 9px; }
+.vc-m-sect b { font-family: var(--serif); font-weight: 500; font-size: 14px; }
+.vc-m-sect span { font-size: 11px; color: var(--ink-400); }
+
+.vc-m-card { border: 1px solid var(--mist-200); border-radius: 13px; background: #fff; overflow: hidden; }
+/* на телефоне строки ветвей и людей ужимаются: 370px, а не 1280 */
+.vc-m-card .vc-branch { gap: 7px; padding: 6px 7px; }
+.vc-m-card .vc-branch-txt b { font-size: 12px; }
+.vc-m-card .vc-branch-txt span { font-size: 10.5px; }
+.vc-m-card .vc-fly { width: 54px; height: 26px; padding: 0; justify-content: center; font-size: 10px; }
+.vc-m-card .vc-fly svg { display: none; }
+.vc-m-card .vc-prow-txt b, .vc-m-card .vc-m-searchrow-txt b { font-size: 12.5px; }
+.vc-m-search { min-width: 0; }
+.vc-m-head-row > div { min-width: 0; }
+.vc-m-card + .vc-m-card { margin-top: 10px; }
+.vc-m-searchrow { display: flex; align-items: center; gap: 9px; width: 100%; min-width: 0; padding: 9px 12px; border-bottom: 1px solid var(--mist-100); text-align: left; }
+.vc-m-searchrow:last-child { border-bottom: 0; }
+.vc-m-searchrow:hover { background: var(--mist-50); }
+.vc-m-searchrow-txt { min-width: 0; flex: 1; }
+.vc-m-searchrow-txt b { display: block; font-size: 13px; font-weight: 500; }
+.vc-m-searchrow-txt span { display: block; font-size: 11px; color: var(--ink-400); font-variant-numeric: tabular-nums; }
+.vc-m-searchrow em {
+  flex: none; font-style: normal; font-size: 10px; color: var(--brass-600);
+  border: 1px solid rgba(201, 162, 39, .45); background: #fdf8e8; border-radius: 6px; padding: 2px 6px; white-space: nowrap;
+}
+
+/* мобильный холст */
+.vc-m-crumbbar {
+  flex: none; display: flex; align-items: center; gap: 6px;
+  padding: 8px 12px; background: #fff; border-bottom: 1px solid var(--mist-200);
+  font-size: 11.5px; color: var(--ink-400); overflow: hidden; white-space: nowrap;
+}
+.vc-m-crumbbar b { color: var(--ink-800); font-weight: 500; }
+.vc-m-canvas {
+  position: relative; flex: 1; min-height: 0; overflow: hidden;
+  background:
+    radial-gradient(circle at 1px 1px, rgba(122, 140, 166, .3) 1px, transparent 0) 0 0 / 18px 18px,
+    var(--vc-canvas);
+}
+.vc-m-bands { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 4px; padding: 50px 0 6px; overflow: hidden; }
+.vc-m-band { position: relative; flex: none; height: 106px; display: flex; align-items: center; border-radius: 0 9px 9px 0; }
+.vc-m-band--g1 { background: var(--vc-band-1); }
+.vc-m-band--g2 { background: var(--vc-band-2); }
+.vc-m-band--g3 { background: var(--vc-band-3); }
+.vc-m-band--g4 { background: var(--vc-band-4); }
+.vc-m-band--g5 { background: var(--vc-band-5); }
+.vc-m-band-lab {
+  flex: none; width: 32px; align-self: stretch; display: flex; flex-direction: column; justify-content: center; gap: 1px;
+  padding-left: 9px; border-right: 1px solid rgba(142, 156, 174, .35);
+}
+.vc-m-band-lab b { font-size: 10.5px; font-weight: 600; color: var(--ink-500); }
+.vc-m-band-lab span { font-size: 8.5px; color: var(--ink-400); font-variant-numeric: tabular-nums; }
+.vc-m-band-people { display: flex; gap: 8px; padding-left: 9px; }
+.vc-med--sm { width: 114px; height: 42px; padding: 5px 8px; gap: 6px; }
+.vc-med--sm .vc-med-txt b { font-size: 11.5px; }
+.vc-med--sm .vc-med-txt span { font-size: 10px; }
+.vc-wires--m { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+.vc-m-now {
+  position: absolute; left: 10px; right: 10px; top: 8px; z-index: 8;
+  display: flex; align-items: center; gap: 9px;
+  padding: 5px 9px; border-radius: 11px;
+  background: rgba(255, 255, 255, .94); border: 1px solid var(--mist-200);
+  box-shadow: 0 6px 16px -12px rgba(10, 17, 32, .6);
+}
+.vc-m-now-txt { min-width: 0; }
+.vc-m-now-txt b { display: block; font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vc-m-now-txt span { display: block; font-size: 10.5px; color: var(--ink-400); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vc-m-zoom { position: absolute; right: 10px; bottom: 10px; z-index: 8; display: flex; flex-direction: column; gap: 3px; }
+.vc-m-zoom button {
+  display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; font-size: 14px;
+  border: 1px solid var(--mist-200); background: rgba(255, 255, 255, .95); color: var(--ink-500);
+}
+.vc-m-tabs {
+  flex: none; display: flex; align-items: center; gap: 4px; padding: 0 12px;
+  background: #fff; border-bottom: 1px solid var(--mist-200);
+}
+.vc-m-tabs .vc-tab { height: 40px; font-size: 12.5px; }
+
+/* мобильный лист «путь» */
+.vc-m-sheet { flex: none; background: #fff; border-top: 1px solid var(--mist-200); border-radius: 16px 16px 0 0; box-shadow: 0 -12px 28px -18px rgba(10, 17, 32, .4); }
+.vc-m-sheet--mini .vc-m-grip { margin: 6px auto 2px; }
+.vc-m-sheet--mini .vc-m-sheet-h { padding: 2px 14px 2px; }
+.vc-m-sheet--mini .vc-m-sheet-b { padding: 0 8px 8px; }
+.vc-m-sheet--mini .vc-step { padding: 5px 10px 5px 12px; }
+.vc-m-grip { width: 40px; height: 4px; border-radius: 999px; background: var(--mist-300); margin: 8px auto 4px; }
+.vc-m-sheet-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 14px 4px; }
+.vc-m-sheet-h b { font-family: var(--serif); font-weight: 500; font-size: 14.5px; }
+.vc-m-sheet-h span { font-size: 11px; color: var(--ink-400); font-variant-numeric: tabular-nums; }
+.vc-m-sheet-b { padding: 0 8px 14px; }
+/* на телефоне лист по умолчанию свёрнут: холст и карточка важнее */
+.vc-m-sheet--mini .vc-m-sheet-b { padding: 0 8px 10px; }
+.vc-m-sheet--mini .vc-step + .vc-step { display: none; }
+.vc-m-sheet--mini .vc-m-sheet-h span { color: var(--brass-600); }
+.vc-m-sheet-b .vc-step-txt b { font-size: 12.5px; }
+
+.vc-m-hero { display: flex; align-items: center; gap: 13px; padding: 14px; }
+.vc-m-hero h1 { font-family: var(--serif); font-weight: 500; font-size: 19px; line-height: 1.15; }
+.vc-m-hero p { margin-top: 4px; font-size: 11.5px; color: var(--ink-400); font-variant-numeric: tabular-nums; }
+.vc-m-hero .vc-role-sm { margin-top: 6px; }
+.vc-m-acts { display: flex; gap: 7px; padding: 0 14px 14px; }
+.vc-m-acts .vc-btn { flex: 1; height: 40px; }
+.vc-m-foot { flex: none; display: flex; align-items: center; gap: 8px; padding: 10px 14px 26px; background: #fff; border-top: 1px solid var(--mist-200); }
+.vc-m-foot .vc-btn { flex: 1; height: 44px; }
+.vc-m-foot .vc-btn--brass { flex: 0 0 132px; }
+
+.vc-m-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 0; border-top: 1px solid var(--mist-100); font-size: 12.5px; }
+.vc-m-row:first-child { border-top: 0; }
+.vc-m-row span { color: var(--ink-400); font-size: 11.5px; }
+.vc-m-row b { font-weight: 500; color: var(--ink-800); text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ---------- 13. Футер документа и мелочи ---------- */
+
+.vc-foot { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; justify-content: space-between; }
+.vc-foot-links { display: flex; flex-wrap: wrap; gap: 12px; }
+.vc-note-lead { margin: 0 0 10px; font-size: 13.5px; color: var(--ink-500); }
+.vc-note-lead b { color: var(--ink-700); font-weight: 500; }
+</style>
+</head>
+<body>
+
+<!-- ============ Навигация по вариантам ============ -->
+<div class="topbar">
+  <span class="brand"><i>T</i>Torlmood — тестовые варианты интерфейса</span>
+  <nav aria-label="Варианты интерфейса">
+    <a href="index.html">Обзор</a>
+    <a href="a-quiet-archive.html">A · Тихий архив</a>
+    <a href="b-canvas-studio.html">B · Холст-студия</a>
+    <a href="c-family-atlas.html" aria-current="page">C · Атлас рода</a>
+    <a href="d-card-catalog.html">D · Картотека</a>
+    <a href="e-chronicle.html">E · Хроника</a>
+  </nav>
+</div>
+
+<div class="wrap">
+
+  <header class="doc-head">
+    <p class="eyebrow">Вариант C</p>
+    <h1>Атлас рода</h1>
+    <p class="lead">Древо перестаёт быть схемой и становится картой: холст разрезан на горизонтальные полосы поколений, по краям — навигатор-ветви и панель «Путь». Искать можно не «самый длинный мужской род», а <b>линию от корня до конкретного человека</b>: путь подсвечивается, остальное уходит в тень. Подходит семьям, которые приходят не заполнять таблицу, а «сходить» к деду и рассказать о нём детям.</p>
+    <div class="chips">
+      <span class="chip"><b>Холст</b> полосы поколений I–V с годами эпох</span>
+      <span class="chip"><b>Поиск</b> с путём от корня до человека</span>
+      <span class="chip"><b>Навигатор</b> ветви вместо миникарты</span>
+      <span class="chip"><b>Крошки</b> — это и есть путь</span>
+      <span class="chip chip--brass"><b>Медальоны</b> годы слева, латунное кольцо у выбранного</span>
+    </div>
+  </header>
+
+  <!-- ==================== ЭКРАНЫ: ДЕСКТОП ==================== -->
+  <section class="section" id="desktop">
+    <h2><span class="num">01</span>Десктоп</h2>
+    <p>Три экрана подряд: карта семей на дашборде, холст-атлас с подсвеченным путём и карточка человека, у которой путь вынесен в правую панель.</p>
+    <div class="rule"></div>
+
+    <div class="stage">
+      <div class="stage-row">
+
+        <!-- ---------- Экран 1. Дашборд ---------- -->
+        <figure class="shot">
+          <div class="frame">
+            <div class="browser">
+              <span class="dots"><i></i><i></i><i></i></span>
+              <span class="addr">torlmood.ru/dashboard</span>
+              <span class="tabs">Torlmood</span>
+            </div>
+            <div class="screen" data-vc-screen="dash">
+              <div class="vc-root">
+
+                <header class="vc-appbar">
+                  <span class="vc-brand"><i>T</i><b>Torlmood</b></span>
+                  <div class="vc-appbar-meta">
+                    <span class="vc-people">
+                      <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="5.4" r="2.6"/><path d="M2.8 13.6c.6-2.6 2.8-3.9 5.2-3.9s4.6 1.3 5.2 3.9"/></svg>
+                      Ковалёвы и Соколовы · 148 человек
+                    </span>
+                    <span class="vc-who">Рязань → Ленинград</span>
+                  </div>
+                  <div class="vc-rowact">
+                    <span class="vc-role">Владелец</span>
+                    <button class="vc-btn vc-btn--onDark" type="button">
+                      <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="7" cy="7" r="4.4"/><path d="M10.4 10.4 14 14"/></svg>
+                      Поиск по древу
+                    </button>
+                    <button class="vc-iconbtn" type="button" aria-label="Меню аккаунта">
+                      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><circle cx="8" cy="3.4" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="8" cy="12.6" r="1.4"/></svg>
+                    </button>
+                  </div>
+                </header>
+
+                <div class="vc-dash">
+                  <!-- левая колонка -->
+                  <div class="vc-rail">
+                    <div class="vc-card">
+                      <div class="vc-card-h"><b>Объект</b><em>2 часа назад</em></div>
+                      <div class="vc-card-body">
+                        <div class="vc-dl" style="grid-template-columns:1fr auto">
+                          <div><dt>Людей</dt><dd>148</dd></div>
+                          <div><dt>Связей</dt><dd>61</dd></div>
+                          <div><dt>Участников</dt><dd>4</dd></div>
+                          <div><dt>Приглашений</dt><dd>2</dd></div>
+                          <div><dt>Событий</dt><dd>12</dd></div>
+                          <div><dt>Документов</dt><dd>9</dd></div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="vc-card vc-card--grow">
+                      <div class="vc-card-h"><b>Ветви</b><span>4</span></div>
+                      <div class="vc-card-scroll">
+                        <div class="vc-plist">
+                          <button class="vc-branch vc-branch--k vc-branch--on" type="button">
+                            <span class="vc-branch-dot"></span>
+                            <span class="vc-branch-txt"><b>Ковалёвы</b><span>ветвь Петра · 42 человека</span></span>
+                          </button>
+                          <button class="vc-branch vc-branch--s" type="button">
+                            <span class="vc-branch-dot"></span>
+                            <span class="vc-branch-txt"><b>Соколовы</b><span>ветвь Анны · 26 человек</span></span>
+                          </button>
+                          <button class="vc-branch vc-branch--p" type="button">
+                            <span class="vc-branch-dot"></span>
+                            <span class="vc-branch-txt"><b>Прохоровы</b><span>ветвь Галины · 18 человек</span></span>
+                          </button>
+                        </div>
+                        <p class="vc-steps-note" style="padding:10px 4px 0">Ветви считаются на сервере: это обход всего древа, а не вид карты.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- середина -->
+                  <div class="vc-dash-main">
+                    <div class="vc-banner">
+                      <div>
+                        <h2>Ковалёвы и Соколовы</h2>
+                        <p>148 человек · 4 участника · 2 приглашения · изменено 2 часа назад</p>
+                      </div>
+                      <button class="vc-btn vc-btn--brass" type="button">
+                        <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M3 8h10"/></svg>
+                        Добавить человека
+                      </button>
+                    </div>
+
+                    <div class="vc-block">
+                      <div class="vc-block-h"><b>Карта семей</b><span>3 ветви · 86 человек</span></div>
+                      <div class="vc-fams">
+
+                        <button class="vc-fam" type="button">
+                          <div class="vc-fam-h"><b>Ковалёвы</b><span class="vc-fam-count">42 человека</span></div>
+                          <div class="vc-fam-map vc-fam-map--k">
+                            <i style="left:10%;top:14%;width:9px;height:9px;background:#7fa6c9"></i>
+                            <i style="left:26%;top:14%;width:9px;height:9px;background:#d1873f"></i>
+                            <i style="left:26%;top:48%;width:9px;height:9px;background:#7fa6c9"></i>
+                            <i style="left:52%;top:48%;width:9px;height:9px;background:#d1873f"></i>
+                            <i style="left:58%;top:78%;width:9px;height:9px;background:#7fa6c9;box-shadow:0 0 0 2px rgba(201,162,39,.8)"></i>
+                            <i class="vc-bar" style="left:13%;top:20%;width:2px;height:26px;background:#b4bfcd"></i>
+                            <i class="vc-bar" style="left:29%;top:20%;width:24%;height:2px;background:#b4bfcd"></i>
+                            <i class="vc-bar" style="left:29%;top:54%;width:2px;height:22px;background:#b4bfcd"></i>
+                            <i class="vc-bar" style="left:55%;top:54%;width:6%;height:2px;background:#b4bfcd"></i>
+                            <i class="vc-bar" style="left:61%;top:54%;width:2px;height:22px;background:#c9a227"></i>
+                          </div>
+                          <div class="vc-fam-foot">
+                            <span>1889–2009 · <b>Рязань → Ленинград</b></span>
+                            <span class="vc-avas">
+                              <span class="vc-mini vc-mini--m"><i></i><b></b></span>
+                              <span class="vc-mini vc-mini--f"><i></i><b></b></span>
+                              <span class="vc-mini vc-mini--m"><i></i><b></b></span>
+                              <span class="vc-ava-more">+39</span>
+                            </span>
+                          </div>
+                        </button>
+
+                        <button class="vc-fam" type="button">
+                          <div class="vc-fam-h"><b>Соколовы</b><span class="vc-fam-count">26 человек</span></div>
+                          <div class="vc-fam-map vc-fam-map--s">
+                            <i style="left:14%;top:16%;width:9px;height:9px;background:#d1873f"></i>
+                            <i style="left:36%;top:16%;width:9px;height:9px;background:#7fa6c9"></i>
+                            <i style="left:40%;top:52%;width:9px;height:9px;background:#7fa6c9"></i>
+                            <i style="left:66%;top:52%;width:9px;height:9px;background:#d1873f"></i>
+                            <i class="vc-bar" style="left:17%;top:22%;width:22%;height:2px;background:#c9b59c"></i>
+                            <i class="vc-bar" style="left:39%;top:22%;width:2px;height:28px;background:#c9b59c"></i>
+                            <i class="vc-bar" style="left:43%;top:58%;width:26%;height:2px;background:#c9b59c"></i>
+                          </div>
+                          <div class="vc-fam-foot">
+                            <span>1894–1995 · <b>Рязань · Ленинград</b></span>
+                            <span class="vc-avas">
+                              <span class="vc-mini vc-mini--f"><i></i><b></b></span>
+                              <span class="vc-mini vc-mini--m"><i></i><b></b></span>
+                              <span class="vc-ava-more">+24</span>
+                            </span>
+                          </div>
+                        </button>
+
+                        <button class="vc-fam" type="button">
+                          <div class="vc-fam-h"><b>Прохоровы</b><span class="vc-fam-count">18 человек</span></div>
+                          <div class="vc-fam-map vc-fam-map--p">
+                            <i style="left:16%;top:18%;width:9px;height:9px;background:#d1873f"></i>
+                            <i style="left:38%;top:18%;width:9px;height:9px;background:#7fa6c9"></i>
+                            <i style="left:54%;top:54%;width:9px;height:9px;background:#7fa6c9"></i>
+                            <i class="vc-bar" style="left:19%;top:24%;width:22%;height:2px;background:#c3bda6"></i>
+                            <i class="vc-bar" style="left:41%;top:24%;width:2px;height:30px;background:#c3bda6"></i>
+                            <i class="vc-bar" style="left:46%;top:60%;width:11%;height:2px;background:#c3bda6"></i>
+                          </div>
+                          <div class="vc-fam-foot">
+                            <span>1949–1980 · <b>Ленинград</b></span>
+                            <span class="vc-avas">
+                              <span class="vc-mini vc-mini--f"><i></i><b></b></span>
+                              <span class="vc-mini vc-mini--m"><i></i><b></b></span>
+                              <span class="vc-ava-more">+16</span>
+                            </span>
+                          </div>
+                        </button>
+
+                      </div>
+                    </div>
+
+                    <div class="vc-block">
+                      <div class="vc-block-h"><b>Продолжить с того места</b><span>вы открывали вчера</span></div>
+                      <div class="vc-continue">
+                        <span class="vc-mini vc-mini--m" style="width:46px;height:46px;border-radius:12px"><i></i><b></b></span>
+                        <span class="vc-continue-txt">
+                          <b>Аркадий Петрович Ковалёв</b>
+                          <span>1947–2011 · Ленинград · III поколение · 6 правок в карточке</span>
+                        </span>
+                        <span class="vc-continue-acts">
+                          <button class="vc-btn vc-btn--sm" type="button">Открыть карточку</button>
+                          <button class="vc-btn vc-btn--sm vc-btn--brass" type="button">Показать на холсте</button>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- правая колонка -->
+                  <div class="vc-dash-side">
+                    <div class="vc-panel">
+                      <div class="vc-panel-h"><b>Ближайшие даты</b><span>5 дней</span></div>
+                      <div class="vc-panel-body">
+                        <div class="vc-date">
+                          <span class="vc-date-day"><b>2</b><i>окт</i></span>
+                          <span class="vc-date-txt">
+                            <b>Нина Борисовна Ковалёва</b>
+                            <span>75 лет · Тверь · в девичестве Верещагина</span>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="vc-panel vc-card--grow">
+                      <div class="vc-panel-h"><b>Что менялось</b><span>12 событий</span></div>
+                      <div class="vc-panel-body">
+                        <ul class="vc-feed">
+                          <li>
+                            <i>✎</i>
+                            <span><b>Ольга изменила: место рождения</b><span><span class="vc-old">Тверь</span> → <span class="vc-new">Рязань</span> · 2 часа назад</span></span>
+                          </li>
+                          <li>
+                            <i>+</i>
+                            <span><b>Илья добавил карточку Веры Ильиничны</b><span>2009 · V поколение · 5 часов назад</span></span>
+                          </li>
+                          <li>
+                            <i>◎</i>
+                            <span><b>Дмитрий Соколов присоединился к древу</b><span>роль: зритель · вчера</span></span>
+                          </li>
+                          <li>
+                            <i>⇪</i>
+                            <span><b>Импорт GEDCOM: 34 человека</b><span>Илья · 3 дня назад</span></span>
+                          </li>
+                          <li>
+                            <i>⚭</i>
+                            <span><b>Галина уточнила дату свадьбы</b><span>1975 · Прохоровы · 4 дня назад</span></span>
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+
+                    <div class="vc-panel">
+                      <div class="vc-panel-h"><b>Приглашение</b><span>14 дней</span></div>
+                      <div class="vc-invite">
+                        <div class="vc-invite-line"><span>3 из 10 переходов</span><b>torlmood.ru/i/9f2c</b></div>
+                        <div class="vc-track"><i></i></div>
+                        <div class="vc-tasks">
+                          <span class="vc-task vc-task--done"><i>✓</i>Ссылка активна</span>
+                          <span class="vc-task vc-task--done"><i>✓</i>Дмитрий Соколов присоединился</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+          <figcaption>
+            <b>Дашборд</b>
+            <code>torlmood.ru/dashboard</code>
+            <span>Карта семей: ветви-регионы с числом людей и миниатюрой, блок «Продолжить с того места» с последним открытым человеком, справа — даты, правки и приглашение.</span>
+          </figcaption>
+        </figure>
+
+        <!-- ---------- Экран 2. Холст-атлас ---------- -->
+        <figure class="shot">
+          <div class="frame">
+            <div class="browser">
+              <span class="dots"><i></i><i></i><i></i></span>
+              <span class="addr">torlmood.ru/tree/kovalevy</span>
+              <span class="tabs">Torlmood</span>
+            </div>
+            <div class="screen" data-vc-screen="tree">
+              <div class="vc-root" data-vc-root>
+
+                <header class="vc-appbar">
+                  <span class="vc-brand"><i>T</i><b>Torlmood</b></span>
+                  <div class="vc-appbar-meta">
+                    <span class="vc-people">
+                      <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="5.4" r="2.6"/><path d="M2.8 13.6c.6-2.6 2.8-3.9 5.2-3.9s4.6 1.3 5.2 3.9"/></svg>
+                      Ковалёвы и Соколовы · 148 человек
+                    </span>
+                    <span class="vc-who">показано 18 из 148</span>
+                  </div>
+                  <div class="vc-rowact">
+                    <button class="vc-btn vc-btn--onDark" type="button">
+                      <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M8 2.6 2.6 8 8 13.4M2.6 8H13"/></svg>
+                      К карте семей
+                    </button>
+                    <button class="vc-btn vc-btn--brass" type="button">
+                      <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M3 8h10"/></svg>
+                      Добавить человека
+                    </button>
+                    <button class="vc-iconbtn" type="button" aria-label="Меню аккаунта">
+                      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><circle cx="8" cy="3.4" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="8" cy="12.6" r="1.4"/></svg>
+                    </button>
+                  </div>
+                </header>
+
+                <div class="vc-crumbbar">
+                  <nav class="vc-crumbs" aria-label="Путь до человека">
+                    <span>Ковалёвы</span>
+                    <span class="vc-sep">→</span>
+                    <span>Пётр Григорьевич</span>
+                    <span class="vc-sep">→</span>
+                    <span class="vc-crumb--now">Аркадий Петрович</span>
+                    <span class="vc-sep">·</span>
+                    <span>путь от корня · 3 шага</span>
+                  </nav>
+                  <div class="vc-crumb-meta">
+                    <span>история: <b>12</b></span>
+                    <span>GEDCOM</span>
+                    <a class="vc-linkbrass" href="#notes">Экспорт картинкой</a>
+                    <button class="vc-btn vc-btn--sm" type="button">Поделиться</button>
+                  </div>
+                </div>
+
+                <div class="vc-body">
+                  <!-- левая рейка -->
+                  <div class="vc-rail">
+                    <div class="vc-card">
+                      <div class="vc-card-body">
+                        <div class="vc-searchbox">
+                          <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="7" cy="7" r="4.4"/><path d="M10.4 10.4 14 14"/></svg>
+                          <input type="text" placeholder="Найти человека" aria-label="Найти человека" data-vc-search>
+                          <kbd>⌘K</kbd>
+                        </div>
+                        <p class="vc-steps-note" style="padding:8px 2px 0">Поиск прокладывает путь от корня: светлая цепочка, остальные — <b>35&nbsp;%</b> яркости.</p>
+                      </div>
+                    </div>
+
+                    <div class="vc-card">
+                      <div class="vc-card-h"><b>Моя ветвь</b><em>владелец</em></div>
+                      <div class="vc-card-body">
+                        <div class="vc-mine">
+                          <span class="vc-mini vc-mini--m"><i></i><b></b></span>
+                          <span class="vc-mine-txt">
+                            <b>Илья Аркадьевич Ковалёв</b>
+                            <span>1974 · 4-е колено от Григория</span>
+                            <span class="vc-role-sm">Владелец древа</span>
+                          </span>
+                        </div>
+                        <button class="vc-btn vc-btn--sm vc-btn--block" type="button" style="margin-top:10px">Показать мою ветвь</button>
+                      </div>
+                    </div>
+
+                    <div class="vc-card vc-card--grow">
+                      <div class="vc-card-h"><b>Ещё на холсте</b><span>18 из 148</span></div>
+                      <div class="vc-card-scroll">
+                        <div class="vc-plist">
+                          <button class="vc-prow vc-prow--on" type="button">
+                            <span class="vc-mini vc-mini--m"><i></i><b></b></span>
+                            <span class="vc-prow-txt"><b>Илья Аркадьевич</b><span class="vc-num">1974 · на пути</span></span>
+                          </button>
+                          <button class="vc-prow" type="button">
+                            <span class="vc-mini vc-mini--f"><i></i><b></b></span>
+                            <span class="vc-prow-txt"><b>Ольга Аркадьевна</b><span class="vc-num">1978 · редактор</span></span>
+                          </button>
+                          <button class="vc-prow" type="button">
+                            <span class="vc-mini vc-mini--f"><i></i><b></b></span>
+                            <span class="vc-prow-txt"><b>Галина Петровна</b><span class="vc-num">1952 · дочь Петра</span></span>
+                          </button>
+                          <button class="vc-prow" type="button">
+                            <span class="vc-mini vc-mini--m"><i></i><b></b></span>
+                            <span class="vc-prow-txt"><b>Антон Юрьевич</b><span class="vc-num">1980 · Прохоровы</span></span>
+                          </button>
+                          <button class="vc-prow" type="button">
+                            <span class="vc-mini vc-mini--f"><i></i><b></b></span>
+                            <span class="vc-prow-txt"><b>Вера Ильинична</b><span class="vc-num">2009 · V поколение</span></span>
+                          </button>
+                          <button class="vc-prow" type="button">
+                            <span class="vc-mini vc-mini--m"><i></i><b></b></span>
+                            <span class="vc-prow-txt"><b>Тимур Ильич</b><span class="vc-num">2005 · V поколение</span></span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- холст -->
+                  <div class="vc-canvas" data-vc-canvas>
+                    <div class="vc-searchbox vc-searchbox--float">
+                      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="7" cy="7" r="4.4"/><path d="M10.4 10.4 14 14"/></svg>
+                      <input type="text" value="Аркадий" aria-label="Найти человека на холсте">
+                      <kbd>⏎</kbd>
+                    </div>
+
+                    <div class="vc-pathbadge">
+                      <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="3" cy="13" r="1.6"/><circle cx="8" cy="8" r="1.6"/><circle cx="13" cy="3" r="1.6"/><path d="M4.2 11.8 6.8 9.2M9.2 6.8 11.8 4.2"/></svg>
+                      <span>путь от корня: <b>Григорий → Пётр → Аркадий</b></span>
+                    </div>
+
+                    <div class="vc-bands">
+                      <!-- I -->
+                      <div class="vc-band vc-band--g1">
+                        <div class="vc-band-lab"><b>I</b><span>1880–1920</span><i>3 человека</i></div>
+                        <div class="vc-band-people">
+                          <button class="vc-med vc-med--m" type="button">
+                            <span class="vc-mini vc-mini--m" style="width:32px;height:32px;border-radius:9px"><i></i><b></b></span>
+                            <span class="vc-med-txt"><b>Григорий Ильич</b><span>1889–1954 · Рязань</span></span>
+                          </button>
+                          <button class="vc-med vc-med--f" type="button">
+                            <span class="vc-mini vc-mini--f" style="width:32px;height:32px;border-radius:9px"><i></i><b></b></span>
+                            <span class="vc-med-txt"><b>Анна Сергеевна</b><span>1894–1971 · Рязань</span></span>
+                          </button>
+                          <span class="vc-more">ещё 1</span>
+                        </div>
+                      </div>
+                      <!-- II -->
+                      <div class="vc-band vc-band--g2">
+                        <div class="vc-band-lab"><b>II</b><span>1910–1950</span><i>8 человек</i></div>
+                        <div class="vc-band-people">
+                          <button class="vc-med vc-med--m" type="button">
+                            <span class="vc-mini vc-mini--m" style="width:32px;height:32px;border-radius:9px"><i></i><b></b></span>
+                            <span class="vc-med-txt"><b>Пётр Григорьевич</b><span>1918–1983 · Ленинград</span></span>
+                          </button>
+                          <button class="vc-med vc-med--f" type="button">
+                            <span class="vc-mini vc-mini--f" style="width:32px;height:32px;border-radius:9px"><i></i><b></b></span>
+                            <span class="vc-med-txt"><b>Мария Тимофеевна</b><span>1922–2004 · Ленинград</span></span>
+                          </button>
+                          <button class="vc-med vc-med--f" type="button">
+                            <span class="vc-mini vc-mini--f" style="width:32px;height:32px;border-radius:9px"><i></i><b></b></span>
+                            <span class="vc-med-txt"><b>Валентина Григ.</b><span>1926–1996 · Ленинград</span></span>
+                          </button>
+                          <button class="vc-med vc-med--m" type="button">
+                            <span class="vc-mini vc-mini--m" style="width:32px;height:32px;border-radius:9px"><i></i><b></b></span>
+                            <span class="vc-med-txt"><b>Дмитрий Львович</b><span>1920–1995 · Ленинград</span></span>
+                          </button>
+                          <span class="vc-more">ещё 4</span>
+                        </div>
+                      </div>
+                      <!-- III -->
+                      <div class="vc-band vc-band--g3">
+                        <div class="vc-band-lab"><b>III</b><span>1940–1980</span><i>18 человек</i></div>
+                        <div class="vc-band-people">
+                          <button class="vc-med vc-med--m vc-med--sel vc-med--onpath" type="button">
+                            <span class="vc-mini vc-mini--m" style="width:32px;height:32px;border-radius:9px"><i></i><b></b></span>
+                            <span class="vc-med-txt"><b>Аркадий Петрович</b><span>1947–2011 · Ленинград</span></span>
+                          </button>
+                          <button class="vc-med vc-med--f" type="button">
+                            <span class="vc-mini vc-mini--f" style="width:32px;height:32px;border-radius:9px"><i></i><b></b></span>
+                            <span class="vc-med-txt"><b>Нина Борисовна</b><span>1950 · Тверь</span></span>
+                          </button>
+                          <button class="vc-med vc-med--f" type="button">
+                            <span class="vc-mini vc-mini--f" style="width:32px;height:32px;border-radius:9px"><i></i><b></b></span>
+                            <span class="vc-med-txt"><b>Галина Петровна</b><span>1952 · Ленинград</span></span>
+                          </button>
+                          <button class="vc-med vc-med--m" type="button">
+                            <span class="vc-mini vc-mini--m" style="width:32px;height:32px;border-radius:9px"><i></i><b></b></span>
+                            <span class="vc-med-txt"><b>Юрий Андреевич</b><span>1949 · Ленинград</span></span>
+                          </button>
+                          <span class="vc-more">ещё 14</span>
+                        </div>
+                      </div>
+                      <!-- IV -->
+                      <div class="vc-band vc-band--g4">
+                        <div class="vc-band-lab"><b>IV</b><span>1970–2010</span><i>34 человека</i></div>
+                        <div class="vc-band-people">
+                          <button class="vc-med vc-med--m vc-med--onpath" type="button">
+                            <span class="vc-mini vc-mini--m" style="width:32px;height:32px;border-radius:9px"><i></i><b></b></span>
+                            <span class="vc-med-txt"><b>Илья Аркадьевич</b><span>1974 · Ленинград</span></span>
+                          </button>
+                          <button class="vc-med vc-med--f" type="button">
+                            <span class="vc-mini vc-mini--f" style="width:32px;height:32px;border-radius:9px"><i></i><b></b></span>
+                            <span class="vc-med-txt"><b>Ольга Аркадьевна</b><span>1978 · Ленинград</span></span>
+                          </button>
+                          <button class="vc-med vc-med--m" type="button">
+                            <span class="vc-mini vc-mini--m" style="width:32px;height:32px;border-radius:9px"><i></i><b></b></span>
+                            <span class="vc-med-txt"><b>Антон Юрьевич</b><span>1980 · Ленинград</span></span>
+                          </button>
+                          <span class="vc-more">ещё 31</span>
+                        </div>
+                      </div>
+                      <!-- V -->
+                      <div class="vc-band vc-band--g5">
+                        <div class="vc-band-lab"><b>V</b><span>2000–2030</span><i>12 человек</i></div>
+                        <div class="vc-band-people">
+                          <button class="vc-med vc-med--m" type="button">
+                            <span class="vc-mini vc-mini--m" style="width:32px;height:32px;border-radius:9px"><i></i><b></b></span>
+                            <span class="vc-med-txt"><b>Тимур Ильич</b><span>2005 · Санкт-Петербург</span></span>
+                          </button>
+                          <button class="vc-med vc-med--f" type="button">
+                            <span class="vc-mini vc-mini--f" style="width:32px;height:32px;border-radius:9px"><i></i><b></b></span>
+                            <span class="vc-med-txt"><b>Вера Ильинична</b><span>2009 · Санкт-Петербург</span></span>
+                          </button>
+                          <span class="vc-more">ещё 10</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- связи: путь светлый, остальное приглушено -->
+                    <svg class="vc-wires" viewBox="0 0 710 664" preserveAspectRatio="none" aria-hidden="true">
+                      <!-- в стороне от пути: ветви Соколовых и Прохоровых -->
+                      <g opacity=".35">
+                        <path class="vc-wire vc-wire--off" d="M263 71 L263 119"/>
+                        <path class="vc-wire vc-wire--off" d="M263 119 L547 119 L547 197"/>
+                        <path class="vc-wire vc-wire--off" d="M405 71 L405 119"/>
+                        <path class="vc-wire vc-wire--off" d="M689 71 L689 119"/>
+                        <path class="vc-wire vc-wire--off" d="M547 197 L547 245"/>
+                        <path class="vc-wire vc-wire--off" d="M547 245 L689 245 L689 323"/>
+                        <path class="vc-wire vc-wire--off" d="M405 197 L405 245"/>
+                        <path class="vc-wire vc-wire--off" d="M405 245 L689 245"/>
+                        <path class="vc-wire vc-wire--off" d="M689 323 L689 371"/>
+                        <path class="vc-wire vc-wire--off" d="M689 371 L547 371 L547 449"/>
+                        <path class="vc-wire vc-wire--off" d="M405 323 L405 371"/>
+                        <path class="vc-wire vc-wire--off" d="M405 371 L547 371"/>
+                        <circle class="vc-wire-dot" cx="405" cy="119" r="2.6"/>
+                        <circle class="vc-wire-dot" cx="547" cy="245" r="2.6"/>
+                        <circle class="vc-wire-dot" cx="547" cy="371" r="2.6"/>
+                      </g>
+                      <!-- путь от корня: Григорий → Пётр → Аркадий → Илья -->
+                      <g>
+                        <path class="vc-wire vc-wire--on" d="M121 71 L121 119"/>
+                        <path class="vc-wire vc-wire--on" d="M121 119 L263 119 L263 197"/>
+                        <path class="vc-wire vc-wire--on" d="M263 197 L263 245"/>
+                        <path class="vc-wire vc-wire--on" d="M263 245 L405 245 L405 323"/>
+                        <path class="vc-wire vc-wire--on" d="M405 323 L405 371"/>
+                        <path class="vc-wire vc-wire--on" d="M405 371 L405 449"/>
+                        <circle class="vc-wire-dot vc-wire-dot--on" cx="263" cy="119" r="3"/>
+                        <circle class="vc-wire-dot vc-wire-dot--on" cx="405" cy="245" r="3"/>
+                        <circle class="vc-wire-dot vc-wire-dot--on" cx="405" cy="371" r="3"/>
+                      </g>
+                    </svg>
+
+                    <div class="vc-canvas-hint">колесо — масштаб · тянуть — сдвиг карты · ⌘K — поиск с путём</div>
+                    <div class="vc-legend">
+                      <span><i class="vc-lg-m"></i>мужчины</span>
+                      <span><i class="vc-lg-f"></i>женщины</span>
+                      <span><i class="vc-lg-r"></i>выбранный</span>
+                    </div>
+                  </div>
+
+                  <!-- правая панель -->
+                  <aside class="vc-side">
+                    <div class="vc-card vc-card--grow">
+                      <div class="vc-card-h">
+                        <b>Путь от корня</b>
+                        <span>3 шага до Аркадия</span>
+                      </div>
+                      <div class="vc-card-scroll">
+                        <div class="vc-steps">
+                          <div class="vc-step">
+                            <span class="vc-step-n">1</span>
+                            <span class="vc-step-txt">
+                              <b>Григорий Ильич Ковалёв</b>
+                              <span>1889–1954 · Рязань</span>
+                              <em>основатель ветви, I поколение</em>
+                            </span>
+                          </div>
+                          <div class="vc-step">
+                            <span class="vc-step-n">2</span>
+                            <span class="vc-step-txt">
+                              <b>Пётр Григорьевич Ковалёв</b>
+                              <span>1918–1983 · Ленинград</span>
+                              <em>сын · переезд в 1918</em>
+                            </span>
+                          </div>
+                          <div class="vc-step vc-step--on">
+                            <span class="vc-step-n">3</span>
+                            <span class="vc-step-txt">
+                              <b>Аркадий Петрович Ковалёв</b>
+                              <span>1947–2011 · Ленинград</span>
+                              <em>выбран сейчас</em>
+                            </span>
+                          </div>
+                          <div class="vc-step">
+                            <span class="vc-step-n">4</span>
+                            <span class="vc-step-txt">
+                              <b>Илья Аркадьевич Ковалёв</b>
+                              <span>1974 · Санкт-Петербург</span>
+                              <em>сын · вы</em>
+                            </span>
+                          </div>
+                        </div>
+                        <p class="vc-steps-note">В сторону от пути: <b>144 человека</b> приглушены до 35&nbsp;%.</p>
+                      </div>
+                      <div class="vc-path-btn">
+                        <button class="vc-btn vc-btn--brass vc-btn--block" type="button" data-vc-toggle>
+                          <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1.6 8S4 3.4 8 3.4 14.4 8 14.4 8 12 12.6 8 12.6 1.6 8 1.6 8Z"/><circle cx="8" cy="8" r="1.8"/></svg>
+                          Показать на холсте
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="vc-card">
+                      <div class="vc-card-h"><b>Ветви</b><span>4 · 148 человек</span></div>
+                      <div class="vc-card-body">
+                        <div class="vc-branch vc-branch--k vc-branch--on">
+                          <span class="vc-branch-dot"></span>
+                          <span class="vc-branch-txt"><b>Ковалёвы, ветвь Петра</b><span>вы здесь · 42 человека</span></span>
+                          <button class="vc-fly" type="button">
+                            <svg width="11" height="11" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 14 14 2M14 2H7M14 2v7"/></svg>
+                            перелететь
+                          </button>
+                        </div>
+                        <div class="vc-branch vc-branch--s">
+                          <span class="vc-branch-dot"></span>
+                          <span class="vc-branch-txt"><b>Соколовы</b><span>26 человек · 3 колена</span></span>
+                          <button class="vc-fly" type="button">
+                            <svg width="11" height="11" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 14 14 2M14 2H7M14 2v7"/></svg>
+                            перелететь
+                          </button>
+                        </div>
+                        <div class="vc-branch vc-branch--p">
+                          <span class="vc-branch-dot"></span>
+                          <span class="vc-branch-txt"><b>Прохоровы</b><span>18 человек · 2 колена</span></span>
+                          <button class="vc-fly" type="button">
+                            <svg width="11" height="11" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 14 14 2M14 2H7M14 2v7"/></svg>
+                            перелететь
+                          </button>
+                        </div>
+                        <div class="vc-branch vc-branch--k">
+                          <span class="vc-branch-dot"></span>
+                          <span class="vc-branch-txt"><b>Ковалёвы, ветвь Галины</b><span>34 человека · 2 колена</span></span>
+                          <button class="vc-fly" type="button">
+                            <svg width="11" height="11" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 14 14 2M14 2H7M14 2v7"/></svg>
+                            перелететь
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </aside>
+                </div>
+
+              </div>
+            </div>
+          </div>
+          <figcaption>
+            <b>Холст-атлас</b>
+            <code>torlmood.ru/tree/kovalevy</code>
+            <span>Полосы поколений I–V, путь «Григорий → Пётр → Аркадий» светлый, остальные медальоны приглушены, справа — шаги пути и навигатор-ветви.</span>
+          </figcaption>
+        </figure>
+
+        <!-- ---------- Экран 3. Карточка человека ---------- -->
+        <figure class="shot">
+          <div class="frame">
+            <div class="browser">
+              <span class="dots"><i></i><i></i><i></i></span>
+              <span class="addr">torlmood.ru/tree/kovalevy/person/arkady</span>
+              <span class="tabs">Torlmood</span>
+            </div>
+            <div class="screen" data-vc-screen="person">
+              <div class="vc-root">
+
+                <header class="vc-appbar">
+                  <span class="vc-brand"><i>T</i><b>Torlmood</b></span>
+                  <div class="vc-appbar-meta">
+                    <span class="vc-people">
+                      <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="5.4" r="2.6"/><path d="M2.8 13.6c.6-2.6 2.8-3.9 5.2-3.9s4.6 1.3 5.2 3.9"/></svg>
+                      Ковалёвы и Соколовы · 148 человек
+                    </span>
+                    <span class="vc-who">карточка человека</span>
+                  </div>
+                  <div class="vc-rowact">
+                    <button class="vc-btn vc-btn--onDark" type="button">
+                      <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M8 2.6 2.6 8 8 13.4M2.6 8H13"/></svg>
+                      К холсту
+                    </button>
+                    <button class="vc-btn vc-btn--brass" type="button">
+                      <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 2.6 13.4 5 6 12.4l-3.4.6.6-3.4Z"/></svg>
+                      Редактировать
+                    </button>
+                    <button class="vc-iconbtn" type="button" aria-label="Меню аккаунта">
+                      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><circle cx="8" cy="3.4" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="8" cy="12.6" r="1.4"/></svg>
+                    </button>
+                  </div>
+                </header>
+
+                <div class="vc-crumbbar">
+                  <nav class="vc-crumbs" aria-label="Путь до человека">
+                    <span>Ковалёвы</span>
+                    <span class="vc-sep">→</span>
+                    <span>Пётр Григорьевич</span>
+                    <span class="vc-sep">→</span>
+                    <span class="vc-crumb--now">Аркадий Петрович</span>
+                  </nav>
+                  <div class="vc-crumb-meta">
+                    <span>III поколение</span>
+                    <span>4-е колено от Григория</span>
+                    <a class="vc-linkbrass" href="#notes">К холсту с путём</a>
+                  </div>
+                </div>
+
+                <div class="vc-card" style="flex:none;border:0;border-bottom:1px solid var(--mist-200);border-radius:0;background:#fff">
+                  <div class="vc-hero">
+                    <div class="vc-hero-id">
+                      <span class="vc-ring vc-ring--md">
+                        <span class="vc-mini vc-mini--m" style="width:96px;height:96px;border-radius:50%"><i style="width:30px;height:30px;top:18px"></i><b style="width:64px;height:38px"></b></span>
+                      </span>
+                      <div>
+                        <h2>Аркадий Петрович Ковалёв</h2>
+                        <p class="vc-hero-sub">1947–2011 · 64 года · Ленинград · Санкт-Петербург</p>
+                        <div class="vc-hero-acts">
+                          <button class="vc-btn vc-btn--sm" type="button">Добавить факт</button>
+                          <button class="vc-btn vc-btn--sm" type="button">Документы · 3</button>
+                          <button class="vc-btn vc-btn--sm" type="button">Фото · 6</button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="vc-hero-facts">
+                      <div class="vc-factline"><span>Рождение</span><b>1947 · Ленинград</b></div>
+                      <div class="vc-factline"><span>Смерть</span><b>2011 · Санкт-Петербург</b></div>
+                      <div class="vc-factline"><span>Отец</span><b>Пётр Григорьевич Ковалёв, 1918–1983</b></div>
+                      <div class="vc-factline"><span>Мать</span><b>Мария Тимофеевна Ковалёва, <span class="vc-maiden">в девичестве Зайцева</span>, 1922–2004</b></div>
+                      <div class="vc-factline"><span>Супруга</span><b>Нина Борисовна Ковалёва, <span class="vc-maiden">в девичестве Верещагина</span>, 1950</b></div>
+                      <div class="vc-factline"><span>Дети</span><b>Илья, 1974 · Ольга, 1978</b></div>
+                    </div>
+
+                    <div class="vc-hero-path">
+                      <div class="vc-card-h"><b>Путь к человеку</b><span>от корня · 3 шага</span></div>
+                      <div class="vc-steps" style="padding:6px 4px 0">
+                        <div class="vc-step">
+                          <span class="vc-step-n">1</span>
+                          <span class="vc-step-txt"><b>Григорий Ильич</b><span>Рязань 1889</span></span>
+                        </div>
+                        <div class="vc-step">
+                          <span class="vc-step-n">2</span>
+                          <span class="vc-step-txt"><b>Пётр Григорьевич</b><span>Ленинград 1918</span></span>
+                        </div>
+                        <div class="vc-step vc-step--on">
+                          <span class="vc-step-n">3</span>
+                          <span class="vc-step-txt"><b>Аркадий Петрович</b><span>Ленинград 1947</span></span>
+                        </div>
+                      </div>
+                      <div class="vc-path-btn">
+                        <button class="vc-btn vc-btn--brass vc-btn--block vc-btn--sm" type="button">
+                          <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1.6 8S4 3.4 8 3.4 14.4 8 14.4 8 12 12.6 8 12.6 1.6 8 1.6 8Z"/><circle cx="8" cy="8" r="1.8"/></svg>
+                          Показать на холсте
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="vc-tabs">
+                  <button class="vc-tab vc-tab--on" type="button" aria-current="true">Факты <em>14</em></button>
+                  <button class="vc-tab" type="button">События <em>9</em></button>
+                  <button class="vc-tab" type="button">История <em>12</em></button>
+                  <span class="vc-tabs-hint">последняя правка — Ольга, 2 часа назад</span>
+                </div>
+
+                <div class="vc-cols">
+                  <div class="vc-col vc-col--a">
+                    <div class="vc-card">
+                      <div class="vc-card-body">
+                        <div class="vc-sect"><b>Основное</b><i></i></div>
+                        <dl class="vc-dl">
+                          <div><dt>Пол</dt><dd>мужской</dd></div>
+                          <div><dt>Дата рождения</dt><dd>12.05.1947</dd></div>
+                          <div><dt>Место рождения</dt><dd>Ленинград</dd></div>
+                          <div><dt>Дата и место смерти</dt><dd>03.09.2011 · Санкт-Петербург</dd></div>
+                          <div><dt>Род</dt><dd>Ковалёвы, ветвь Петра</dd></div>
+                        </dl>
+                        <div class="vc-sect" style="margin-top:14px"><b>Семья</b><i></i></div>
+                        <dl class="vc-dl">
+                          <div><dt>Отец</dt><dd>Пётр Григорьевич Ковалёв</dd></div>
+                          <div><dt>Мать</dt><dd>Мария Тимофеевна Ковалёва <span class="vc-maiden">(Зайцева)</span></dd></div>
+                          <div><dt>Супруга</dt><dd>Нина Борисовна Ковалёва <span class="vc-maiden">(Верещагина)</span>, ⚭ 1971</dd></div>
+                        </dl>
+                      </div>
+                    </div>
+                    <div class="vc-card vc-card--grow">
+                      <div class="vc-card-body vc-scrollbody">
+                        <div class="vc-sect"><b>Потомки</b><i></i></div>
+                        <div class="vc-kids">
+                          <div class="vc-kid">
+                            <span class="vc-kid-txt">
+                              <span class="vc-mini vc-mini--m" style="width:30px;height:30px;border-radius:9px"><i></i><b></b></span>
+                              <span><b>Илья Аркадьевич Ковалёв</b><br><span>1974 · владелец древа</span></span>
+                            </span>
+                            <em>2 ребёнка · Ольга, 1978</em>
+                          </div>
+                        </div>
+                        <div class="vc-sect" style="margin-top:14px"><b>Документы</b><i></i></div>
+                        <div class="vc-files">
+                          <div class="vc-file">
+                            <i>JPEG</i>
+                            <span><b>Свидетельство о рождении, 1947</b><span>скан · 1,2 МБ · Илья, 3 дня назад</span></span>
+                          </div>
+                          <div class="vc-file">
+                            <i>PDF</i>
+                            <span><b>Трудовая книжка, 1965–2007</b><span>6 страниц · 2,4 МБ · Ольга, неделю назад</span></span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="vc-col vc-col--b">
+                    <div class="vc-card vc-card--grow">
+                      <div class="vc-card-h"><b>События</b><span>9 из 9</span></div>
+                      <div class="vc-card-scroll" style="padding:10px 12px 10px 4px">
+                        <div class="vc-timeline">
+                          <div class="vc-tl">
+                            <span class="vc-tl-y">1947</span>
+                            <span class="vc-tl-rail"><i></i></span>
+                            <span class="vc-tl-txt"><b>Рождение</b><span>Ленинград · 12 мая</span></span>
+                          </div>
+                          <div class="vc-tl">
+                            <span class="vc-tl-y">1954</span>
+                            <span class="vc-tl-rail"><i></i></span>
+                            <span class="vc-tl-txt"><b>Смерть деда, Григория Ильича</b><span>Рязань · семье 65 лет</span></span>
+                          </div>
+                          <div class="vc-tl vc-tl--on">
+                            <span class="vc-tl-y">1971</span>
+                            <span class="vc-tl-rail"><i></i></span>
+                            <span class="vc-tl-txt"><b>Свадьба с Ниной Борисовной</b><span>Ленинград · <span class="vc-maiden">в девичестве Верещагина</span></span></span>
+                          </div>
+                          <div class="vc-tl">
+                            <span class="vc-tl-y">1974</span>
+                            <span class="vc-tl-rail"><i></i></span>
+                            <span class="vc-tl-txt"><b>Родился сын Илья</b><span>Ленинград</span></span>
+                          </div>
+                          <div class="vc-tl">
+                            <span class="vc-tl-y">1978</span>
+                            <span class="vc-tl-rail"><i></i></span>
+                            <span class="vc-tl-txt"><b>Родилась дочь Ольга</b><span>Ленинград</span></span>
+                          </div>
+                          <div class="vc-tl">
+                            <span class="vc-tl-y">1983</span>
+                            <span class="vc-tl-rail"><i></i></span>
+                            <span class="vc-tl-txt"><b>Смерть отца, Петра Григорьевича</b><span>Ленинград</span></span>
+                          </div>
+                          <div class="vc-tl">
+                            <span class="vc-tl-y">2011</span>
+                            <span class="vc-tl-rail"><i></i></span>
+                            <span class="vc-tl-txt"><b>Смерть</b><span>Санкт-Петербург · 3 сентября<span class="vc-tl-badge">изменено 2 часа назад</span></span></span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="vc-col vc-col--c">
+                    <div class="vc-card vc-card--grow">
+                      <div class="vc-card-h"><b>Переезды рода</b><span>Рязань → Ленинград</span></div>
+                      <div class="vc-card-scroll vc-path-scroll">
+                        <div class="vc-steps">
+                          <div class="vc-step">
+                            <span class="vc-step-n">1</span>
+                            <span class="vc-step-txt">
+                              <b>Григорий Ильич Ковалёв</b>
+                              <span>Рязань 1889</span>
+                              <em>I поколение · основатель</em>
+                            </span>
+                          </div>
+                          <div class="vc-step">
+                            <span class="vc-step-n">2</span>
+                            <span class="vc-step-txt">
+                              <b>Пётр Григорьевич Ковалёв</b>
+                              <span>Ленинград 1918</span>
+                              <em>переезд семьи из Рязани</em>
+                            </span>
+                          </div>
+                          <div class="vc-step vc-step--on">
+                            <span class="vc-step-n">3</span>
+                            <span class="vc-step-txt">
+                              <b>Аркадий Петрович Ковалёв</b>
+                              <span>Ленинград 1947</span>
+                              <em>здесь открыта карточка</em>
+                            </span>
+                          </div>
+                        </div>
+                        <p class="vc-steps-note">Годы и места — из карточек людей. Линия родства считается <b>от выбранного человека</b>, а не как самый длинный мужской род: у Галины Петровны путь ведёт через отца, а не через брата.</p>
+                      </div>
+                      <div class="vc-path-btn">
+                        <a class="vc-linkbrass" href="#desktop">Сверить переезды на холсте</a>
+                      </div>
+                    </div>
+
+                    <div class="vc-card">
+                      <div class="vc-card-h"><b>История правок</b><span>12</span></div>
+                      <div class="vc-card-body vc-scrollbody" style="flex:1;min-height:0">
+                        <div class="vc-history">
+                          <div class="vc-hist">
+                            <i>О</i>
+                            <span><b>Ольга изменила: место рождения</b><span><span class="vc-old">Тверь</span> → <span class="vc-new">Рязань</span> · 2 часа назад</span></span>
+                          </div>
+                        </div>
+                        <button class="vc-btn vc-btn--sm" type="button" style="margin-top:8px">Вся история карточки</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+          <figcaption>
+            <b>Карточка человека</b>
+            <code>torlmood.ru/tree/kovalevy/person/arkady</code>
+            <span>Медальон обведён латунным кольцом, справа — панель «Путь» с шагами Рязань 1889 → Ленинград 1918 → Ленинград 1947 и кнопкой «Показать на холсте», ниже — история правок.</span>
+          </figcaption>
+        </figure>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== ЭКРАНЫ: МОБИЛЬНЫЙ ==================== -->
+  <section class="section" id="mobile">
+    <h2><span class="num">02</span>Мобильный</h2>
+    <p>Три экрана: поиск с путём как первый, холст с прилипающими крошками и карточка человека, где путь — лист снизу.</p>
+    <div class="rule"></div>
+
+    <div class="stage">
+      <div class="stage-row stage-row--center">
+
+        <!-- ---------- Телефон 1. Поиск и путь ---------- -->
+        <figure class="shot">
+          <div class="phone">
+            <div class="notch"></div>
+            <div class="statusbar"><span>9:41</span><span class="icons"><i class="bars"></i><i class="bat"></i></span></div>
+            <div class="phone-screen">
+              <div class="vc-phone">
+
+                <header class="vc-m-head">
+                  <div class="vc-m-head-row">
+                    <div>
+                      <h2>Куда идём?</h2>
+                      <p>Ковалёвы и Соколовы · 148 человек</p>
+                    </div>
+                    <span class="vc-role">Владелец</span>
+                  </div>
+                </header>
+
+                <div class="vc-m-body">
+                  <div class="vc-m-search">
+                    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="7" cy="7" r="4.4"/><path d="M10.4 10.4 14 14"/></svg>
+                    <input type="text" value="Аркадий" aria-label="Найти человека">
+                    <span style="color:var(--ink-600);font-size:12px">✕</span>
+                  </div>
+                  <p class="vc-m-hint">Нашли одного человека — холст подсветит <b>путь от корня</b>, остальные 144 уйдут в тень.</p>
+
+                  <div class="vc-m-sect"><b>Путь к Аркадию</b><span>3 шага · 118 лет</span></div>
+                  <div class="vc-m-card">
+                    <div class="vc-card-b" style="padding:6px 6px 10px">
+                      <div class="vc-steps">
+                        <div class="vc-step">
+                          <span class="vc-step-n">1</span>
+                          <span class="vc-step-txt">
+                            <b>Ковалёвы · Григорий Ильич</b>
+                            <span>Рязань 1889</span>
+                            <em>I поколение · 3 человека</em>
+                          </span>
+                        </div>
+                        <div class="vc-step">
+                          <span class="vc-step-n">2</span>
+                          <span class="vc-step-txt">
+                            <b>Пётр Григорьевич</b>
+                            <span>Ленинград 1918</span>
+                            <em>сын · переезд из Рязани</em>
+                          </span>
+                        </div>
+                        <div class="vc-step vc-step--on">
+                          <span class="vc-step-n">3</span>
+                          <span class="vc-step-txt">
+                            <b>Аркадий Петрович</b>
+                            <span>Ленинград 1947–2011</span>
+                            <em>сын · выбран сейчас</em>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="vc-m-sect"><b>Тот же путь дальше</b><span>2 человека</span></div>
+                  <div class="vc-m-card">
+                    <button class="vc-m-searchrow" type="button">
+                      <span class="vc-mini vc-mini--m"><i></i><b></b></span>
+                      <span class="vc-m-searchrow-txt"><b>Илья Аркадьевич Ковалёв</b><span>1974 · сын · владелец</span></span>
+                      <em>1 шаг</em>
+                    </button>
+                    <button class="vc-m-searchrow" type="button">
+                      <span class="vc-mini vc-mini--f"><i></i><b></b></span>
+                      <span class="vc-m-searchrow-txt"><b>Ольга Аркадьевна Ковалёва</b><span>1978 · дочь · редактор</span></span>
+                      <em>1 шаг</em>
+                    </button>
+                  </div>
+
+                  <div class="vc-m-sect"><b>Ветви</b><span>перелететь</span></div>
+                  <div class="vc-m-card">
+                    <div class="vc-card-b" style="padding:6px 8px">
+                      <div class="vc-branch vc-branch--k vc-branch--on">
+                        <span class="vc-branch-dot"></span>
+                        <span class="vc-branch-txt"><b>Ковалёвы, ветвь Петра</b><span>42 человека</span></span>
+                        <button class="vc-fly" type="button">перелететь</button>
+                      </div>
+                      <div class="vc-branch vc-branch--s">
+                        <span class="vc-branch-dot"></span>
+                        <span class="vc-branch-txt"><b>Соколовы</b><span>26 человек</span></span>
+                        <button class="vc-fly" type="button">перелететь</button>
+                      </div>
+                      <div class="vc-branch vc-branch--p">
+                        <span class="vc-branch-dot"></span>
+                        <span class="vc-branch-txt"><b>Прохоровы</b><span>18 человек</span></span>
+                        <button class="vc-fly" type="button">перелететь</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+          <figcaption>
+            <b>Поиск и путь</b>
+            <code>torlmood.ru/search</code>
+            <span>Первый экран — поиск, а не холст: сразу видно путь до человека, ветви и то же русло дальше.</span>
+          </figcaption>
+        </figure>
+
+        <!-- ---------- Телефон 2. Холст ---------- -->
+        <figure class="shot">
+          <div class="phone">
+            <div class="notch"></div>
+            <div class="statusbar"><span>9:41</span><span class="icons"><i class="bars"></i><i class="bat"></i></span></div>
+            <div class="phone-screen">
+              <div class="vc-phone">
+
+                <header class="vc-m-head vc-m-head--light" style="padding-top:44px">
+                  <div class="vc-m-head-row">
+                    <button class="vc-m-back" type="button" aria-label="Назад к поиску">
+                      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 3 5 8l5 5"/></svg>
+                    </button>
+                    <div style="flex:1;min-width:0">
+                      <h2 style="font-size:16px">Ковалёвы и Соколовы</h2>
+                      <p>показано 18 из 148</p>
+                    </div>
+                    <span class="vc-role-sm" style="margin:0">путь</span>
+                  </div>
+                </header>
+
+                <div class="vc-m-crumbbar">
+                  <span>Ковалёвы</span><span class="vc-sep">→</span>
+                  <span>Пётр Григорьевич</span><span class="vc-sep">→</span>
+                  <b>Аркадий Петрович</b>
+                </div>
+
+                <div class="vc-m-canvas">
+                  <div class="vc-m-bands">
+                    <div class="vc-m-band vc-m-band--g1">
+                      <div class="vc-m-band-lab"><b>I</b><span>1880</span></div>
+                      <div class="vc-m-band-people">
+                        <button class="vc-med vc-med--m vc-med--sm" type="button">
+                          <span class="vc-mini vc-mini--m" style="width:28px;height:28px;border-radius:8px"><i></i><b></b></span>
+                          <span class="vc-med-txt"><b>Григорий Ильич</b><span>1889–1954</span></span>
+                        </button>
+                        <button class="vc-med vc-med--f vc-med--sm" type="button">
+                          <span class="vc-mini vc-mini--f" style="width:28px;height:28px;border-radius:8px"><i></i><b></b></span>
+                          <span class="vc-med-txt"><b>Анна Сергеевна</b><span>1894–1971</span></span>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="vc-m-band vc-m-band--g2">
+                      <div class="vc-m-band-lab"><b>II</b><span>1910</span></div>
+                      <div class="vc-m-band-people">
+                        <button class="vc-med vc-med--m vc-med--sm" type="button">
+                          <span class="vc-mini vc-mini--m" style="width:28px;height:28px;border-radius:8px"><i></i><b></b></span>
+                          <span class="vc-med-txt"><b>Пётр Григорьевич</b><span>1918–1983</span></span>
+                        </button>
+                        <button class="vc-med vc-med--f vc-med--sm" type="button">
+                          <span class="vc-mini vc-mini--f" style="width:28px;height:28px;border-radius:8px"><i></i><b></b></span>
+                          <span class="vc-med-txt"><b>Мария Тимофеевна</b><span>1922–2004</span></span>
+                        </button>
+                        <button class="vc-med vc-med--f vc-med--sm vc-med--dim" type="button">
+                          <span class="vc-mini vc-mini--f" style="width:28px;height:28px;border-radius:8px"><i></i><b></b></span>
+                          <span class="vc-med-txt"><b>Валентина Григорьевна</b><span>1926–1996</span></span>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="vc-m-band vc-m-band--g3">
+                      <div class="vc-m-band-lab"><b>III</b><span>1940</span></div>
+                      <div class="vc-m-band-people">
+                        <button class="vc-med vc-med--m vc-med--sm vc-med--sel vc-med--onpath" type="button">
+                          <span class="vc-mini vc-mini--m" style="width:28px;height:28px;border-radius:8px"><i></i><b></b></span>
+                          <span class="vc-med-txt"><b>Аркадий Петрович</b><span>1947–2011</span></span>
+                        </button>
+                        <button class="vc-med vc-med--f vc-med--sm" type="button">
+                          <span class="vc-mini vc-mini--f" style="width:28px;height:28px;border-radius:8px"><i></i><b></b></span>
+                          <span class="vc-med-txt"><b>Нина Борисовна</b><span>1950</span></span>
+                        </button>
+                        <button class="vc-med vc-med--f vc-med--sm vc-med--dim" type="button">
+                          <span class="vc-mini vc-mini--f" style="width:28px;height:28px;border-radius:8px"><i></i><b></b></span>
+                          <span class="vc-med-txt"><b>Галина Петровна</b><span>1952</span></span>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="vc-m-band vc-m-band--g4">
+                      <div class="vc-m-band-lab"><b>IV</b><span>1970</span></div>
+                      <div class="vc-m-band-people">
+                        <button class="vc-med vc-med--m vc-med--sm vc-med--onpath" type="button">
+                          <span class="vc-mini vc-mini--m" style="width:28px;height:28px;border-radius:8px"><i></i><b></b></span>
+                          <span class="vc-med-txt"><b>Илья Аркадьевич</b><span>1974</span></span>
+                        </button>
+                        <button class="vc-med vc-med--f vc-med--sm vc-med--dim" type="button">
+                          <span class="vc-mini vc-mini--f" style="width:28px;height:28px;border-radius:8px"><i></i><b></b></span>
+                          <span class="vc-med-txt"><b>Ольга Аркадьевна</b><span>1978</span></span>
+                        </button>
+                        <button class="vc-med vc-med--m vc-med--sm vc-med--dim" type="button">
+                          <span class="vc-mini vc-mini--m" style="width:28px;height:28px;border-radius:8px"><i></i><b></b></span>
+                          <span class="vc-med-txt"><b>Антон Юрьевич</b><span>1980</span></span>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="vc-m-band vc-m-band--g5">
+                      <div class="vc-m-band-lab"><b>V</b><span>2000</span></div>
+                      <div class="vc-m-band-people">
+                        <button class="vc-med vc-med--m vc-med--sm vc-med--dim" type="button">
+                          <span class="vc-mini vc-mini--m" style="width:28px;height:28px;border-radius:8px"><i></i><b></b></span>
+                          <span class="vc-med-txt"><b>Тимур Ильич</b><span>2005</span></span>
+                        </button>
+                        <button class="vc-med vc-med--f vc-med--sm vc-med--dim" type="button">
+                          <span class="vc-mini vc-mini--f" style="width:28px;height:28px;border-radius:8px"><i></i><b></b></span>
+                          <span class="vc-med-txt"><b>Вера Ильинична</b><span>2009</span></span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <svg class="vc-wires vc-wires--m" viewBox="0 0 370 578" preserveAspectRatio="none" aria-hidden="true">
+                      <!-- ветви вне пути — приглушены -->
+                      <g opacity=".35">
+                        <path class="vc-wire vc-wire--off" d="M67 48 L67 212"/>
+                        <path class="vc-wire vc-wire--off" d="M67 212 L195 212 L195 332"/>
+                        <path class="vc-wire vc-wire--off" d="M67 332 L67 452 L323 452"/>
+                        <path class="vc-wire vc-wire--off" d="M67 452 L67 572"/>
+                      </g>
+                      <!-- путь от корня -->
+                      <g>
+                        <path class="vc-wire vc-wire--on" d="M67 48 L67 212"/>
+                        <path class="vc-wire vc-wire--on" d="M67 212 L195 212 L195 332"/>
+                        <path class="vc-wire vc-wire--on" d="M195 332 L195 452"/>
+                        <path class="vc-wire vc-wire--on" d="M195 452 L195 572"/>
+                        <circle class="vc-wire-dot vc-wire-dot--on" cx="67" cy="212" r="3"/>
+                        <circle class="vc-wire-dot vc-wire-dot--on" cx="195" cy="332" r="3"/>
+                        <circle class="vc-wire-dot vc-wire-dot--on" cx="195" cy="452" r="3"/>
+                      </g>
+                    </svg>
+
+                  <div class="vc-m-now">
+                    <span class="vc-mini vc-mini--m" style="width:28px;height:28px;border-radius:8px"><i></i><b></b></span>
+                    <span class="vc-m-now-txt"><b>Аркадий Петрович Ковалёв</b><span>1947–2011 · путь из 3 шагов</span></span>
+                  </div>
+                  <div class="vc-m-zoom">
+                    <button type="button" aria-label="Приблизить">＋</button>
+                    <button type="button" aria-label="Отдалить">−</button>
+                  </div>
+                </div>
+
+                <div class="vc-m-sheet">
+                  <span class="vc-m-grip"></span>
+                  <div class="vc-m-sheet-h">
+                    <b>Путь</b>
+                    <span>3 шага · открыть лист</span>
+                  </div>
+                  <div class="vc-m-sheet-b">
+                    <div class="vc-steps">
+                      <div class="vc-step vc-step--on">
+                        <span class="vc-step-n">3</span>
+                        <span class="vc-step-txt"><b>Аркадий Петрович</b><span>Ленинград 1947 · выбран</span></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+          <figcaption>
+            <b>Холст с путём</b>
+            <code>torlmood.ru/tree/kovalevy</code>
+            <span>Крошки залипают под шапкой, полосы поколений сжаты до подписи «I · 1880», путь подсвечен, ветвь вне пути приглушена.</span>
+          </figcaption>
+        </figure>
+
+        <!-- ---------- Телефон 3. Карточка человека ---------- -->
+        <figure class="shot">
+          <div class="phone">
+            <div class="notch"></div>
+            <div class="statusbar"><span>9:41</span><span class="icons"><i class="bars"></i><i class="bat"></i></span></div>
+            <div class="phone-screen">
+              <div class="vc-phone">
+
+                <header class="vc-m-head vc-m-head--light" style="padding-top:44px">
+                  <div class="vc-m-head-row">
+                    <button class="vc-m-back" type="button" aria-label="Назад к холсту">
+                      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 3 5 8l5 5"/></svg>
+                    </button>
+                    <div style="flex:1;min-width:0">
+                      <h2 style="font-size:15px">Ковалёвы → Пётр → Аркадий</h2>
+                      <p>карточка человека</p>
+                    </div>
+                    <button class="vc-m-back" type="button" aria-label="Ещё действия">
+                      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><circle cx="3.4" cy="8" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="12.6" cy="8" r="1.4"/></svg>
+                    </button>
+                  </div>
+                </header>
+
+                <div class="vc-m-body">
+                  <div class="vc-m-card">
+                    <div class="vc-m-hero">
+                      <span class="vc-ring vc-ring--sm">
+                        <span class="vc-mini vc-mini--m" style="width:72px;height:72px;border-radius:50%"><i style="width:22px;height:22px;top:14px"></i><b style="width:48px;height:28px"></b></span>
+                      </span>
+                      <div style="min-width:0">
+                        <h1>Аркадий Петрович Ковалёв</h1>
+                        <p>1947–2011 · 64 года · Ленинград</p>
+                        <span class="vc-role-sm">III поколение · 3-й шаг пути</span>
+                      </div>
+                    </div>
+                    <div class="vc-m-acts">
+                      <button class="vc-btn" type="button">Редактировать</button>
+                      <button class="vc-btn" type="button">Документы · 3</button>
+                    </div>
+                  </div>
+
+                  <div class="vc-m-sect"><b>Моя ветвь</b><span>от вас до корня</span></div>
+                  <div class="vc-m-card">
+                    <div class="vc-card-b" style="padding:6px 6px 10px">
+                      <div class="vc-steps">
+                        <div class="vc-step">
+                          <span class="vc-step-n">1</span>
+                          <span class="vc-step-txt"><b>Илья Аркадьевич</b><span>1974 · это вы</span></span>
+                        </div>
+                        <div class="vc-step">
+                          <span class="vc-step-n">2</span>
+                          <span class="vc-step-txt"><b>Аркадий Петрович</b><span>1947–2011 · отец</span></span>
+                        </div>
+                        <div class="vc-step vc-step--on">
+                          <span class="vc-step-n">3</span>
+                          <span class="vc-step-txt"><b>Пётр Григорьевич</b><span>1918–1983 · дед</span></span>
+                        </div>
+                        <div class="vc-step">
+                          <span class="vc-step-n">4</span>
+                          <span class="vc-step-txt"><b>Григорий Ильич</b><span>1889–1954 · прадед</span></span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="vc-m-tabs" style="margin:14px -14px 0;padding:0 14px">
+                    <button class="vc-tab vc-tab--on" type="button" aria-current="true">Факты</button>
+                    <button class="vc-tab" type="button">События <em>9</em></button>
+                    <button class="vc-tab" type="button">История <em>12</em></button>
+                  </div>
+
+                  <div class="vc-m-card" style="margin-top:10px">
+                    <div class="vc-card-b" style="padding:4px 12px 10px">
+                      <div class="vc-m-row"><span>Дата рождения</span><b>12.05.1947</b></div>
+                      <div class="vc-m-row"><span>Место рождения</span><b>Ленинград</b></div>
+                      <div class="vc-m-row"><span>Дата смерти</span><b>03.09.2011</b></div>
+                      <div class="vc-m-row"><span>Супруга</span><b>Нина Борисовна, ⚭ 1971</b></div>
+                      <div class="vc-m-row"><span>Дети</span><b>Илья, 1974 · Ольга, 1978</b></div>
+                      <div class="vc-m-row"><span>Род</span><b>Ковалёвы, ветвь Петра</b></div>
+                    </div>
+                  </div>
+
+                  <div class="vc-m-sect"><b>События</b><span>9 из 9</span></div>
+                  <div class="vc-m-card">
+                    <div class="vc-card-b">
+                      <div class="vc-timeline">
+                        <div class="vc-tl">
+                          <span class="vc-tl-y">1947</span><span class="vc-tl-rail"><i></i></span>
+                          <span class="vc-tl-txt"><b>Рождение</b><span>Ленинград · 12 мая</span></span>
+                        </div>
+                        <div class="vc-tl vc-tl--on">
+                          <span class="vc-tl-y">1971</span><span class="vc-tl-rail"><i></i></span>
+                          <span class="vc-tl-txt"><b>Свадьба с Ниной Борисовной</b><span>Ленинград</span></span>
+                        </div>
+                        <div class="vc-tl">
+                          <span class="vc-tl-y">2011</span><span class="vc-tl-rail"><i></i></span>
+                          <span class="vc-tl-txt"><b>Смерть</b><span>Санкт-Петербург · 3 сентября</span></span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="vc-m-sheet vc-m-sheet--mini">
+                  <span class="vc-m-grip"></span>
+                  <div class="vc-m-sheet-h">
+                    <b>Переезды рода</b>
+                    <span>Рязань 1889 → Ленинград 1947</span>
+                  </div>
+                  <div class="vc-m-sheet-b">
+                    <div class="vc-steps">
+                      <div class="vc-step">
+                        <span class="vc-step-n">1</span>
+                        <span class="vc-step-txt"><b>Григорий Ильич Ковалёв</b><span>Рязань 1889</span></span>
+                      </div>
+                      <div class="vc-step">
+                        <span class="vc-step-n">2</span>
+                        <span class="vc-step-txt"><b>Пётр Григорьевич Ковалёв</b><span>Ленинград 1918</span></span>
+                      </div>
+                      <div class="vc-step vc-step--on">
+                        <span class="vc-step-n">3</span>
+                        <span class="vc-step-txt"><b>Аркадий Петрович Ковалёв</b><span>Ленинград 1947</span></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="vc-m-foot">
+                  <button class="vc-btn vc-btn--brass" type="button">На холсте</button>
+                  <button class="vc-btn" type="button">Добавить событие</button>
+                </div>
+
+              </div>
+            </div>
+          </div>
+          <figcaption>
+            <b>Карточка человека</b>
+            <code>torlmood.ru/tree/kovalevy/person/arkady</code>
+            <span>Карточка «Моя ветвь» от вас до корня, факты и события списком, путь — лист снизу с тремя шагами и годами мест.</span>
+          </figcaption>
+        </figure>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== ЗАМЕТКИ ==================== -->
+  <section class="section" id="notes">
+    <h2><span class="num">03</span>Заметки</h2>
+    <p>Что направление даёт семье, во что обходится в коде и где можно промахнуться.</p>
+    <div class="rule"></div>
+
+    <div class="notes">
+      <div class="note-card">
+        <h3>Что это даёт семье</h3>
+        <p class="vc-note-lead">Вместо «таблицы родственников» — карта, по которой можно сходить в гости к прадеду.</p>
+        <ul>
+          <li>Полосы поколений с годами («III · 1940–1980») отвечают на вопрос «кто кому ровня по времени» без чтения дат на каждой карточке.</li>
+          <li>Путь от корня до человека объясняет родство одной картинкой: у Галины Петровны линия идёт через её отца, а не через брата, — и это видно, а не подразумевается.</li>
+          <li>Крошки-путь «Ковалёвы → Пётр Григорьевич → Аркадий Петрович» заменяют слова «это сын брата деда».</li>
+          <li>Кнопка «Показать на холсте» и навигатор-ветви дают быстрый способ добраться туда, где 148 человек не помещаются на экран.</li>
+          <li>Поиск стоит первым на телефоне: человек приходит с именем, а не с желанием «посмотреть древо».</li>
+        </ul>
+      </div>
+
+      <div class="note-card">
+        <h3>Как ложится на код</h3>
+        <ul>
+          <li><code>src/lib/layout.ts</code> — глубокая переработка: вместо свободной раскладки React Flow считаем геометрию полосами, поколение → строка, внутри строки фиксированный шаг. Здесь же считаются координаты сочленений для SVG-связей.</li>
+          <li><code>src/components/tree/TreeCanvas.tsx</code> — переписать заметно: полосы как подложки, SVG-слой связей под узлами, вместо миникарты — панель навигатора-ветвей, крошки-путь в шапке.</li>
+          <li><code>src/components/tree/PersonNode.tsx</code> — средняя правка: медальон (годы слева, дуга пола, латунное кольцо), состояния <code>vc-med--dim</code> и <code>vc-med--onpath</code>.</li>
+          <li><code>src/lib/maleLine.ts</code> — меняется смысл: вместо отбора самого длинного мужского рода функция возвращает цепочку предков от выбранного человека до корня; фильтр «мужская линия» остаётся её частным случаем.</li>
+          <li><code>src/lib/place.ts</code> — небольшая правка: из мест человека собираются шаги пути («Рязань 1889 → Ленинград 1918»), нужен год привязки к месту.</li>
+          <li><code>src/app/(app)/tree/[treeId]/page.tsx</code> — средняя правка: состояние поиска с путём, выделенный человек, ветви для навигатора (лучше считать на сервере).</li>
+          <li><code>src/app/(app)/dashboard/page.tsx</code> — заметная правка: карта семей плитками и блок «Продолжить с того места».</li>
+          <li><code>src/app/globals.css</code> — добавить токены полос поколений и стили медальона; существующая палитра и латунь подходят без изменений.</li>
+          <li>Экран «Моя ветвь» на телефоне — новая страница поиска, которой сейчас нет вовсе.</li>
+        </ul>
+      </div>
+
+      <div class="note-card note-card--warn">
+        <h3>Риски и цена</h3>
+        <ul>
+          <li>Подсветка пути на большом древе может тормозить: при 148 узлах это пересчёт классов, но на 1500 человек понадобится мемоизация и подсветка только видимого окна.</li>
+          <li>Полосы поколений спорны там, где даты «плавают»: приёмный ребёнок, второй брак, разрыв в 40 лет — человек может не попасть ни в одну полосу или попасть в чужую. Нужен запасной режим «без полос».</li>
+          <li>Навигатор-ветви нельзя считать на клиенте: разбиение на ветви — это обход всего древа, его место на сервере и в кэше.</li>
+          <li>Приглушение до 35&nbsp;% снижает контраст: подписи вне пути перестают читаться, а значит нельзя оставлять их единственным способом найти человека (поиск и список обязательны).</li>
+          <li>Карта требует больше места по вертикали, чем список: на ноутбуке 1280×720 пять полос уже тесны, придётся ужимать медальоны.</li>
+          <li>Кнопка «Показать на холсте» из карточки человека добавляет переход, которого сейчас нет, — лишний шаг для того, кто просто правит даты.</li>
+        </ul>
+      </div>
+
+      <div class="note-card">
+        <h3>Палитра</h3>
+        <p class="vc-note-lead">Основа — палитра проекта; добавлены только мягкие подложки полос поколений.</p>
+        <div class="swatches">
+          <span class="swatch"><i style="background:#c9a227"></i><b>Латунь</b><span>#c9a227 · путь, кольцо выбранного</span></span>
+          <span class="swatch"><i style="background:#7fa6c9"></i><b>Мужчины</b><span>#7fa6c9 · дуга на медальоне</span></span>
+          <span class="swatch"><i style="background:#d1873f"></i><b>Женщины</b><span>#d1873f · дуга на медальоне</span></span>
+          <span class="swatch"><i style="background:#eaedf3"></i><b>Холст-карта</b><span>#eaedf3 · бумага атласа</span></span>
+          <span class="swatch"><i style="background:#deeaf3"></i><b>Полоса II–III</b><span>#deeaf3 · холодный тон</span></span>
+          <span class="swatch"><i style="background:#e2d8c8"></i><b>Полоса IV</b><span>#e2d8c8 · тёплый тон</span></span>
+          <span class="swatch"><i style="background:#0f1a2e"></i><b>Обложка</b><span>#0f1a2e · шапка и баннер</span></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer vc-foot">
+      <span>Вариант C · «Атлас рода» — тестовая страница, данные вымышлены для примера вёрстки.</span>
+      <span class="vc-foot-links">
+        <a href="index.html">Обзор вариантов</a>
+        <a href="a-quiet-archive.html">A · Тихий архив</a>
+        <a href="b-canvas-studio.html">B · Холст-студия</a>
+        <a href="d-card-catalog.html">D · Картотека</a>
+      </span>
+    </div>
+  </section>
+
+</div>
+
+<script>
+/* Пара строк ванили: кнопка «Показать на холсте» снимает/возвращает
+   приглушение карточек и связей — чтобы состояние пути можно было пощупать. */
+(function () {
+  var canvas = document.querySelector('[data-vc-canvas]');
+  var toggle = document.querySelector('[data-vc-toggle]');
+  if (canvas && toggle) {
+    toggle.addEventListener('click', function () {
+      var off = canvas.classList.toggle('vc-canvas--nopath');
+      toggle.lastChild.textContent = off ? ' Скрыть путь' : ' Показать на холсте';
+    });
+  }
+  var input = document.querySelector('[data-vc-search]');
+  if (input) {
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { input.value = ''; input.blur(); }
+    });
+  }
+})();
+</script>
+</body>
+</html>

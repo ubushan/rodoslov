@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Torlmood — пять направлений интерфейса</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Literata:wght@400;500;600&family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="base.css">
+<style>
+/* ===== 1. Локальные стили обзорной страницы (префикс vi-) ===== */
+.vi-table-wrap {
+  margin-top: 20px; overflow-x: auto;
+  border: 1px solid var(--mist-200); border-radius: var(--r); background: #fff;
+}
+.vi-table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 1120px; }
+.vi-table th, .vi-table td {
+  text-align: left; vertical-align: top;
+  padding: 12px 16px; border-bottom: 1px solid var(--mist-200);
+}
+.vi-table thead th {
+  background: var(--mist-50); font-weight: 500; color: var(--ink-700);
+  font-family: var(--serif); font-size: 14.5px; white-space: nowrap;
+}
+.vi-table thead th:first-child { width: 190px; }
+.vi-table tbody th {
+  font-weight: 500; color: var(--ink-500); font-size: 13px;
+}
+.vi-table tbody tr:last-child th, .vi-table tbody tr:last-child td { border-bottom: none; }
+.vi-table tbody tr:hover td, .vi-table tbody tr:hover th { background: var(--mist-50); }
+.vi-table .vi-a { color: var(--ink-800); }
+.vi-table small { display: block; margin-top: 3px; color: var(--ink-400); font-size: 12px; }
+
+/* ===== 2. Шаги «что дальше» ===== */
+.vi-steps { display: grid; gap: 14px; margin-top: 20px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.vi-step {
+  border: 1px solid var(--mist-200); border-radius: var(--r); background: #fff;
+  padding: 18px 20px 20px;
+}
+.vi-step .vi-n {
+  display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px;
+  background: var(--ink-800); color: var(--brass-400);
+  font-size: 13px; font-family: var(--mono); margin-bottom: 10px;
+}
+.vi-step h3 { margin: 0 0 6px; font-family: var(--serif); font-weight: 500; font-size: 17px; }
+.vi-step p { margin: 0; color: var(--ink-500); font-size: 14px; }
+.vi-step code {
+  font-family: var(--mono); font-size: 12.5px; color: var(--ink-700);
+  background: var(--mist-50); border: 1px solid var(--mist-200); border-radius: 6px; padding: 1px 5px;
+}
+
+/* ===== 3. Мелочи ===== */
+.vi-toc-tag { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.vi-toc-tag .dot { width: 8px; height: 8px; border-radius: 50%; }
+.vi-note-inline {
+  margin-top: 18px; padding: 14px 18px;
+  border: 1px solid #e8d9a8; border-radius: var(--r); background: #fefbf0;
+  color: var(--ink-600); font-size: 14px;
+}
+.vi-files { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.vi-file {
+  display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: var(--ink-600);
+  border: 1px solid var(--mist-200); border-radius: 10px; background: #fff;
+  padding: 8px 13px; font-size: 13.5px;
+}
+.vi-file:hover { border-color: var(--mist-300); background: var(--mist-50); }
+.vi-file b { font-weight: 500; }
+.vi-file span { color: var(--ink-400); font-size: 12.5px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand"><i>T</i> Torlmood — тестовые страницы интерфейса</div>
+  <nav>
+    <a href="index.html" aria-current="page">Обзор</a>
+    <a href="a-quiet-archive.html">A · Тихий архив</a>
+    <a href="b-canvas-studio.html">B · Холст-студия</a>
+    <a href="c-family-atlas.html">C · Атлас рода</a>
+    <a href="d-card-catalog.html">D · Картотека</a>
+    <a href="e-chronicle.html">E · Хроника</a>
+  </nav>
+</div>
+
+<div class="wrap">
+
+  <header class="doc-head">
+    <p class="eyebrow">Тестовые страницы · октябрь 2026</p>
+    <h1>Пять направлений интерфейса</h1>
+    <p class="lead">
+            Сейчас у Torlmood один интерфейс: тёмная обложка, строка хлебных крошек,
+      холст с плавающей панелью и карточка человека отдельной страницей. Эти пять
+      страниц — не косметические правки, а пять разных способов смотреть на продукт:
+      <b>типографика вместо рамок</b>, <b>тёмная мастерская</b>, <b>карта рода</b>,
+      <b>плотная картотека</b> и <b>лента времени</b>. В каждом варианте показаны
+      десктоп и телефон.
+    </p>
+    <div class="chips">
+      <span class="chip"><b>5</b> направлений и <b>6</b> страниц</span>
+      <span class="chip"><b>3</b> десктопных экрана и <b>2–3</b> мобильных в каждом</span>
+      <span class="chip">чистый HTML + CSS, без сборки</span>
+      <span class="chip chip--brass">ничего в <b>src/</b> не менялось</span>
+    </div>
+  </header>
+
+  <section class="section" id="variants">
+    <h2><span class="num">01</span>Варианты</h2>
+    <p>
+      Данные во всех вариантах одни и те же: древо «Ковалёвы и Соколовы», 148 человек,
+      4 участника, выбранный человек — Аркадий Петрович Ковалёв (1947–2011).
+      Так варианты можно сравнивать построчно, а не по впечатлению.
+    </p>
+
+    <div class="toc">
+      <a class="toc-card" href="a-quiet-archive.html">
+        <div class="thumb"><img src="shots/a-quiet-archive-thumb.png" alt="Вариант A — макет дашборда: таблица древ"></div>
+        <div class="body">
+          <h3>A · Тихий архив</h3>
+          <p>Музейный каталог. У карточек нет теней и цветной заливки: только имя, годы и волосяные линии. Пол — узкая полоса слева, слева по холсту идёт линейка поколений.</p>
+          <span class="tag">Для спокойного чтения родословной</span>
+        </div>
+      </a>
+
+      <a class="toc-card" href="b-canvas-studio.html">
+        <div class="thumb"><img src="shots/b-canvas-studio-thumb.png" alt="Вариант B — макет дашборда: тёмные плитки древ"></div>
+        <div class="body">
+          <h3>B · Холст-студия</h3>
+          <p>Тёмная мастерская: холст на весь экран, стеклянные панели, нижний док, инспектор справа и командная палитра ⌘K вместо хлебных крошек.</p>
+          <span class="tag">Для долгой работы с большим древом</span>
+        </div>
+      </a>
+
+      <a class="toc-card" href="b-canvas-studio-light.html">
+        <div class="thumb"><img src="shots/b-canvas-studio-light-thumb.png" alt="Вариант B, светлая тема — макет холста"></div>
+        <div class="body">
+          <h3>B · Холст-студия — светлая тема</h3>
+          <p>Та же мастерская в светлой палитре: белые поверхности, стекло на тени и границе, тёмный янтарь вместо светлой латуни. Отдельная страница, чтобы сравнивать темы рядом.</p>
+          <span class="tag">Для работы днём и на солнце</span>
+        </div>
+      </a>
+
+      <a class="toc-card" href="c-family-atlas.html">
+        <div class="thumb"><img src="shots/c-family-atlas-thumb.png" alt="Вариант C — макет дашборда: карта семей"></div>
+        <div class="body">
+          <h3>C · Атлас рода</h3>
+          <p>Древо как карта: полосы поколений, навигатор-ветви вместо миникарты и подсветка пути от корня до человека — ответ на открытый вопрос про «линию от выбранного человека».</p>
+          <span class="tag">Для ориентации в 148 человеках</span>
+        </div>
+      </a>
+
+      <a class="toc-card" href="d-card-catalog.html">
+        <div class="thumb"><img src="shots/d-card-catalog-thumb.png" alt="Вариант D — макет дашборда: картотека древ"></div>
+        <div class="body">
+          <h3>D · Картотека</h3>
+          <p>Плотный архивный указатель: слева таблица людей с фильтрами, справа досье с фактами, документами, событиями и историей правок. Моноширинные цифры, всё выровнено в столбцы.</p>
+          <span class="tag">Для поиска и точности данных</span>
+        </div>
+      </a>
+
+      <a class="toc-card" href="e-chronicle.html">
+        <div class="thumb"><img src="shots/e-chronicle-thumb.png" alt="Вариант E — макет ленты рода"></div>
+        <div class="body">
+          <h3>E · Хроника</h3>
+          <p>Лента времени вместо древа: год как главный герой, полоса историй с градиентными кольцами, карточки-сквирклы событий, рельс десятилетий слева и бенто-обзор. Другая пара шрифтов и кислотная палитра — ни на что прежнее не похоже.</p>
+          <span class="tag">Для пополнения: событие в три касания</span>
+        </div>
+      </a>
+    </div>
+  </section>
+
+  <section class="section" id="compare">
+    <h2><span class="num">02</span>Чем отличаются</h2>
+    <p>По строкам видно, что каждый вариант по-своему решает три задачи: как выглядит человек, как не потеряться в большом древе и что делать с телефона.</p>
+
+    <div class="vi-table-wrap">
+      <table class="vi-table">
+        <thead>
+          <tr>
+            <th>Что сравниваем</th>
+            <th>A · Тихий архив</th>
+            <th>B · Холст-студия</th>
+            <th>C · Атлас рода</th>
+            <th>D · Картотека</th>
+            <th>E · Хроника</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th>Идея</th>
+            <td>Музейный каталог: типографика и линии</td>
+            <td>Мастерская: холст и стеклянные панели</td>
+            <td>Карта рода: полосы поколений и путь</td>
+            <td>Архивный указатель: список и досье</td>
+            <td>Лента времени: род как поток событий</td>
+          </tr>
+          <tr>
+            <th>Главный экран</th>
+            <td>Список-таблица древ</td>
+            <td>Холст во весь экран</td>
+            <td>Поиск и путь от корня</td>
+            <td>Список людей + досье</td>
+            <td>Поток событий по годам</td>
+          </tr>
+          <tr>
+            <th>Как выглядит человек</th>
+            <td>Имя и годы, пол — полоса слева<small>без аватара и заливки</small></td>
+            <td>Тёмное стекло, кромка по полу, свечение при выделении</td>
+            <td>Медальон: годы слева от имени, кольцо у выбранного</td>
+            <td>Строка таблицы и плитка на холсте</td>
+            <td>Кольцо-история в полосе и чип внутри события</td>
+          </tr>
+          <tr>
+            <th>Как открыть человека</th>
+            <td>Отдельная страница: «Факты» и «События» в две колонки</td>
+            <td>Инспектор справа, не уходя с холста</td>
+            <td>Медальон + панели «Путь к человеку» и «Переезды рода»</td>
+            <td>Досье в мастере-детали, не уходя со списка</td>
+            <td>Полноэкранный профиль с таймлайном жизни</td>
+          </tr>
+          <tr>
+            <th>Навигация в большом древе</th>
+            <td>Линейка поколений I–V у левого края</td>
+            <td>Командная палитра ⌘K и поиск по людям</td>
+            <td>Навигатор-ветви, путь от корня, подсветка цепочки</td>
+            <td>Таблица с фильтрами «Мужчины / Женщины / Живые / Без дат»</td>
+            <td>Рельс десятилетий и годы-заголовки в ленте</td>
+          </tr>
+          <tr>
+            <th>Телефон</th>
+            <td>Залипающие чипы поколений, действия листом снизу</td>
+            <td>Холст во весь экран, док-пилюля, инспектор листом</td>
+            <td>Поиск первым экраном, «Моя ветвь», путь листом</td>
+            <td>Лента карточек с фильтрами и нижние вкладки</td>
+            <td>Полноэкранная лента, истории, нижний остров</td>
+          </tr>
+          <tr>
+            <th>Что решает лучше всего</th>
+            <td>Разреженность и «музейность»: древо читают, а не правят</td>
+            <td>Долгую работу: много правок, связи, экспорт</td>
+            <td>Ориентацию: где я, чья это ветвь, как я сюда попал</td>
+            <td>Поиск и точность: пробелы в датах, документы, история</td>
+            <td>Пополнение: событие добавляется в три касания</td>
+          </tr>
+          <tr>
+            <th>Чем платим</th>
+            <td>Суше и холоднее, меньше «тепла» семейного альбома<small>теряется нынешняя обложка</small></td>
+            <td>Тёмная тема на солнце, blur на слабых телефонах, инспектор тесен для длинных текстов</td>
+            <td>Подсветка пути и полосы поколений дороже по расчёту на больших древах</td>
+            <td>Таблица тесна на телефоне, плотность пугает неподготовленных родственников</td>
+            <td>У семей есть только имена и годы — лента вырождается в список; древо уходит на второй план</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="vi-note-inline">
+      Варианты намеренно не смешаны: так видно характер каждого. Но выбрать можно
+      и гибрид — например, типографику A, подсветку пути из C и нижний док из B.
+      Тогда следующий шаг — свести это в один список решений, а не в один файл.
+    </div>
+  </section>
+
+  <section class="section" id="next">
+    <h2><span class="num">03</span>Что с этим делать дальше</h2>
+    <p>Порядок, при котором решение принимается один раз и не переделывается дважды.</p>
+
+    <div class="vi-steps">
+      <div class="vi-step">
+        <div class="vi-n">1</div>
+        <h3>Посмотреть с телефона</h3>
+        <p>Откройте страницы на телефоне: все пять вариантов показывают мобильные экраны в рамке телефона. Половина правок в семейном древе делается с телефона, и разница между вариантами там заметнее, чем на десктопе.</p>
+      </div>
+      <div class="vi-step">
+        <div class="vi-n">2</div>
+        <h3>Выбрать один или собрать гибрид</h3>
+        <p>Если ничего не менять — тоже ответ: значит, текущий интерфейс устраивает, и силы лучше вложить в функции из README: комментарии к карточкам, поиск по древу, подписки на изменения.</p>
+      </div>
+      <div class="vi-step">
+        <div class="vi-n">3</div>
+        <h3>Перенести в код</h3>
+        <p>Палитра и токены — в <code>globals.css</code> (два слоя <code>--p-*</code> и <code>@theme</code> сохраняются), карточка и связи — в <code>TreeCanvas.tsx</code>, <code>PersonNode.tsx</code>, <code>FamilyBusEdge.tsx</code>, раскладка — в <code>lib/layout.ts</code> и <code>lib/place.ts</code>. Порядок и объём работ разобран в блоке «Как ложится на код» на странице каждого варианта.</p>
+      </div>
+    </div>
+
+    <div class="vi-files">
+      <a class="vi-file" href="SPEC.md"><b>SPEC.md</b> <span>бриф: данные, экраны, правила</span></a>
+      <a class="vi-file" href="render-shots.sh"><b>render-shots.sh</b> <span>пересобрать снимки в shots/</span></a>
+      <a class="vi-file" href="a-quiet-archive.html"><b>A</b> <span>Тихий архив</span></a>
+      <a class="vi-file" href="b-canvas-studio.html"><b>B</b> <span>Холст-студия</span></a>
+      <a class="vi-file" href="c-family-atlas.html"><b>C</b> <span>Атлас рода</span></a>
+      <a class="vi-file" href="d-card-catalog.html"><b>D</b> <span>Картотека</span></a>
+      <a class="vi-file" href="e-chronicle.html"><b>E</b> <span>Хроника</span></a>
+    </div>
+
+    <div class="rule"></div>
+    <p class="footer">
+      Тестовые страницы лежат в <code>ui-variants/</code> — вне <code>src/</code> и вне <code>public/</code>,
+      поэтому при выкатке на <code>torlmood.ru</code> они никуда не попадут.
+      Данные вымышленные, но структура настоящая: те же поля карточки, роли участников,
+      история правок и обрезка по пределу числа людей. Открываются двойным кликом по файлу,
+      интернет нужен только для шрифтов Literata и Golos Text.
+    </p>
+  </section>
+
+</div>
+</body>
+</html>

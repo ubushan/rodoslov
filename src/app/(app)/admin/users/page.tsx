@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { Section, Empty } from "@/components/admin/ui";
+import { Chip, Section, Empty } from "@/components/admin/ui";
 import { UsersTable, type UserRow } from "@/components/admin/UsersTable";
 import { adminClient, adminEmails, adminIds, currentAdmin, hasServiceKey } from "@/lib/admin";
 import { formatDateTime } from "@/lib/format";
 
-export const metadata = { title: "Пользователи — Родослов" };
+export const metadata = { title: "Пользователи — Torlmud" };
 
 type Search = { searchParams: Promise<{ page?: string }> };
 const PER_PAGE = 50;
@@ -73,25 +73,31 @@ export default async function AdminUsersPage({ searchParams }: Search) {
       </Section>
 
       {lastPage > 1 && (
-        <div className="flex items-center justify-between text-[13px] text-ink-500">
+        <nav aria-label="Страницы пользователей" className="flex items-center justify-between gap-3">
           {page > 1 ? (
-            <Link href={`/admin/users?page=${page - 1}`} className="hover:text-ink-800">
+            <Link
+              href={`/admin/users?page=${page - 1}`}
+              className="inline-flex h-8 items-center rounded-[10px] border border-[var(--p-line)] bg-[var(--p-field-bg)] px-3 text-[12.5px] text-ink-700 transition-colors hover:border-[var(--p-line-3)] hover:text-ink-800"
+            >
               ← Предыдущая
             </Link>
           ) : (
             <span />
           )}
-          <span>
+          <Chip>
             Страница {page} из {lastPage}
-          </span>
+          </Chip>
           {page < lastPage ? (
-            <Link href={`/admin/users?page=${page + 1}`} className="hover:text-ink-800">
+            <Link
+              href={`/admin/users?page=${page + 1}`}
+              className="inline-flex h-8 items-center rounded-[10px] border border-[var(--p-line)] bg-[var(--p-field-bg)] px-3 text-[12.5px] text-ink-700 transition-colors hover:border-[var(--p-line-3)] hover:text-ink-800"
+            >
               Следующая →
             </Link>
           ) : (
             <span />
           )}
-        </div>
+        </nav>
       )}
     </div>
   );

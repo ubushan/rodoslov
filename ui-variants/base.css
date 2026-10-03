@@ -1,0 +1,299 @@
+/* =====================================================================
+   Torlmood — тестовые страницы интерфейса: общая «рама».
+   Здесь только то, что одинаково у всех вариантов: обои документа,
+   браузерная рамка, телефон, подписи, чипы, заметки.
+   Сам интерфейс приложения каждый вариант рисует сам, в своём <style>,
+   со своим префиксом классов (va- / vb- / vc- / vd-).
+   ===================================================================== */
+
+:root {
+  /* Светлая палитра проекта — как :root в src/app/globals.css */
+  --ink-900: #0a1120;
+  --ink-800: #0f1a2e;
+  --ink-700: #131e33;
+  --ink-600: #1c2b45;
+  --ink-500: #2b3d5c;
+  --ink-400: #47597a;
+  --ink-300: #7487a5;
+
+  --mist-50: #f7f9fc;
+  --mist-100: #eef1f6;
+  --mist-200: #dfe5ee;
+  --mist-300: #c6cfdd;
+
+  --brass: #c9a227;
+  --brass-400: #d9b64a;
+  --brass-600: #a3821a;
+
+  --bond-100: #e7f0f7;
+  --bond-200: #c9dcea;
+  --bond-400: #7fa6c9;
+  --bond-500: #5b87ae;
+
+  --male: #7fa6c9;
+  --female: #d1873f;
+
+  --danger: #c05a4d;
+  --ok: #4a6b3f;
+
+  --serif: "Literata", Georgia, "Times New Roman", serif;
+  --sans: "Golos Text", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --lift: 0 1px 2px rgba(10, 17, 32, .06), 0 12px 32px -12px rgba(10, 17, 32, .24);
+  --plate: 0 2px 0 rgba(10, 17, 32, .04), 0 18px 48px -24px rgba(10, 17, 32, .4);
+  --r: 14px;
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--mist-100);
+  color: var(--ink-800);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---------- Документ ---------- */
+
+.wrap { max-width: 1440px; margin: 0 auto; padding: 36px 26px 96px; }
+
+.topbar {
+  display: flex; flex-wrap: wrap; gap: 10px 16px;
+  align-items: center; justify-content: space-between;
+  padding: 12px 26px;
+  background: var(--ink-800);
+  color: #f7f9fc;
+  font-size: 13.5px;
+}
+.topbar .brand {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--serif); font-size: 16px; letter-spacing: -.01em;
+}
+.topbar .brand i {
+  display: grid; place-items: center;
+  width: 26px; height: 26px; border-radius: 8px;
+  border: 1px solid rgba(201, 162, 39, .55);
+  background: radial-gradient(120% 120% at 20% 0, rgba(201, 162, 39, .28), transparent 60%);
+  color: var(--brass-400); font-style: normal; font-size: 13px;
+}
+.topbar nav { display: flex; flex-wrap: wrap; gap: 6px; }
+.topbar a {
+  color: #c8d2e2; text-decoration: none;
+  border: 1px solid transparent; border-radius: 8px; padding: 4px 9px;
+}
+.topbar a:hover { color: #fff; border-color: rgba(200, 210, 226, .3); }
+.topbar a[aria-current="page"] { color: #0f1a2e; background: var(--brass-400); border-color: var(--brass-400); }
+
+.eyebrow {
+  margin: 0 0 6px; font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--brass-600); font-weight: 600;
+}
+
+.doc-head { margin: 8px 0 0; }
+.doc-head h1 {
+  margin: 0; font-family: var(--serif); font-weight: 500; font-size: 38px;
+  letter-spacing: -.02em; line-height: 1.12;
+}
+.lead { margin: 10px 0 0; max-width: 78ch; color: var(--ink-500); font-size: 16px; }
+.lead b { color: var(--ink-700); font-weight: 500; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  border: 1px solid var(--mist-300); border-radius: 999px;
+  background: #fff; padding: 5px 12px;
+  font-size: 13px; color: var(--ink-500);
+}
+.chip b { color: var(--ink-700); font-weight: 500; }
+.chip--brass { border-color: rgba(201, 162, 39, .5); background: #fdf8e8; color: var(--brass-600); }
+.chip--quiet { background: transparent; }
+
+.section { margin-top: 48px; }
+.section > h2 {
+  margin: 0; font-family: var(--serif); font-weight: 500; font-size: 23px;
+  letter-spacing: -.015em;
+}
+.section > h2 .num {
+  font-size: 14px; color: var(--ink-300); font-family: var(--sans);
+  margin-right: 8px; letter-spacing: .08em;
+}
+.section > p { margin: 8px 0 0; max-width: 82ch; color: var(--ink-500); font-size: 14.5px; }
+.rule { height: 1px; margin: 26px 0 0; background: linear-gradient(90deg, var(--mist-300), transparent); }
+
+/* ---------- Сцена со «скриншотами» ---------- */
+
+/* Горизонтальная прокрутка вместо сжатия: макеты всегда в натуральную величину */
+.stage {
+  margin-top: 22px; padding: 26px;
+  border: 1px solid var(--mist-200); border-radius: 20px;
+  background:
+    radial-gradient(circle at 1px 1px, var(--mist-300) 1px, transparent 0) 0 0 / 22px 22px,
+    var(--mist-50);
+  overflow-x: auto;
+}
+/* Ряды переносятся: макеты стоят по одному в строку, а не уезжают
+   за горизонтальную прокрутку. Сцена прокручивается только если
+   макет шире самой сцены. */
+.stage-row {
+  display: flex; flex-wrap: wrap; gap: 44px 40px;
+  align-items: flex-start; width: 100%;
+}
+.stage-row + .stage-row { margin-top: 44px; }
+.stage-row--center { justify-content: center; }
+
+.shot { margin: 0; }
+/* Ширину фигуры задаёт сам макет, а не подпись: иначе длинная подпись
+   растягивает фигуру и телефоны перестают помещаться в один ряд. */
+.shot:has(.phone) { width: 390px; }
+.shot:has(.frame) { width: 1282px; }
+.shot figcaption {
+  margin-top: 12px; font-size: 13px; color: var(--ink-400);
+  display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap;
+}
+.shot figcaption b { color: var(--ink-600); font-weight: 500; font-size: 13.5px; }
+.shot figcaption code {
+  font-family: var(--mono); font-size: 12px; color: var(--ink-400);
+  background: #fff; border: 1px solid var(--mist-200); border-radius: 6px; padding: 1px 6px;
+}
+
+/* Браузерная рамка: десктопный экран 1280×820 */
+.frame {
+  width: 1280px; border: 1px solid var(--mist-300); border-radius: var(--r);
+  background: #fff; overflow: hidden; box-shadow: var(--plate);
+}
+.browser {
+  display: flex; align-items: center; gap: 14px;
+  height: 40px; padding: 0 14px;
+  background: linear-gradient(180deg, #fbfcfe, var(--mist-100));
+  border-bottom: 1px solid var(--mist-200);
+}
+.browser .dots { display: flex; gap: 6px; }
+.browser .dots i { width: 10px; height: 10px; border-radius: 50%; background: var(--mist-300); }
+.browser .addr {
+  flex: 1; display: flex; align-items: center; gap: 8px;
+  height: 24px; padding: 0 12px;
+  border: 1px solid var(--mist-200); border-radius: 999px;
+  background: #fff; color: var(--ink-400); font-size: 12px; font-family: var(--mono);
+}
+.browser .addr::before {
+  content: ""; width: 9px; height: 11px; border: 1.4px solid var(--ok); border-radius: 2px;
+}
+.browser .tabs { color: var(--ink-300); font-size: 12px; }
+
+.screen {
+  position: relative; width: 1280px; height: 820px;
+  overflow: hidden; isolation: isolate; background: #fff;
+}
+
+/* Телефон: 390×844, как iPhone 14/15 */
+.phone {
+  position: relative; width: 390px; height: 844px; flex: none;
+  border-radius: 46px; padding: 10px;
+  background: linear-gradient(160deg, #2b3d5c, #0a1120 60%);
+  box-shadow: var(--plate);
+}
+.phone::after { /* кнопка сбоку */
+  content: ""; position: absolute; right: -2px; top: 186px;
+  width: 3px; height: 64px; border-radius: 3px; background: #4b5a76;
+}
+.phone-screen {
+  position: relative; width: 370px; height: 824px;
+  border-radius: 37px; overflow: hidden; isolation: isolate;
+  background: #fff;
+}
+.notch {
+  position: absolute; left: 50%; top: 8px; transform: translateX(-50%);
+  width: 108px; height: 26px; border-radius: 999px; background: #0a1120; z-index: 40;
+}
+
+/* Строка состояния, если вариант её не рисует сам */
+.statusbar {
+  position: absolute; inset: 0 0 auto; z-index: 30;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 13px 26px 0; font-size: 13px; font-weight: 600; color: var(--ink-800);
+  pointer-events: none;
+}
+.statusbar .icons { display: flex; gap: 5px; align-items: flex-end; }
+/* Четыре полоски связи: высота растёт, как у системного индикатора */
+.statusbar .icons i { display: block; width: 3px; background: currentColor; border-radius: 1px; }
+.statusbar .icons i:nth-child(1) { height: 4px; }
+.statusbar .icons i:nth-child(2) { height: 6px; }
+.statusbar .icons i:nth-child(3) { height: 8px; }
+.statusbar .icons i:nth-child(4) { height: 11px; }
+.statusbar .icons .bat { width: 22px; height: 11px; border-radius: 3px; border: 1.4px solid currentColor; background: none; position: relative; }
+.statusbar .icons .bat::after { content: ""; position: absolute; inset: 1.6px; right: 6px; border-radius: 1px; background: currentColor; }
+
+/* ---------- Заметки ---------- */
+
+.notes {
+  display: grid; gap: 16px; margin-top: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+.note-card {
+  border: 1px solid var(--mist-200); border-radius: var(--r);
+  background: #fff; padding: 18px 20px;
+}
+.note-card h3 {
+  margin: 0 0 8px; font-family: var(--serif); font-weight: 500; font-size: 17px;
+}
+.note-card p { margin: 0; color: var(--ink-500); font-size: 14px; }
+.note-card ul { margin: 0; padding-left: 18px; color: var(--ink-500); font-size: 14px; }
+.note-card li + li { margin-top: 5px; }
+.note-card code {
+  font-family: var(--mono); font-size: 12.5px; color: var(--ink-700);
+  background: var(--mist-50); border: 1px solid var(--mist-200); border-radius: 6px; padding: 1px 5px;
+}
+.note-card--warn { border-color: #e8d9a8; background: #fefbf0; }
+.note-card--warn h3 { color: var(--brass-600); }
+
+/* ---------- Палитра ---------- */
+
+.swatches { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 18px; }
+.swatch { width: 132px; }
+.swatch i {
+  display: block; height: 54px; border-radius: 10px;
+  border: 1px solid rgba(10, 17, 32, .12);
+}
+.swatch span { display: block; margin-top: 7px; font-size: 12px; color: var(--ink-400); }
+.swatch b { display: block; font-size: 12.5px; color: var(--ink-700); font-weight: 500; }
+
+/* ---------- Прочее ---------- */
+
+.footer { margin-top: 56px; color: var(--ink-400); font-size: 13.5px; }
+.footer a { color: var(--ink-500); }
+
+.toc { display: grid; gap: 14px; margin-top: 22px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.toc-card {
+  display: block; text-decoration: none; color: inherit;
+  border: 1px solid var(--mist-200); border-radius: var(--r); background: #fff;
+  overflow: hidden; box-shadow: var(--lift);
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+.toc-card:hover { transform: translateY(-2px); box-shadow: var(--plate); }
+.toc-card .thumb { height: 168px; overflow: hidden; background: var(--mist-100); position: relative; }
+.toc-card .thumb img { display: block; width: 100%; }
+.toc-card .thumb--empty { display: grid; place-items: center; color: var(--ink-300); font-size: 13px; }
+.toc-card .body { padding: 16px 18px 18px; }
+.toc-card h3 { margin: 0; font-family: var(--serif); font-weight: 500; font-size: 19px; }
+.toc-card p { margin: 6px 0 0; color: var(--ink-500); font-size: 13.5px; }
+.toc-card .tag { display: inline-block; margin-top: 10px; font-size: 12px; color: var(--brass-600); }
+
+:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; border-radius: 4px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+@media (max-width: 640px) {
+  .wrap { padding: 24px 14px 72px; }
+  .doc-head h1 { font-size: 29px; }
+  .stage { padding: 16px; }
+  .stage-row { gap: 24px; }
+}

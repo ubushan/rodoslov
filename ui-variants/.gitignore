@@ -1,0 +1,7 @@
+# Chrome-профиль для съёмки скриншотов и полные снимки — производные,
+# пересобираются командой: bash ui-variants/render-shots.sh
+.chrome-profile/
+shots/*-full.png
+shots/*-frame*.png
+shots/*-phones.png
+shots/index.png

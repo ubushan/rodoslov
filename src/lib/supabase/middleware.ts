@@ -6,7 +6,15 @@ import { NextResponse, type NextRequest } from "next/server";
 const PROTECTED = ["/dashboard", "/tree", "/profile", "/admin"];
 
 export async function updateSession(request: NextRequest) {
-  let response = NextResponse.next({ request });
+  const path = request.nextUrl.pathname;
+
+  // Шапка живёт в серверном layout и не знает адрес запроса. Пробрасываем путь
+  // заголовком: layout читает его через headers() и, если это /tree/<id>,
+  // достаёт название древа, роль и участников под сессией пользователя.
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-pathname", path);
+
+  let response = NextResponse.next({ request: { headers: requestHeaders } });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -16,7 +24,7 @@ export async function updateSession(request: NextRequest) {
         getAll: () => request.cookies.getAll(),
         setAll: (list) => {
           list.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next({ request });
+          response = NextResponse.next({ request: { headers: requestHeaders } });
           list.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
           );
@@ -26,7 +34,6 @@ export async function updateSession(request: NextRequest) {
   );
 
   const { data: { user } } = await supabase.auth.getUser();
-  const path = request.nextUrl.pathname;
 
   if (!user && PROTECTED.some((p) => path.startsWith(p))) {
     const url = request.nextUrl.clone();
@@ -42,5 +49,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // тот же путь в ответе — удобно проверять в браузере и в тестах
+  response.headers.set("x-pathname", path);
   return response;
 }

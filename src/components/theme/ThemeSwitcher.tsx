@@ -14,6 +14,7 @@ function ThemeIcon({ theme }: { theme: ThemeKey }) {
     strokeWidth: 1.7,
     strokeLinecap: "round" as const,
     strokeLinejoin: "round" as const,
+    "aria-hidden": true,
   };
   if (theme === "dark") {
     return (
@@ -25,8 +26,8 @@ function ThemeIcon({ theme }: { theme: ThemeKey }) {
   if (theme === "sepia") {
     return (
       <svg {...common}>
-        <path d="M4.5 2.5h6.5l2.5 2.5v10.5h-9z" />
-        <path d="M11 2.5V5h2.5M6.8 8.5h4.4M6.8 11.5h4.4" />
+        <path d="M5 2.5h5.5L13 5v10.5H5z" />
+        <path d="M10.5 2.5V5H13M7 8.5h4M7 11.5h4" />
       </svg>
     );
   }
@@ -34,7 +35,7 @@ function ThemeIcon({ theme }: { theme: ThemeKey }) {
     return (
       <svg {...common}>
         <rect x="2.5" y="3.5" width="13" height="8.5" rx="1.5" />
-        <path d="M6.5 15h5" />
+        <path d="M6.5 15h5M9 12v3" />
       </svg>
     );
   }
@@ -46,97 +47,116 @@ function ThemeIcon({ theme }: { theme: ThemeKey }) {
   );
 }
 
+/** Короткие подписи для title и aria-label — в интерфейсе текста нет. */
+const TITLE: Record<ThemeKey, string> = {
+  light: "Тема: светлая",
+  dark: "Тема: тёмная",
+  sepia: "Тема: сепия",
+  auto: "Тема: как в системе",
+};
+
+/** «Как в системе» разрешается в конкретную палитру по настройке устройства. */
+function resolve(key: ThemeKey): Exclude<ThemeKey, "auto"> {
+  if (key !== "auto") return key;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
 /**
  * Выбор темы. Хранится в куке, поэтому сервер сразу отдаёт нужную палитру;
  * при выборе тема применяется тут же, без перезагрузки.
+ *
+ * На широком экране — ряд из четырёх иконок (`.icon-seg`), на телефоне —
+ * одна кнопка-циклер «светлая → тёмная → сепия → как в системе» с иконкой
+ * текущей темы: так шапка не занимает пол-экрана и название древа помещается.
+ * `tone` оставлен для шапок на тёмной «обложке» (лендинг, вход).
  */
 export function ThemeSwitcher({ tone = "cover" }: { tone?: "cover" | "plain" }) {
   const [choice, setChoice] = useState<ThemeKey>(DEFAULT_THEME);
-  const [open, setOpen] = useState(false);
-  const boxRef = useRef<HTMLDivElement>(null);
+  // актуальный выбор для обработчиков, которые не должны переподписываться
+  const choiceRef = useRef<ThemeKey>(DEFAULT_THEME);
 
   // куку читаем после монтирования: на сервере её в разметке нет
   useEffect(() => {
     const match = document.cookie.match(new RegExp(`(?:^|; )${THEME_COOKIE}=([^;]*)`));
     const value = match ? decodeURIComponent(match[1]) : DEFAULT_THEME;
-    if (THEMES.some((theme) => theme.key === value)) setChoice(value as ThemeKey);
+    if (THEMES.some((theme) => theme.key === value)) {
+      choiceRef.current = value as ThemeKey;
+      setChoice(value as ThemeKey);
+    }
   }, []);
 
+  // «как в системе» следит за prefers-color-scheme, пока выбран этот режим;
+  // выбранную вручную тему подтверждаем на смену схемы — иначе слушатель из
+  // корневого скрипта (он ставится один раз при загрузке со значением auto)
+  // мог бы перекрасить страницу в светлую.
   useEffect(() => {
-    if (!open) return;
-    const onDown = (event: MouseEvent) => {
-      if (!boxRef.current?.contains(event.target as Node)) setOpen(false);
+    const query = window.matchMedia("(prefers-color-scheme: dark)");
+    const sync = () => {
+      document.documentElement.dataset.theme =
+        choiceRef.current === "auto"
+          ? query.matches
+            ? "dark"
+            : "light"
+          : choiceRef.current;
     };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+    sync();
+    query.addEventListener("change", sync);
+    return () => query.removeEventListener("change", sync);
+  }, []);
 
   function apply(key: ThemeKey) {
+    choiceRef.current = key;
     setChoice(key);
-    setOpen(false);
     document.cookie = `${THEME_COOKIE}=${key}; path=/; max-age=31536000; samesite=lax`;
-    document.documentElement.dataset.theme =
-      key === "auto"
-        ? window.matchMedia("(prefers-color-scheme: dark)").matches
-          ? "dark"
-          : "light"
-        : key;
+    document.documentElement.dataset.theme = resolve(key);
   }
 
-  const active = THEMES.find((theme) => theme.key === choice) ?? THEMES[0];
-  const buttonTone =
-    tone === "cover"
-      ? "text-album-muted hover:bg-white/10 hover:text-album-text"
-      : "text-ink-500 hover:bg-mist-100 hover:text-ink-800";
+  /** Циклер телефона: следующий режим по порядку, по кругу. */
+  function cycle() {
+    const index = THEMES.findIndex((theme) => theme.key === choiceRef.current);
+    apply(THEMES[(index + 1) % THEMES.length].key);
+  }
+
+  const next = THEMES[(THEMES.findIndex((theme) => theme.key === choice) + 1) % THEMES.length];
+
+  const seg = `icon-seg ${tone === "cover" ? "icon-seg--cover" : ""}`;
 
   return (
-    <div ref={boxRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-label={`Тема оформления: ${active.label}`}
-        title={`Тема: ${active.label}`}
-        className={`grid h-9 w-9 place-items-center rounded-lg transition-colors ${buttonTone}`}
-      >
-        <ThemeIcon theme={choice} />
-      </button>
+    <>
+      {/* Телефон: одна кнопка вместо ряда — иконка показывает текущую тему,
+          подсказка называет её и следующий режим. */}
+      <span className="md:hidden">
+        <span className={seg}>
+          <button
+            type="button"
+            onClick={cycle}
+            aria-label={`${TITLE[choice]}. Переключить тему`}
+            title={`${TITLE[choice]}. Дальше — ${TITLE[next.key].replace("Тема: ", "")}`}
+            className="icon-seg__i"
+          >
+            <ThemeIcon theme={choice} />
+          </button>
+        </span>
+      </span>
 
-      {open && (
-        <div
-          role="menu"
-          className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-xl border border-mist-200 bg-surface p-1 shadow-lift"
-        >
+      {/* Десктоп: ряд из четырёх иконок, как было. */}
+      <span className="hidden md:inline-flex">
+        <span role="group" aria-label="Тема оформления" className={seg}>
           {THEMES.map((theme) => (
             <button
               key={theme.key}
               type="button"
-              role="menuitemradio"
-              aria-checked={theme.key === choice}
               onClick={() => apply(theme.key)}
-              className={`flex w-full items-start gap-2.5 rounded-lg px-3 py-2 text-left transition-colors ${
-                theme.key === choice ? "bg-mist-100" : "hover:bg-mist-100"
-              }`}
+              aria-pressed={theme.key === choice}
+              aria-label={TITLE[theme.key]}
+              title={TITLE[theme.key]}
+              className="icon-seg__i"
             >
-              <span className="mt-0.5 text-ink-500">
-                <ThemeIcon theme={theme.key} />
-              </span>
-              <span className="min-w-0">
-                <span className="block text-[13px] text-ink-800">{theme.label}</span>
-                <span className="block text-[12px] text-ink-400">{theme.hint}</span>
-              </span>
+              <ThemeIcon theme={theme.key} />
             </button>
           ))}
-        </div>
-      )}
-    </div>
+        </span>
+      </span>
+    </>
   );
 }

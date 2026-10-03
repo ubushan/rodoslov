@@ -26,7 +26,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Родослов — семейное древо, которое собирают вместе",
+  title: "Torlmud — семейное древо, которое собирают вместе",
   description:
     "Сервис для совместного составления родословной: карточки родственников, связи между поколениями, архив документов и экспорт древа в картинку.",
 };
@@ -36,15 +36,14 @@ export const metadata: Metadata = {
  * выбора тёмной на долю секунды мелькала бы светлая страница.
  */
 const THEME_SCRIPT = `(function(){try{
-var m=document.cookie.match(/(?:^|; )${THEME_COOKIE}=([^;]*)/);
-var t=m?decodeURIComponent(m[1]):"light";
-if(t==="auto"){
-  var q=window.matchMedia("(prefers-color-scheme: dark)");
-  t=q.matches?"dark":"light";
-  var on=function(e){document.documentElement.dataset.theme=e.matches?"dark":"light"};
-  q.addEventListener?q.addEventListener("change",on):q.addListener(on);
-}
-document.documentElement.dataset.theme=t;
+var read=function(){var m=document.cookie.match(/(?:^|; )${THEME_COOKIE}=([^;]*)/);return m?decodeURIComponent(m[1]):"light"};
+var q=window.matchMedia("(prefers-color-scheme: dark)");
+var apply=function(){var t=read();document.documentElement.dataset.theme=t==="auto"?(q.matches?"dark":"light"):t};
+apply();
+// слушатель ставим всегда, но перекрашиваем только пока выбран режим «как в системе»:
+// иначе после ручного выбора темы смена схемы в системе ломала бы выбор пользователя
+var on=function(){if(read()==="auto")apply()};
+q.addEventListener?q.addEventListener("change",on):q.addListener(on);
 }catch(e){}})();`;
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -64,7 +63,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body>
         {children}
-        <Toaster position="bottom-center" richColors closeButton />
+        <Toaster position="bottom-center" richColors closeButton offset={96} mobileOffset={96} />
       </body>
     </html>
   );

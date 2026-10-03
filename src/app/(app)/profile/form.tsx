@@ -4,12 +4,15 @@ import { useActionState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 import { toast } from "sonner";
 import { updateProfile } from "@/app/actions/auth";
-import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
 
 function Submit() {
   const { pending } = useFormStatus();
-  return <Button type="submit" disabled={pending}>{pending ? "Сохраняем…" : "Сохранить"}</Button>;
+  return (
+    <button type="submit" disabled={pending} className="btn-accent h-10 w-full sm:w-auto">
+      {pending ? "Сохраняем…" : "Сохранить"}
+    </button>
+  );
 }
 
 export function ProfileForm({ fullName, email }: { fullName: string; email: string }) {
