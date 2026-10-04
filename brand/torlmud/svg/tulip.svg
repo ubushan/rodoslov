@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="Torlmud — Тюльпан">
+  <title>Torlmud — Тюльпан</title>
+  <g fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 13.2C8.5 12 7.1 9.3 7.5 5.0c2.2 1.2 3.5 2.8 4.5 4.8 1-2 2.3-3.6 4.5-4.8.4 4.3-1 7-4.5 8.2Z" stroke="currentColor"/>
+    <path d="M12 13.2v6.4" stroke="currentColor"/>
+    <path d="M7.4 20.9h9.2" stroke="currentColor"/>
+  </g>
+</svg>

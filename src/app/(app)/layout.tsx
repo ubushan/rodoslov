@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { currentAdmin, embeddedName } from "@/lib/admin";
 import { ThemeSwitcher } from "@/components/theme/ThemeSwitcher";
+import { TorlmudMark } from "@/components/brand/TorlmudMark";
 import { AccountMenu } from "@/components/account/AccountMenu";
 import { ContextNav, TreeSearchButton } from "@/components/shell/ContextNav";
 import {
@@ -87,9 +88,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               >
                 <span
                   aria-hidden="true"
-                  className="grid h-7 w-7 place-items-center rounded-[9px] border border-[var(--p-acc-line)] bg-[var(--p-acc-bg)] font-display text-[13px] text-brass-ink"
+                  className="grid h-7 w-7 place-items-center rounded-[9px] border border-[var(--p-acc-line)] bg-[var(--p-acc-bg)] text-brass-ink"
                 >
-                  T
+                  {/* «Спираль рода» — компактная нарезка: на 28 px плашки полная
+                      спираль слилась бы в пятно (см. brand/torlmud/README.md). */}
+                  <TorlmudMark className="h-[17px] w-[17px]" />
                 </span>
                 <span className="hidden font-display text-[15px] font-semibold text-ink-800 md:block">
                   Torlmud

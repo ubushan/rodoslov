@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="Torlmud — Узлы и связи">
+  <title>Torlmud — Узлы и связи</title>
+  <g fill="none" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="6.3" r="2.2" fill="currentColor"/>
+    <circle cx="5.6" cy="17.7" r="2.2" fill="currentColor"/>
+    <circle cx="18.4" cy="17.7" r="2.2" fill="currentColor"/>
+    <path d="M12 8.5C12 12.7 5.6 11.5 5.6 15.5" stroke="currentColor"/>
+    <path d="M12 8.5c0 4.2 6.4 3 6.4 7" stroke="currentColor"/>
+  </g>
+</svg>

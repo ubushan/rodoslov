@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { TorlmudMark } from "@/components/brand/TorlmudMark";
 import { ThemeSwitcher } from "@/components/theme/ThemeSwitcher";
 import { MiniTree } from "@/components/landing/MiniTree";
 import { Button } from "@/components/ui/button";
@@ -63,9 +64,9 @@ export default async function LandingPage() {
           <Link href="/" className="flex items-center gap-2.5">
             <span
               aria-hidden="true"
-              className="grid h-9 w-9 place-items-center rounded-[10px] border border-brass-400/50 bg-white/[0.06] font-display text-[16px] text-brass-400"
+              className="grid h-9 w-9 place-items-center rounded-[10px] border border-brass-400/50 bg-white/[0.06] text-brass-400"
             >
-              T
+              <TorlmudMark className="h-5 w-5" />
             </span>
             <span className="font-display text-[18px] text-album-text">Torlmud</span>
           </Link>

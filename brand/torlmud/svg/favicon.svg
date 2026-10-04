@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="Torlmud — Спираль рода (для малых размеров)">
+  <title>Torlmud — Спираль рода (для малых размеров)</title>
+  <style>
+    svg { --i: #0f172a; --a: #a16207; --if: #0f172a; --af: #a16207 }
+    @media (prefers-color-scheme: dark) { svg { --i: #f2f5fa; --a: #d3ab35; --if: #f2f5fa; --af: #d3ab35 } }
+  </style>
+  <g fill="none" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 3H21V21H3V9H15V15H9V12H12" stroke="var(--i, currentColor)"/>
+    <circle cx="12" cy="12" r="1.7" fill="var(--af, currentColor)"/>
+  </g>
+</svg>
