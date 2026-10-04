@@ -334,13 +334,23 @@ body {
   box-shadow: var(--shadow-lift);
 }
 
-/* Карточка человека: кромка по полу 2px по нижнему краю */
+/* Карточка человека: кромка по полу 2px по нижнему краю.
+   --card-accent — цвет пола одной переменной: из неё собраны и кромка, и
+   свечение выделения (см. .react-flow__node.selected), поэтому они всегда
+   совпадают. Разметка задаёт пол классом .is-male/.is-female. */
 .studio-card {
+  --card-accent: var(--color-plain);
   position: relative;
   background: var(--color-surface);
   border: 1px solid var(--p-line);
   border-radius: 18px;
   box-shadow: var(--shadow-lift);
+}
+.studio-card.is-male {
+  --card-accent: var(--color-male);
+}
+.studio-card.is-female {
+  --card-accent: var(--color-female);
 }
 .studio-card::after {
   content: "";
@@ -350,21 +360,19 @@ body {
   bottom: 0;
   height: 2px;
   border-radius: 0 0 17px 17px;
-  background: var(--color-plain);
-}
-.studio-card.is-male::after {
-  background: var(--color-male);
-}
-.studio-card.is-female::after {
-  background: var(--color-female);
+  background: var(--card-accent);
 }
 
 /* Карточка на холсте — 176×100 как в прототипе: скругление 12px, кромка по
    низу повторяет тот же радиус, поверхность — градиент, тень — карточная.
    Остальные .studio-card (лендинг, страница ветки) остаются на 18px. */
 .person-card {
-  /* диаметр портрета: карточка, сетка и круг читают одно значение */
-  --face-size: 34px;
+  /* диаметр портрета: карточка, сетка и круг читают одно значение.
+     46px — круг по центру верхней кромки: заметно крупнее прежних 34px,
+     а под именем (две строки по 15px) ещё остаётся воздух до кромки пола. */
+  --face-size: 46px;
+  /* толщина кромки пола — чуть жирнее, чем у остальных .studio-card */
+  --card-edge: 3px;
   border-radius: 12px;
   background: var(--p-card-bg);
   box-shadow: var(--p-shadow-card);
@@ -378,8 +386,19 @@ body {
 .person-card:active {
   transform: scale(0.985);
 }
+/* Кромка на холсте: ::after накрывает всю карточку (inset:-1px — ровно по
+   рамке) и залит цветом пола только снизу. Скругление наследуется от
+   карточки, поэтому полоса обрезается по тем же дугам: раньше это была
+   отдельная планка 2px со своим радиусом, и её углы вылезали за карточку. */
 .person-card::after {
-  border-radius: 0 0 11px 11px;
+  inset: -1px;
+  height: auto;
+  border-radius: inherit;
+  background: linear-gradient(
+    to top,
+    var(--card-accent) 0 var(--card-edge),
+    transparent var(--card-edge)
+  );
 }
 
 /* Портрет без фотографии — силуэт как в прототипе: круг с головой и плечами
@@ -389,8 +408,8 @@ body {
 .card-face {
   --face: var(--color-plain);
   position: relative;
-  width: var(--face-size, 34px);
-  height: var(--face-size, 34px);
+  width: var(--face-size, 46px);
+  height: var(--face-size, 46px);
   overflow: hidden;
   border: 1px solid var(--p-line);
   border-radius: 50%;
@@ -573,6 +592,34 @@ body {
   box-shadow: var(--p-inset-hi), var(--p-shadow-glass);
 }
 
+/* Меню кнопок дока: та же стеклянная поверхность, что у .studio-dock, но с
+   тенью парящей панели — «Фильтр», «Вид» и «Экспорт» раскрываются вверх
+   ровно над своей кнопкой (см. components/tree/DockMenu.tsx). */
+.dock-menu {
+  background: var(--p-glass);
+  border: 1px solid var(--p-line);
+  border-radius: 16px;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: var(--p-inset-hi), var(--shadow-lift);
+  animation: dock-menu-in 0.14s ease-out;
+}
+@keyframes dock-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dock-menu {
+    animation: none;
+  }
+}
+
 /* Нижний лист (телефон): ручка сверху и тень вверх */
 .studio-sheet {
   position: relative;
@@ -675,13 +722,16 @@ h1, h2, h3, .display {
   pointer-events: none !important;
 }
 
-/* Выделение карточки: рамка латунью, кольцо и мягкое свечение — как
-   .card--sel в прототипе (там же тень карточки, а не мягкая тень студии) */
+/* Выделение карточки: рамка, кольцо и мягкое свечение — как .card--sel в
+   прототипе (там же тень карточки, а не мягкая тень студии). Цвет — цвет
+   пола (--card-accent): синий у мужчин, жёлто-оранжевый у женщин, как у
+   кромки; форма и интенсивность прежние (55% — как было у латуни).
+   Латунь остаётся у фокуса (:focus-visible) и служебных элементов студии. */
 .react-flow__node.selected .person-card {
-  border-color: var(--color-brass-500);
+  border-color: var(--card-accent);
   box-shadow:
-    0 0 0 1px var(--p-acc-line),
-    0 0 30px -6px var(--p-acc-line),
+    0 0 0 1px color-mix(in srgb, var(--card-accent) 55%, transparent),
+    0 0 30px -6px color-mix(in srgb, var(--card-accent) 55%, transparent),
     var(--p-shadow-card);
 }
 

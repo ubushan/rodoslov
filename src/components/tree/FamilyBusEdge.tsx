@@ -18,6 +18,15 @@ const FALLBACK_H = 100;
  * концы и стыки скруглены (stroke-linecap/linejoin: round) — как в прототипе,
  * где линии нарисованы командами M/V/H без дуг.
  *
+ * Восходящее древо (data.dir = "up") — то же самое, но снизу вверх: карточки
+ * зеркалятся холстом (см. TreeCanvas), дети оказываются выше родителей, и шина
+ * строится над родителями, а отводы входят в нижние кромки детей.
+ *
+ * Горизонтальное древо (data.dir = "right", вид «слева направо») — та же
+ * геометрия, повёрнутая на 90°: стебель выходит из правой кромки пары (или
+ * центра одинокого родителя), шина идёт вертикально в зазоре между колонками,
+ * отводы входят в левые кромки детей. Карточки остаются прямыми.
+ *
  * Всю семью рисует ровно одно ребро — от основного родителя к первому ребёнку,
  * как один path в прототипе. Остальные рёбра семьи (второй родитель, другие
  * дети) не рисуют ничего: иначе полупрозрачный штрих лёг бы сам на себя и линия
@@ -26,18 +35,30 @@ const FALLBACK_H = 100;
  * Позиции берём из хранилища React Flow, поэтому линии всегда совпадают с
  * карточками.
  */
-function FamilyBusEdgeComponent({ source, target }: EdgeProps) {
+function FamilyBusEdgeComponent({ source, target, data }: EdgeProps) {
   const nodes = useNodes();
   const edges = useEdges();
+  // Направление раскладки: «down» — нисходящее (по умолчанию), «up» —
+  // восходящее (дети выше родителей), «right» — «слева направо» (дети правее).
+  const dir = (data as { dir?: string } | undefined)?.dir ?? "down";
   const kindOf = (id: string) =>
     (edges.find((e) => e.id === id)?.data as { kind?: string } | undefined)?.kind;
 
   const nodeById = new Map(nodes.map((n) => [n.id, n]));
-  const bottom = (id: string) => {
+  const box = (id: string) => {
     const n = nodeById.get(id);
     const w = n?.measured?.width ?? FALLBACK_W;
     const h = n?.measured?.height ?? FALLBACK_H;
-    return { x: (n?.position.x ?? 0) + w / 2, y: (n?.position.y ?? 0) + h };
+    const x = n?.position.x ?? 0;
+    const y = n?.position.y ?? 0;
+    return {
+      x: x + w / 2,
+      y: y + h / 2,
+      left: x,
+      right: x + w,
+      top: y,
+      bottom: y + h,
+    };
   };
 
   // пара родителей (сам родитель + его супруг, если есть)
@@ -52,7 +73,12 @@ function FamilyBusEdgeComponent({ source, target }: EdgeProps) {
   const parentIds = new Set([source]);
   if (spouseId) parentIds.add(spouseId);
 
-  const parents = [...parentIds].map((id) => ({ id, ...bottom(id) })).sort((a, b) => a.x - b.x);
+  // «Слева направо» супруги стоят друг под другом — тогда пару сортируем по
+  // вертикали, в остальных видах по горизонтали: так стебель встаёт ровно
+  // посередине между карточками пары.
+  const parents = [...parentIds]
+    .map((id) => ({ id, ...box(id) }))
+    .sort((a, b) => (dir === "right" ? a.y - b.y : a.x - b.x));
 
   // дети этой семьи. Ребёнок рисуется только от основного родителя —
   // то же правило использует раскладка, иначе линия ушла бы в чужую ветвь
@@ -62,11 +88,7 @@ function FamilyBusEdgeComponent({ source, target }: EdgeProps) {
     .filter((e) => parentIds.has(e.source) && primaryParent.get(e.target) === e.source)
     .map((e) => nodeById.get(e.target))
     .filter((n): n is NonNullable<typeof n> => !!n)
-    .map((n) => {
-      const w = n.measured?.width ?? FALLBACK_W;
-      const h = n.measured?.height ?? FALLBACK_H;
-      return { id: n.id, x: n.position.x + w / 2, top: n.position.y };
-    });
+    .map((n) => ({ id: n.id, ...box(n.id) }));
   if (!kids.length) return null;
 
   // хозяин геометрии семьи: основная связь с первым ребёнком. Остальные рёбра
@@ -80,23 +102,54 @@ function FamilyBusEdgeComponent({ source, target }: EdgeProps) {
     selectedIds.length > 0 &&
     (selectedIds.includes(source) || (!!spouseId && selectedIds.includes(spouseId)));
 
-  // стебель выходит из середины пары (или из центра одинокого родителя):
-  // вертикаль от левого родителя прошла бы сквозь карточку супруга
-  const parentBottom = Math.max(...parents.map((p) => p.y));
+  // Отводы к детям идут от шины:
+  //  - вертикальные виды: шина горизонтальная, отводы спускаются/поднимаются
+  //    по x детей (kmin..kmax), стебель — по x середины пары;
+  //  - «слева направо»: шина вертикальная, отводы идут по y детей (kmin..kmax),
+  //    стебель выходит из правой кромки пары по её середине по вертикали.
   const stemX =
     parents.length > 1 ? (parents[0].x + parents[parents.length - 1].x) / 2 : parents[0].x;
-  const kidTop = Math.min(...kids.map((k) => k.top));
-  // шина на STEM_GAP ниже родителей; если ряд почему-то сжался — прижимаем её к детям
-  const busY = Math.min(parentBottom + STEM_GAP, Math.max(parentBottom + 2, kidTop - 2));
+  const stemY =
+    parents.length > 1 ? (parents[0].y + parents[parents.length - 1].y) / 2 : parents[0].y;
   const kmin = Math.min(...kids.map((k) => k.x));
   const kmax = Math.max(...kids.map((k) => k.x));
 
   // один path на всю семью: стебель, шина и отвод к каждому ребёнку
-  const d = [
-    `M ${stemX},${parentBottom} V ${busY}`,
-    `M ${Math.min(stemX, kmin)},${busY} H ${kmax}`,
-    ...kids.map((k) => `M ${k.x},${busY} V ${k.top}`),
-  ].join(" ");
+  let d: string;
+  if (dir === "right") {
+    const parentRight = Math.max(...parents.map((p) => p.right));
+    const kidLeft = Math.min(...kids.map((k) => k.left));
+    const kidTop = Math.min(...kids.map((k) => k.y));
+    const kidBottom = Math.max(...kids.map((k) => k.y));
+    // шина на STEM_GAP правее родителей; если колонки почему-то сжались —
+    // прижимаем её к детям
+    const busX = Math.min(parentRight + STEM_GAP, Math.max(parentRight + 2, kidLeft - 2));
+    d = [
+      `M ${parentRight},${stemY} H ${busX}`,
+      `M ${busX},${Math.min(stemY, kidTop)} V ${kidBottom}`,
+      ...kids.map((k) => `M ${busX},${k.y} H ${k.left}`),
+    ].join(" ");
+  } else if (dir === "up") {
+    const parentTop = Math.min(...parents.map((p) => p.top));
+    const kidBottom = Math.max(...kids.map((k) => k.bottom));
+    // шина на STEM_GAP выше родителей; если ряд почему-то сжался — прижимаем её к детям
+    const busY = Math.min(parentTop - 2, Math.max(kidBottom + 2, parentTop - STEM_GAP));
+    d = [
+      `M ${stemX},${parentTop} V ${busY}`,
+      `M ${Math.min(stemX, kmin)},${busY} H ${kmax}`,
+      ...kids.map((k) => `M ${k.x},${busY} V ${k.bottom}`),
+    ].join(" ");
+  } else {
+    const parentBottom = Math.max(...parents.map((p) => p.bottom));
+    const kidTop = Math.min(...kids.map((k) => k.top));
+    // шина на STEM_GAP ниже родителей; если ряд почему-то сжался — прижимаем её к детям
+    const busY = Math.min(parentBottom + STEM_GAP, Math.max(parentBottom + 2, kidTop - 2));
+    d = [
+      `M ${stemX},${parentBottom} V ${busY}`,
+      `M ${Math.min(stemX, kmin)},${busY} H ${kmax}`,
+      ...kids.map((k) => `M ${k.x},${busY} V ${k.top}`),
+    ].join(" ");
+  }
 
   return (
     <path

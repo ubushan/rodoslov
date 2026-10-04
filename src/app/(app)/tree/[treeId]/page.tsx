@@ -62,6 +62,10 @@ export default async function TreePage({ params }: { params: Promise<{ treeId: s
 
   const role = membership.role as MemberRole;
 
+  // Ключ выбранного вида холста: свой у каждого пользователя и древа. Холст
+  // читает его из localStorage и возвращает выбранный режим после перезагрузки.
+  const viewStorageKey = `canvas-view:${user!.id}:${treeId}`;
+
   // Второй стеклянной полосы на странице нет: название древа, роль и разделы
   // переехали в шапку приложения. Здесь остаётся только сам холст на всю высоту.
   return (
@@ -75,6 +79,7 @@ export default async function TreePage({ params }: { params: Promise<{ treeId: s
           relationships={(relationships ?? []) as Relationship[]}
           attachments={(attachments ?? []) as Attachment[]}
           changes={changes}
+          viewStorageKey={viewStorageKey}
         />
       </div>
     </div>

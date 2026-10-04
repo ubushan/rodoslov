@@ -91,7 +91,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 >
                   T
                 </span>
-                <span className="hidden font-display text-[15px] text-ink-800 md:block">
+                <span className="hidden font-display text-[15px] font-semibold text-ink-800 md:block">
                   Torlmud
                 </span>
               </Link>

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NodeMenu, MenuItem } from "./NodeMenu";
+import { MenuButton, type MenuOption } from "./DockMenu";
 import {
   ageYears,
   birthLabel,
@@ -50,8 +51,18 @@ type Props = {
   /** добавление родственника: отец, мать, супруг(а), сын, дочь, брат, сестра.
       Пол передаём для «Сын»/«Дочь» — иначе оба пункта ведут к одной связи. */
   onAddRelative: (id: string, relation: NewRelative, gender?: "male" | "female") => void;
+  /** «Связь» между двумя выбранными: тип выбирается в меню кнопки */
+  onRelate: (kind: "parent" | "spouse") => void;
+  /** скрытие с холста: только отображение, данные не меняются */
   onHide: (ids: string[]) => void;
   onClear: () => void;
+  /**
+   * Реальная геометрия нижнего листа на телефоне: верхняя кромка и высота
+   * относительно холста. Холст поднимает над листом выбранную карточку, а
+   * высота листа зависит от содержимого, поэтому её нельзя посчитать заранее.
+   * На десктопе панель справа — приходит null.
+   */
+  onSheetMetrics?: (metrics: { top: number; height: number } | null) => void;
 };
 
 /**
@@ -67,9 +78,15 @@ type Props = {
  * Прокрутка: на телефоне лист целиком (`overflow-y-auto`) — на низких экранах
  * фиксированные ряды выше `max-h`, и `overflow-hidden` срезал вкладки и низ
  * карточки. На десктопе прокручивается только тело раздела.
+ *
+ * Потолок высоты листа — 56% холста (было 46%): на телефоне лист читался
+ * приплюснутым, а список фактов и истории упирался в прокрутку на первом же
+ * экране. Отсчёт идёт от высоты холста (окно без шапки), поэтому запас до
+ * нижней панели остаётся и на низких экранах: 56% + 76px дока + зазор всегда
+ * меньше высоты холста.
  */
 const INSPECTOR_SURFACE =
-  "absolute inset-x-0 bottom-[calc(76px+env(safe-area-inset-bottom))] z-30 flex max-h-[46%] flex-col gap-3 overflow-y-auto overscroll-contain rounded-[22px] border border-[var(--p-line)] bg-[var(--p-glass)] p-4 pb-6 shadow-[var(--p-shadow-sheet)] backdrop-blur-[14px] sm:inset-x-auto sm:bottom-3 sm:right-3 sm:top-3 sm:max-h-none sm:w-[320px] sm:overflow-hidden sm:rounded-[20px] sm:p-3.5 sm:shadow-[var(--shadow-lift)]";
+  "absolute inset-x-0 bottom-[calc(76px+env(safe-area-inset-bottom))] z-30 flex max-h-[56%] flex-col gap-3 overflow-y-auto overscroll-contain rounded-[22px] border border-[var(--p-line)] bg-[var(--p-glass)] p-4 pb-6 shadow-[var(--p-shadow-sheet)] backdrop-blur-[14px] sm:inset-x-auto sm:bottom-3 sm:right-3 sm:top-3 sm:max-h-none sm:w-[320px] sm:overflow-hidden sm:rounded-[20px] sm:p-3.5 sm:shadow-[var(--shadow-lift)]";
 
 const TABS = [
   { id: "facts", label: "Факты" },
@@ -171,12 +188,65 @@ function IconClose() {
   );
 }
 
+/** Два человека и связь между ними — «Связь» в мультивыделении */
+function IconRelation() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 18 18"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="4.6" cy="9" r="2.1" />
+      <circle cx="13.4" cy="9" r="2.1" />
+      <path d="M6.7 9h4.6" />
+    </svg>
+  );
+}
+
+/**
+ * Пункты меню «Связь»: сначала тип связи, потом серверное действие
+ * createRelationship (его зовёт onRelate с выбранным типом). Если выбрано не
+ * ровно двое, пункты выключены и объясняют, чего не хватает. Одна и та же
+ * функция питает пилюлю над доком (TreeCanvas) и нижний лист (Inspector).
+ */
+export function relationOptions(
+  enough: boolean,
+  onRelate: (kind: "parent" | "spouse") => void
+): MenuOption[] {
+  const hint = enough ? undefined : "Выберите ровно двух человек";
+  return [
+    {
+      id: "parent",
+      label: "Родитель — ребёнок",
+      hint: enough ? "Родителем станет человек из более старшего поколения" : hint,
+      disabled: !enough,
+      onSelect: () => onRelate("parent"),
+    },
+    {
+      id: "spouse",
+      label: "Супруги",
+      hint: enough ? "Связать двух выбранных как пару" : hint,
+      disabled: !enough,
+      onSelect: () => onRelate("spouse"),
+    },
+  ];
+}
+
 /**
  * Поколение = глубина от старших предков. Считается по связям «родитель —
  * ребёнок»: у корней I, у их детей II и так далее. Циклы в данных не вешают
  * обход — очередь ограничена счётчиком шагов.
+ *
+ * Функция экспортируется: тем же счётом холст выбирает, кто из двух выбранных
+ * становится родителем в действии «Связь» (см. TreeCanvas).
  */
-function generationMap(persons: Person[], relationships: Relationship[]) {
+export function generationMap(persons: Person[], relationships: Relationship[]) {
   const children = new Map<string, string[]>();
   const hasParent = new Set<string>();
   for (const rel of relationships) {
@@ -367,8 +437,10 @@ export function Inspector({
   onEditCard,
   onBranch,
   onAddRelative,
+  onRelate,
   onHide,
   onClear,
+  onSheetMetrics,
 }: Props) {
   const [tab, setTab] = useState<TabId>("facts");
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
@@ -376,6 +448,8 @@ export function Inspector({
   const [addMenu, setAddMenu] = useState<{ x: number; y: number } | null>(null);
   const moreRef = useRef<HTMLButtonElement>(null);
   const addRef = useRef<HTMLButtonElement>(null);
+  // сам нижний лист: по нему холст узнаёт, над чем выравнивать карточку
+  const sheetRef = useRef<HTMLElement>(null);
 
   const singleId = selectedIds.length === 1 ? selectedIds[0] : null;
 
@@ -383,6 +457,37 @@ export function Inspector({
   useEffect(() => {
     setTab("facts");
   }, [singleId]);
+
+  /**
+   * Отдаём наверх верхнюю кромку и высоту листа. Меряем сам элемент, а не
+   * проценты: высота зависит от содержимого (сколько строк фактов, какая
+   * вкладка). ResizeObserver сообщает и о смене содержимого, и о повороте
+   * экрана. Эффект перезапускается при смене выделения, поэтому к моменту
+   * выравнивания наверху лежит уже свежая геометрия нового человека.
+   */
+  const reportSheet = useCallback(() => {
+    if (!onSheetMetrics) return;
+    const el = sheetRef.current;
+    // на десктопе панель справа на всю высоту — холсту она не мешает
+    if (!el || !window.matchMedia("(max-width: 639px)").matches) {
+      onSheetMetrics(null);
+      return;
+    }
+    onSheetMetrics({ top: el.offsetTop, height: el.offsetHeight });
+  }, [onSheetMetrics]);
+
+  useEffect(() => {
+    reportSheet();
+    const el = sheetRef.current;
+    if (!el || !onSheetMetrics) return;
+    const observer = new ResizeObserver(reportSheet);
+    observer.observe(el);
+    window.addEventListener("resize", reportSheet);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", reportSheet);
+    };
+  }, [reportSheet, onSheetMetrics, selectedIds.length, singleId]);
 
   const byId = useMemo(() => new Map(persons.map((person) => [person.id, person])), [persons]);
   const generations = useMemo(() => generationMap(persons, relationships), [persons, relationships]);
@@ -424,6 +529,7 @@ export function Inspector({
   if (!person) {
     return (
       <aside
+        ref={sheetRef}
         aria-label="Инспектор выделенного человека"
         className={INSPECTOR_SURFACE}
       >
@@ -456,13 +562,13 @@ export function Inspector({
             ))}
           </div>
           <p className="mt-3 hidden text-[12px] leading-relaxed text-ink-400 sm:block">
-            Массовых правок нет: «Показать ветвь», «Скрыть на холсте» и «Снять выделение» — кнопки
+            Массовых правок нет: «Показать ветвь», «Связь» и «Снять выделение» — кнопки
             в пилюле над доком.
           </p>
         </div>
 
         {/* Массовые действия на телефоне: нижний лист перекрывает пилюлю над
-            доком, поэтому те же три кнопки живут прямо здесь — как в прототипе,
+            доком, поэтому те же кнопки живут прямо здесь — как в прототипе,
             где на узком экране пилюля скрыта. */}
         <div className="grid shrink-0 gap-2 sm:hidden">
           <button
@@ -479,15 +585,29 @@ export function Inspector({
             <IconBranch />
             Показать ветвь
           </button>
-          <button
-            type="button"
-            onClick={() => onHide(selectedIds)}
-            title="Скрыть на холсте — только отображение"
-            className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-[10px] border border-[var(--p-line)] bg-[var(--p-field-bg)] px-3 text-[13px] text-ink-600 transition-colors hover:bg-[var(--p-hover-bg)] hover:text-ink-800"
-          >
-            <IconEyeOff />
-            Скрыть на холсте
-          </button>
+          {/* «Связь»: ровно двое выбранных, тип связи — в меню вверх.
+              Создавать связи могут только владелец и редакторы. */}
+          {canEdit && (
+            <MenuButton
+              className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-[10px] border border-[var(--p-line)] bg-[var(--p-field-bg)] px-3 text-[13px] text-ink-600 transition-colors hover:bg-[var(--p-hover-bg)] hover:text-ink-800"
+              ariaLabel="Связать выбранных"
+              title={
+                selectedIds.length === 2
+                  ? "Создать связь между двумя выбранными"
+                  : "Выберите ровно двух человек"
+              }
+              menuLabel="Тип связи"
+              note={
+                selectedIds.length === 2
+                  ? undefined
+                  : `Нужно ровно два человека — сейчас выбрано ${selectedIds.length}`
+              }
+              options={relationOptions(selectedIds.length === 2, onRelate)}
+            >
+              <IconRelation />
+              Связь
+            </MenuButton>
+          )}
           <button
             type="button"
             onClick={onClear}
@@ -577,6 +697,7 @@ export function Inspector({
 
   return (
     <aside
+      ref={sheetRef}
       aria-label="Инспектор выделенного человека"
       className={INSPECTOR_SURFACE}
     >
@@ -610,9 +731,11 @@ export function Inspector({
         </div>
       </div>
 
-      {/* Действия: карточка, «Добавить родственника» иконкой и меню «…».
-          Отдельной кнопки «Правка» нет — правка открывается пунктом
-          «Редактирование» в «…» (для роли без прав кнопок правки нет вовсе). */}
+      {/* Действия: карточка, «Скрыть на холсте» иконкой, «Добавить родственника»
+          и меню «…». Отдельной кнопки «Правка» нет — правка открывается пунктом
+          «Редактирование» в «…» (для роли без прав кнопок правки нет вовсе).
+          Скрытие — только отображение, поэтому доступно всем ролям; из
+          мультивыделения его кнопка убрана, механизм живёт здесь. */}
       <div className="flex shrink-0 items-center gap-2">
         <button
           type="button"
@@ -620,6 +743,15 @@ export function Inspector({
           className="btn-accent h-9 min-w-0 flex-1 text-[13px]"
         >
           Открыть карточку
+        </button>
+        <button
+          type="button"
+          onClick={() => onHide([person.id])}
+          aria-label="Скрыть на холсте"
+          title="Скрыть на холсте — только отображение"
+          className="icon-btn h-9 w-9 shrink-0"
+        >
+          <IconEyeOff />
         </button>
         {canEdit && (
           <button

@@ -43,8 +43,24 @@ function birthSortKey(n: Node): string {
  * Сначала снизу вверх считаем ширину поддерева каждой семьи (чтобы ветви
  * соседей не пересекались), затем сверху вниз расставляем центры: слот
  * каждой семьи центрируется на оси родителей, дети — на оси своей семьи.
+ *
+ * `horizontal` — вид «слева направо»: та же раскладка, повёрнутая на 90°.
+ * Считаем её в повёрнутых координатах (карточка «ложится на бок»: ширина
+ * становится высотой), поэтому все зазоры — NODE_GAP, BRANCH_GAP, FAMILY_GAP,
+ * RANK_GAP — остаются ровно теми же. В конце координаты меняются местами:
+ * ряды поколений становятся колонками слева направо (предки слева), а соседи
+ * по поколению встают друг под другом по вертикали.
  */
-export function autoLayout(nodes: Node[], edges: Edge[]) {
+export function autoLayout(
+  nodes: Node[],
+  edges: Edge[],
+  { horizontal = false }: { horizontal?: boolean } = {}
+) {
+  // «Повёрнутые» карточки: раскладка меряет ими ряды и поддеревья так же, как
+  // в вертикальном виде. Наружу отдаём исходные узлы — меняются только позиции.
+  const source = horizontal
+    ? nodes.map((n) => ({ ...n, measured: { width: CARD_H, height: CARD_W } }))
+    : nodes;
   const parentEdges = edges.filter((e) => e.data?.kind === "parent");
   const spouseEdges = edges.filter((e) => e.data?.kind === "spouse");
 
@@ -52,13 +68,13 @@ export function autoLayout(nodes: Node[], edges: Edge[]) {
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
   g.setGraph({ rankdir: "TB", nodesep: NODE_GAP, ranksep: RANK_GAP, marginx: 40, marginy: 40 });
-  nodes.forEach((n) => g.setNode(n.id, sizeOf(n)));
+  source.forEach((n) => g.setNode(n.id, sizeOf(n)));
   parentEdges.forEach((e) => g.setEdge(e.source, e.target, { weight: 2, minlen: 1 }));
   dagre.layout(g);
 
-  const size = new Map(nodes.map((n) => [n.id, sizeOf(n)]));
+  const size = new Map(source.map((n) => [n.id, sizeOf(n)]));
   const anchor = new Map<string, { x: number; y: number }>();
-  for (const n of nodes) {
+  for (const n of source) {
     const p = g.node(n.id);
     anchor.set(n.id, { x: p.x, y: p.y });
   }
@@ -82,7 +98,7 @@ export function autoLayout(nodes: Node[], edges: Edge[]) {
     }
   }
   const unitOf = new Map<string, string>(); // personId -> unitId
-  for (const n of nodes) unitOf.set(n.id, coupleOf.get(n.id) ?? n.id);
+  for (const n of source) unitOf.set(n.id, coupleOf.get(n.id) ?? n.id);
   const unitMembers = (unitId: string): string[] => coupleMembers.get(unitId) ?? [unitId];
   const unitWidth = (unitId: string) =>
     unitMembers(unitId).reduce((s, id) => s + size.get(id)!.width, 0) +
@@ -114,9 +130,9 @@ export function autoLayout(nodes: Node[], edges: Edge[]) {
 
   // ---- ранги по вертикали ----
   const bucket = (y: number) => Math.round(y / 12) * 12;
-  const rankY = [...new Set(nodes.map((n) => bucket(anchor.get(n.id)!.y)))].sort((a, b) => a - b);
+  const rankY = [...new Set(source.map((n) => bucket(anchor.get(n.id)!.y)))].sort((a, b) => a - b);
   const rankOf = new Map<number, string[]>();
-  for (const n of nodes) {
+  for (const n of source) {
     const y = bucket(anchor.get(n.id)!.y);
     rankOf.set(y, [...(rankOf.get(y) ?? []), n.id]);
   }
@@ -289,6 +305,8 @@ export function autoLayout(nodes: Node[], edges: Edge[]) {
 
   return nodes.map((n) => {
     const p = final.get(n.id)!;
-    return { ...n, position: { x: p.x, y: p.y } };
+    // Горизонтальный вид: x и y меняются местами — поколения становятся
+    // колонками слева направо, соседи по поколению — друг под другом.
+    return { ...n, position: horizontal ? { x: p.y, y: p.x } : { x: p.x, y: p.y } };
   });
 }

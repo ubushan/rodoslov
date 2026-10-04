@@ -25,7 +25,9 @@ import { CouplePlate } from "./CouplePlate";
 import { FamilyBusEdge } from "./FamilyBusEdge";
 import { StudioMinimap } from "./StudioMinimap";
 import { StudioZoom } from "./StudioZoom";
-import { Inspector, type InspectorChange } from "./Inspector";
+import { CANVAS_VIEWS, isCanvasView, type CanvasView } from "./ViewSwitcher";
+import { MenuButton } from "./DockMenu";
+import { Inspector, generationMap, relationOptions, type InspectorChange } from "./Inspector";
 import { CommandPalette, type PaletteAction } from "./CommandPalette";
 import { createClient } from "@/lib/supabase/client";
 import { peopleWord, publicUrl, shortName } from "@/lib/format";
@@ -33,7 +35,7 @@ import { autoLayout, CARD_W, CARD_H } from "@/lib/layout";
 import type { NewRelative } from "@/lib/place";
 import { maleLineIds } from "@/lib/maleLine";
 import { THEMES, THEME_COOKIE, resolveStoredTheme } from "@/lib/theme";
-import { deleteRelationship } from "@/app/actions/persons";
+import { createRelationship, deleteRelationship } from "@/app/actions/persons";
 import { exportTree } from "@/app/actions/gedcom";
 import type { Person, Relationship, Attachment, MemberRole } from "@/lib/types";
 
@@ -47,6 +49,21 @@ const edgeTypes = { family: FamilyBusEdge };
  * никакой подложки под панелью нет.
  */
 const INSPECTOR_RESERVE = 344;
+
+/**
+ * Телефон: зазор между нижней кромкой выбранной карточки и верхней кромкой
+ * нижнего листа инспектора, а также поле от верхней кромки холста. По ним
+ * холст поднимает карточку в свободную область над листом (см. эффект
+ * выравнивания ниже).
+ */
+const SHEET_GAP = 14;
+const SHEET_TOP_MARGIN = 12;
+
+/** Переезд холста: без анимации, если система просит поменьше движения */
+function motionDuration(ms: number) {
+  if (typeof window === "undefined") return ms;
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : ms;
+}
 
 /* Кнопка дока действий: иконка и подпись столбиком, как в студийном доке.
    До 640px — пилюля телефона: шире в высоту, круглее, мельче подпись. */
@@ -99,12 +116,24 @@ function IconFilter() {
   );
 }
 
-/** Скрыть с холста — глаз перечёркнут */
-function IconEyeOff() {
+/** Вид холста — кнопка «Вид» дока: карточки-поколения друг под другом */
+function IconView() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="5.5" y="2.6" width="7" height="3.4" rx="1" />
+      <rect x="1.8" y="11.9" width="6" height="3.4" rx="1" />
+      <rect x="10.2" y="11.9" width="6" height="3.4" rx="1" />
+      <path d="M9 6v2.6M4.8 11.9V8.6h8.4v3.3" />
+    </svg>
+  );
+}
+
+/** Файл — пункт «Экспорт в формате GEDCOM» */
+function IconFile() {
   return (
     <svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M2.6 6.3C4.3 4.6 6.6 3.6 9 3.6s4.7 1 6.4 2.7M3.9 12.4C5.1 13.6 6.9 14.4 9 14.4s3.9-.8 5.1-2" />
-      <path d="M3 3l12 12" />
+      <path d="M4.5 2.5h5.2l3.8 3.8v9.2H4.5z" />
+      <path d="M9.6 2.6v3.8h3.8" />
     </svg>
   );
 }
@@ -130,6 +159,21 @@ function IconBranch() {
   );
 }
 
+/** Два человека и связь между ними — кнопка «Связь» мультивыделения */
+function IconRelation() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="4.6" cy="9" r="2.1" />
+      <circle cx="13.4" cy="9" r="2.1" />
+      <path d="M6.7 9h4.6" />
+    </svg>
+  );
+}
+
+/* Диаграммы предков («Веер» и «Часовая») удалены вместе с их данными и
+   экспортом SVG: на холсте остались три вида — нисходящее, восходящее и
+   «слева направо» (см. ViewSwitcher). */
+
 type Props = {
   treeId: string;
   treeTitle: string;
@@ -148,6 +192,13 @@ type Props = {
   wholeTreeHref?: string;
   /** на странице ветки — её родоначальник и число людей, не попавших в ветку */
   branchRoot?: { id: string; hidden: number };
+  /**
+   * Ключ вида холста в localStorage: `canvas-view:<userId>:<treeId>` — его
+   * строит страница (см. tree/[treeId]/page.tsx), чтобы выбор вида был свой
+   * у каждого пользователя и каждого древа. Пропа нет (страница ветки) —
+   * вид не запоминается, но переключатель работает.
+   */
+  viewStorageKey?: string;
 };
 
 function Canvas({
@@ -160,10 +211,11 @@ function Canvas({
   changes = null,
   wholeTreeHref,
   branchRoot,
+  viewStorageKey,
 }: Props) {
   const router = useRouter();
   const canEdit = role === "owner" || role === "editor";
-  const { getNodes, getNode, fitView, setCenter, setViewport } = useReactFlow();
+  const { getNodes, getNode, fitView, setCenter, getViewport, setViewport } = useReactFlow();
   // размеры области холста: по ним считаем «уместить» с запасом под инспектор
   const containerW = useStore((state) => state.width);
   const containerH = useStore((state) => state.height);
@@ -173,11 +225,42 @@ function Canvas({
   const [maleLineOnly, setMaleLineOnly] = useState(false);
   // выделение на холсте: один или несколько человек (Shift + клик)
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  /**
+   * Геометрия нижнего листа инспектора на телефоне: верхняя кромка и высота
+   * относительно холста. Отдаёт сам лист (Inspector) через ResizeObserver —
+   * его высота зависит от содержимого, поэтому проценты не подходят. Лист
+   * стоит над доком, так что учёт его кромки учитывает и высоту дока.
+   */
+  const sheetRef = useRef<{ top: number; height: number } | null>(null);
+  // тик: лист доизмерился или изменился — будим эффект выравнивания
+  const [sheetTick, setSheetTick] = useState(0);
+  const onSheetMetrics = useCallback((metrics: { top: number; height: number } | null) => {
+    const prev = sheetRef.current;
+    if (!metrics) {
+      if (!prev) return;
+      sheetRef.current = null;
+      setSheetTick((tick) => tick + 1);
+      return;
+    }
+    if (prev && Math.abs(prev.top - metrics.top) < 1 && Math.abs(prev.height - metrics.height) < 1) {
+      return;
+    }
+    sheetRef.current = metrics;
+    setSheetTick((tick) => tick + 1);
+  }, []);
   // «Скрыть на холсте» — только отображение, в базу ничего не пишется
   const [hiddenIds, setHiddenIds] = useState<string[]>([]);
   // командная палитра: ⌘K, событие из шапки или ?palette=1
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [pending, startTransition] = useTransition();
+
+  // ---- Вид холста: нисходящее · восходящее · слева направо ----
+  // До чтения localStorage всегда нисходящее — так же отрисуется и на сервере.
+  const [view, setView] = useState<CanvasView>("desc");
+  /** восходящее: раскладка зеркалится по вертикали, шина идёт снизу вверх */
+  const mirror = view === "asc";
+  /** «слева направо»: раскладка повёрнута на 90°, шина идёт вертикально */
+  const horizontal = view === "lr";
 
   // Кому есть что показывать на отдельной странице ветки: у кого есть супруги
   // или дети. У остальных кнопка ветки в панели деталей неактивна.
@@ -193,6 +276,10 @@ function Canvas({
     }
     return ids;
   }, [relationships]);
+
+  // Поколения по связям «родитель — ребёнок»: по ним «Связь» выбирает, кто из
+  // двух выбранных становится родителем (см. relateSelected).
+  const generations = useMemo(() => generationMap(persons, relationships), [persons, relationships]);
 
   // фильтр мужской линии: набор карточек, которые остаются на холсте
   const lineIds = useMemo(
@@ -232,25 +319,23 @@ function Canvas({
     [shownRelationships, visibleIds]
   );
 
-  const initialEdges = useMemo<Edge[]>(
+  /** Направление связей в текущем виде — его читает FamilyBusEdge */
+  const edgeDir = horizontal ? "right" : mirror ? "up" : "down";
+
+  /**
+   * Рёбра для раскладки: ей нужны только вид связи и её направление, а сторону
+   * хэндлов (её выбирает вид) на этом шаге ещё нельзя посчитать — позиций нет.
+   */
+  const layoutEdges = useMemo<Edge[]>(
     () =>
       visibleRelationships.map((r) => ({
         id: r.id,
         source: r.from_person_id,
         target: r.to_person_id,
-        sourceHandle: r.kind === "spouse" ? "spouse-r" : "child-out",
-        targetHandle: r.kind === "spouse" ? "spouse-l" : "parent-in",
         type: r.kind === "spouse" ? "straight" : "family",
-        animated: false,
-        data: { kind: r.kind },
-        style:
-          r.kind === "spouse"
-            ? // связь супругов — сплошная линия чуть плотнее кровной, как
-              // .w-bond в прототипе: цвет --wire-bond, без пунктира
-              { stroke: "var(--color-wire-bond)", strokeWidth: 1.5 }
-            : { stroke: "var(--color-canvas-line)", strokeWidth: 1.5 },
+        data: { kind: r.kind, dir: edgeDir },
       })),
-    [visibleRelationships]
+    [visibleRelationships, edgeDir]
   );
 
   /**
@@ -267,9 +352,71 @@ function Canvas({
       position: { x: 0, y: 0 },
       data: { person: p },
     }));
-    const laid = autoLayout(stubs, initialEdges);
-    return new Map(laid.map((n) => [n.id, n.position]));
-  }, [visiblePersons, initialEdges]);
+    // «Слева направо» — та же раскладка, повёрнутая на 90°: поколения идут
+    // колонками слева направо, соседи по поколению — друг под другом.
+    const laid = autoLayout(stubs, layoutEdges, { horizontal });
+    // Восходящее — та же раскладка, отражённая по вертикали: y' = -(y + h).
+    // Порядок поколений разворачивается (корень внизу, поколения растут вверх),
+    // а все зазоры раскладки сохраняются, поэтому карточки не наезжают друг на
+    // друга. Отрицательные координаты React Flow принимает как обычные.
+    return new Map(
+      laid.map((n) => [
+        n.id,
+        mirror ? { x: n.position.x, y: -(n.position.y + CARD_H) } : n.position,
+      ])
+    );
+  }, [visiblePersons, layoutEdges, mirror, horizontal]);
+
+  /**
+   * Рёбра холста. Хэндлы выбираются по виду: в вертикальных видах связи идут
+   * сверху вниз, а в «слева направо» — слева направо, поэтому у карточки есть
+   * и боковые точки. Супруги в горизонтальном виде стоят друг под другом, и
+   * линия идёт из нижней кромки верхнего в верхнюю кромку нижнего: кто выше —
+   * решает раскладка (layoutPositions), а не порядок связи в базе.
+   */
+  const initialEdges = useMemo<Edge[]>(
+    () =>
+      visibleRelationships.map((r) => {
+        const spouse = r.kind === "spouse";
+        let source = r.from_person_id;
+        let target = r.to_person_id;
+        let sourceHandle = spouse ? "spouse-r" : "child-out";
+        let targetHandle = spouse ? "spouse-l" : "parent-in";
+        if (horizontal) {
+          if (spouse) {
+            const from = layoutPositions.get(source);
+            const to = layoutPositions.get(target);
+            if (from && to && from.y > to.y) {
+              source = r.to_person_id;
+              target = r.from_person_id;
+            }
+            sourceHandle = "pair-out";
+            targetHandle = "pair-in";
+          } else {
+            // саму линию рисует FamilyBusEdge, хэндлы — только для порядка
+            sourceHandle = "kin-out";
+            targetHandle = "kin-in";
+          }
+        }
+        return {
+          id: r.id,
+          source,
+          target,
+          sourceHandle,
+          targetHandle,
+          type: spouse ? "straight" : "family",
+          animated: false,
+          // dir читает FamilyBusEdge: куда строится стебель, шина и отводы
+          data: { kind: r.kind, dir: edgeDir },
+          style: spouse
+            ? // связь супругов — сплошная линия чуть плотнее кровной, как
+              // .w-bond в прототипе: цвет --wire-bond, без пунктира
+              { stroke: "var(--color-wire-bond)", strokeWidth: 1.5 }
+            : { stroke: "var(--color-canvas-line)", strokeWidth: 1.5 },
+        };
+      }),
+    [visibleRelationships, layoutPositions, horizontal, edgeDir]
+  );
 
   const initialNodes = useMemo<Node[]>(
     () =>
@@ -338,18 +485,42 @@ function Canvas({
     [setNodes]
   );
 
-  /** Выделить одного и показать его в центре холста */
+  /** Выделить одного и показать его на холсте */
   const selectOnly = useCallback(
     (id: string) => {
       applySelection([id]);
-      const centerOnNode = () => {
+      const centerOnNode = (attempt = 0) => {
         const node = getNode(id);
         if (!node) return;
         const width = node.measured?.width ?? CARD_W;
         const height = node.measured?.height ?? CARD_H;
+        // До 640px инспектор — нижний лист: карточку ставим прямо над ним,
+        // в центр окна она бы уехала под лист.
+        const mobile = window.matchMedia("(max-width: 639px)").matches;
+        const sheet = sheetRef.current;
+        // лист только что смонтировался и ещё не измерен — подождём кадр
+        if (mobile && !sheet && attempt < 8) {
+          setTimeout(() => centerOnNode(attempt + 1), 40);
+          return;
+        }
+        if (mobile && sheet) {
+          const zoom = 1;
+          // центр карточки — по центру холста, низ — на SHEET_GAP выше листа
+          const targetX = (containerW || window.innerWidth) / 2 - width / 2;
+          const targetY = sheet.top - SHEET_GAP - height;
+          setViewport(
+            {
+              x: targetX - node.position.x * zoom,
+              y: targetY - node.position.y * zoom,
+              zoom,
+            },
+            { duration: motionDuration(400) }
+          );
+          return;
+        }
         setCenter(node.position.x + width / 2, node.position.y + height / 2, {
           zoom: 1,
-          duration: 400,
+          duration: motionDuration(400),
         });
       };
       // человека могли до этого скрыть с холста — тогда сначала возвращаем его
@@ -360,10 +531,78 @@ function Canvas({
       setHiddenIds((prev) => (prev.includes(id) ? prev.filter((hidden) => hidden !== id) : prev));
       setTimeout(centerOnNode, 220);
     },
-    [applySelection, getNode, setCenter]
+    [applySelection, getNode, setCenter, setViewport, containerW]
   );
 
-  // если выделенный человек ушёл с холста (фильтр или «Скрыть»), снимаем выделение
+  /**
+   * Телефон: выбранную карточку поднимаем над нижним листом инспектора.
+   * Срабатывает только на новое выделение (и на смену выбранного): раскладку,
+   * изменение размера листа и панораму пользователя не перебиваем. Если
+   * карточка и так целиком видна над листом — холст не двигаем.
+   */
+  const alignedSelection = useRef<string | null>(null);
+  const selectionKey = selectedIds.length ? [...selectedIds].sort().join("|") : "";
+
+  useEffect(() => {
+    if (!selectionKey) {
+      alignedSelection.current = null;
+      return;
+    }
+    if (alignedSelection.current === selectionKey) return;
+    // до 640px инспектор — нижний лист; на десктопе панель справа и геометрии нет
+    if (!containerW || containerW >= 640) {
+      alignedSelection.current = selectionKey;
+      return;
+    }
+    const sheet = sheetRef.current;
+    if (!sheet) return; // лист ещё не измерен — эффект повторится по sheetTick
+
+    const viewport = getViewport();
+    let left = Infinity;
+    let top = Infinity;
+    let right = -Infinity;
+    let bottom = -Infinity;
+    for (const id of selectionKey.split("|")) {
+      const node = getNode(id);
+      if (!node || node.type !== "person") continue;
+      const width = (node.measured?.width ?? CARD_W) * viewport.zoom;
+      const height = (node.measured?.height ?? CARD_H) * viewport.zoom;
+      const x = viewport.x + node.position.x * viewport.zoom;
+      const y = viewport.y + node.position.y * viewport.zoom;
+      left = Math.min(left, x);
+      top = Math.min(top, y);
+      right = Math.max(right, x + width);
+      bottom = Math.max(bottom, y + height);
+    }
+    alignedSelection.current = selectionKey;
+    if (!Number.isFinite(left)) return;
+
+    // свободная область: от верхней кромки холста до кромки листа с зазором
+    const freeBottom = Math.max(SHEET_TOP_MARGIN + 40, sheet.top - SHEET_GAP);
+    const visible =
+      bottom <= sheet.top - SHEET_GAP &&
+      top >= SHEET_TOP_MARGIN &&
+      left >= SHEET_TOP_MARGIN &&
+      right <= containerW - SHEET_TOP_MARGIN;
+    if (visible) return;
+
+    // Сдвиг по вертикали — ровно настолько, чтобы карточка встала прямо над
+    // листом с зазором SHEET_GAP от его верхней кромки; по горизонтали
+    // выравниваем в центр свободной области (лист занимает всю ширину). Если
+    // выделение выше свободной области, низ всё равно прижимаем к листу.
+    const centerX = containerW / 2;
+    const centerY = freeBottom - (bottom - top) / 2;
+    setViewport(
+      {
+        x: viewport.x + centerX - (left + right) / 2,
+        y: viewport.y + centerY - (top + bottom) / 2,
+        zoom: viewport.zoom,
+      },
+      { duration: motionDuration(380) }
+    );
+  }, [selectionKey, sheetTick, containerW, getNode, getViewport, setViewport]);
+
+  // если выделенный человек ушёл с холста (фильтр или скрытие), снимаем выделение
   useEffect(() => {
     setSelectedIds((prev) => {
       const next = prev.filter((id) => visibleIds.has(id));
@@ -373,19 +612,46 @@ function Canvas({
 
   const clearSelection = useCallback(() => applySelection([]), [applySelection]);
 
-  function hideSelected() {
-    if (!selectedIds.length) return;
-    const ids = selectedIds;
-    setHiddenIds((prev) => [...new Set([...prev, ...ids])]);
-    clearSelection();
-    toast.success(
-      `Скрыто на холсте: ${ids.length} ${peopleWord(ids.length)}`,
-      { description: "Данные не меняются — вернуть можно чипом справа." }
-    );
-  }
-
   function restoreHidden() {
     setHiddenIds([]);
+  }
+
+  /**
+   * «Связь» из мультивыделения: соединяет ровно двух выбранных. Направление
+   * «Родитель — ребёнок» определяет поколение: родителем становится тот, кто
+   * старше; при равных поколениях — выбранный первым. Супруги — порядок выбора.
+   * Ошибки (в том числе «Такая связь уже есть») приходят из действия и
+   * показываются тостом; после успеха холст обновляется, как в других действиях.
+   */
+  function relateSelected(kind: "parent" | "spouse") {
+    if (selectedIds.length !== 2) {
+      toast.error("Выберите ровно двух человек");
+      return;
+    }
+    const [first, second] = selectedIds;
+    const parentFirst = (generations.get(first) ?? 1) <= (generations.get(second) ?? 1);
+    const from = kind === "parent" && !parentFirst ? second : first;
+    const to = kind === "parent" ? (from === first ? second : first) : second;
+
+    startTransition(async () => {
+      const result = await createRelationship(treeId, kind, from, to);
+      if ("error" in result) {
+        toast.error(result.error);
+        return;
+      }
+      const byId = new Map(persons.map((person) => [person.id, person]));
+      const nameOf = (id: string) => {
+        const person = byId.get(id);
+        return person ? shortName(person) : "человек";
+      };
+      toast.success(
+        kind === "parent"
+          ? `Связь создана: ${nameOf(from)} — родитель ${nameOf(to)}`
+          : `Связь создана: ${nameOf(from)} и ${nameOf(to)} — супруги`
+      );
+      applySelection([]);
+      router.refresh();
+    });
   }
 
   /** Показать всех, кто связан с этим местом: выделяем их на холсте */
@@ -439,6 +705,49 @@ function Canvas({
     return () => clearTimeout(t);
   }, [containerW, containerH, visiblePersons.length, fitAll]);
 
+  // ---- Вид холста: сохранение выбора и фокус диаграмм ----
+
+  // Читаем ключ после монтирования: в localStorage на сервере нет, а первая
+  // отрисовка обязана совпасть с серверной — нисходящее.
+  const [viewHydrated, setViewHydrated] = useState(!viewStorageKey);
+  useEffect(() => {
+    if (!viewStorageKey) return;
+    try {
+      const saved = window.localStorage.getItem(viewStorageKey);
+      if (isCanvasView(saved)) setView(saved);
+    } catch {
+      // приватный режим или запрет хранилища — просто работаем по умолчанию
+    }
+    setViewHydrated(true);
+  }, [viewStorageKey]);
+
+  // Запись выбора. До первого чтения не пишем: иначе значение по умолчанию
+  // затёрло бы сохранённый вид.
+  useEffect(() => {
+    if (!viewStorageKey || !viewHydrated) return;
+    try {
+      window.localStorage.setItem(viewStorageKey, view);
+    } catch {
+      // хранилище недоступно — вид просто не запомнится
+    }
+  }, [view, viewStorageKey, viewHydrated]);
+
+  // Смена вида: раскладка пересобирается целиком, поэтому вписываем древо
+  // заново — иначе оно осталось бы в начале координат. Выделение живёт в
+  // состоянии узлов и переживает пересборку (см. синхронизацию initialNodes).
+  const prevView = useRef<CanvasView>("desc");
+  useEffect(() => {
+    const previous = prevView.current;
+    prevView.current = view;
+    if (previous === view) return;
+    fittedOnce.current = false;
+    const timer = setTimeout(() => {
+      fittedOnce.current = true;
+      fitAll({ padding: 0.2, duration: 0 });
+    }, 80);
+    return () => clearTimeout(timer);
+  }, [view, fitAll]);
+
   // Мягкая рамка вокруг пары супругов — когда они рядом.
   // Кнопок «+» на линии пары больше нет: добавление родственников живёт
   // в панели деталей (инспекторе) и не всплывает при наведении.
@@ -454,9 +763,15 @@ function Canvas({
       const ah = a.measured?.height ?? CARD_H;
       const bw = b.measured?.width ?? CARD_W;
       const bh = b.measured?.height ?? CARD_H;
-      if (Math.abs(a.position.y + ah / 2 - (b.position.y + bh / 2)) > 48) continue;
-      const gap = Math.max(b.position.x - (a.position.x + aw), a.position.x - (b.position.x + bw));
-      if (gap > 120) continue;
+      // Пара читается как одна семья: в вертикальных видах супруги стоят рядом
+      // по горизонтали, в «слева направо» — друг под другом по вертикали.
+      const gap = horizontal
+        ? Math.max(b.position.y - (a.position.y + ah), a.position.y - (b.position.y + bh))
+        : Math.max(b.position.x - (a.position.x + aw), a.position.x - (b.position.x + bw));
+      const aligned = horizontal
+        ? Math.abs(a.position.x + aw / 2 - (b.position.x + bw / 2)) <= 48
+        : Math.abs(a.position.y + ah / 2 - (b.position.y + bh / 2)) <= 48;
+      if (!aligned || gap > 120) continue;
       const left = Math.min(a.position.x, b.position.x) - 10;
       const top = Math.min(a.position.y, b.position.y) - 10;
       out.push({
@@ -475,7 +790,7 @@ function Canvas({
       });
     }
     return out;
-  }, [nodes, edges]);
+  }, [nodes, edges, horizontal]);
 
   // ---- Правки родственников приходят без перезагрузки страницы ----
   useEffect(() => {
@@ -664,7 +979,8 @@ function Canvas({
     else toast.success(`Мужская линия: ${maleLineCount} ${peopleWord(maleLineCount)}`);
   }
 
-  // ---- Экспорт в картинку ----
+  // ---- Экспорт в картинку: PNG карточек (SVG-экспорт был нужен только
+  // диаграммам «Веер» и «Часовая» и удалён вместе с ними) ----
   async function exportPng() {
     const viewport = document.querySelector<HTMLElement>(".react-flow__viewport");
     if (!viewport || personNodes().length === 0) {
@@ -683,10 +999,7 @@ function Canvas({
 
       // цвета картинки берём из текущей темы, иначе экспорт в тёмной теме
       // остался бы светлым
-      const theme = getComputedStyle(document.documentElement);
-      const themeColor = (name: string, fallback: string) =>
-        theme.getPropertyValue(name).trim() || fallback;
-      const canvasBg = themeColor("--color-canvas", "#eef1f6");
+      const canvasBg = themeToken("--color-canvas", "#eef1f6");
 
       const dataUrl = await toPng(viewport, {
         backgroundColor: canvasBg,
@@ -704,8 +1017,8 @@ function Canvas({
       // Подпись древа снизу картинки
       const final = await withCaption(dataUrl, width, height, treeTitle, {
         background: canvasBg,
-        title: themeColor("--color-ink-800", "#131e33"),
-        note: themeColor("--color-ink-300", "#7487a5"),
+        title: themeToken("--color-ink-800", "#131e33"),
+        note: themeToken("--color-ink-300", "#7487a5"),
       });
 
       const a = document.createElement("a");
@@ -720,6 +1033,10 @@ function Canvas({
     }
   }
 
+  /** Пункты меню «Связь»: тип связи выбирается до вызова действия. При любом
+      числе выбранных, кроме двух, пункты выключены с подсказкой. */
+  const exactlyTwo = selectedIds.length === 2;
+
   return (
     <div className={`relative h-full w-full bg-canvas ${exporting ? "exporting" : ""}`}>
       {/* Ореол холста — как .app__halo прототипа: холодное пятно слева сверху и
@@ -728,7 +1045,8 @@ function Canvas({
       <div aria-hidden="true" className="canvas-halo" />
       {/* Холст — на всю ширину окна, без сужения и без отдельного слоя точек
           под панелью: инспектор парит поверх холста, а место под него
-          резервирует только «уместить» (см. fitAll) */}
+          резервирует только «уместить» (см. fitAll). Вид меняет только
+          раскладку и направление связей — сам холст один и тот же. */}
       <div className="relative z-[1] h-full w-full">
         <ReactFlow
           nodes={[...nodes, ...plateNodes]}
@@ -777,35 +1095,24 @@ function Canvas({
       />
       <StudioMinimap className="absolute bottom-5 left-6 z-10 hidden lg:block" />
 
-      {/* Левая колонка холста: возврат ко всему древу (страница ветки), легенда
-          связей и возврат скрытых карточек. Инспектор парит справа, поэтому
-          подписи живут слева. На телефоне колонки нет: её роль берёт нижняя
-          панель действий. */}
-      <div className="pointer-events-none absolute left-3 top-3 z-10 hidden flex-col items-start gap-1.5 sm:flex">
+      {/* Левая колонка холста: возврат ко всему древу (страница ветки) и
+          возврат скрытых карточек. Переключателя вида здесь больше нет — выбор
+          вида переехал в меню кнопки «Вид» дока, поэтому подписи спокойно живут
+          слева, а инспектор парит справа. На телефоне кнопка «Всё древо»
+          уступает место доку и нижнему листу деталей. */}
+      <div className="pointer-events-none absolute left-3 top-3 z-10 flex flex-col items-start gap-1.5">
         {wholeTreeHref && (
           <button
             type="button"
             onClick={() => router.push(wholeTreeHref)}
             aria-label="Раскрыть всё древо"
             title="Раскрыть всё древо"
-            className="glass pointer-events-auto flex items-center gap-2 px-3 py-2 text-[12.5px] text-ink-600 transition-colors hover:text-ink-800"
+            className="glass pointer-events-auto hidden items-center gap-2 px-3 py-2 text-[12.5px] text-ink-600 transition-colors hover:text-ink-800 sm:flex"
           >
             <IconExpand />
             <span>Всё древо</span>
           </button>
         )}
-        <span className="studio-chip">
-          <span aria-hidden="true" className="h-0.5 w-6 rounded-[2px] bg-canvas-line" />
-          родитель — ребёнок
-        </span>
-        <span className="studio-chip">
-          <span
-            aria-hidden="true"
-            className="h-0.5 w-6 rounded-[2px]"
-            style={{ background: "var(--color-wire-bond)" }}
-          />
-          супруги
-        </span>
         {hiddenIds.length > 0 && (
           <button
             type="button"
@@ -816,14 +1123,36 @@ function Canvas({
             Скрыто: {hiddenIds.length} · вернуть
           </button>
         )}
+        {/* Включённый фильтр: чип «Мужская линия» тут же в колонке — видно, что
+            показано, и легко вернуть всех. Раньше он висел по центру холста, но
+            там его перекрывали панели. */}
+        {maleLineOnly && (
+          <button
+            type="button"
+            onClick={toggleMaleLine}
+            title="Показать всех родственников"
+            style={{
+              borderColor: "var(--p-acc-line)",
+              background: "var(--p-acc-bg)",
+              color: "var(--p-brass-ink)",
+            }}
+            className="studio-chip pointer-events-auto shadow-[var(--shadow-lift)]"
+          >
+            <IconMaleLine />
+            Мужская линия: {shownPersons.length} {peopleWord(shownPersons.length)}
+            <span className="text-ink-400">· показать всех</span>
+          </button>
+        )}
       </div>
 
       {/* Док действий: стеклянная панель снизу строго по центру окна, как в
           прототипе (.dock: left 50% + translateX(-50%)). Состав —
-          «Добавить · Фильтр · Экспорт»: раскладка автоматическая, отдельной
-          кнопки у неё нет. Панель деталей парит справа поверх холста и док не
-          сдвигает: на 1440/1280/1024 центр дока совпадает с центром окна и до
-          панели остаётся запас. На телефоне это та же панель-пилюля
+          «Добавить · Фильтр · Вид · Экспорт»: раскладка автоматическая, отдельной
+          кнопки у неё нет. «Фильтр», «Вид» и «Экспорт» открывают меню ВВЕРХ над
+          своей кнопкой (см. DockMenu) — выбор подпунктов не уводит с холста.
+          Панель деталей парит справа поверх холста и док не сдвигает: на
+          1440/1280/1024 центр дока совпадает с центром окна и до панели
+          остаётся запас. На телефоне это та же панель-пилюля
           (см. .studio-dock и DOCK_BTN). */}
       <div className="pointer-events-none absolute inset-x-0 bottom-[calc(12px+env(safe-area-inset-bottom))] z-10 flex justify-center sm:bottom-3">
         <div
@@ -844,13 +1173,29 @@ function Canvas({
               <span>Добавить</span>
             </button>
           )}
-          <button
-            type="button"
-            onClick={toggleMaleLine}
-            aria-pressed={maleLineOnly}
-            aria-label={maleLineOnly ? "Показать всех родственников" : "Фильтр: мужская линия"}
-            title={maleLineOnly ? "Показать всех родственников" : "Фильтр: только мужская линия"}
+          {/* Фильтр мужской линии: кнопка дока раскрывает меню вверх, внутри —
+              единственный пункт-переключатель. Поведение фильтра прежнее. */}
+          <MenuButton
             className={`${DOCK_BTN} ${maleLineOnly ? DOCK_BTN_ON : ""}`}
+            pressed={maleLineOnly}
+            ariaLabel={maleLineOnly ? "Показать всех родственников" : "Фильтр: мужская линия"}
+            title={maleLineOnly ? "Показать всех родственников" : "Фильтр: только мужская линия"}
+            menuLabel="Фильтр холста"
+            width={236}
+            options={[
+              {
+                id: "male-line",
+                label: "Мужская линия",
+                hint: maleLineOnly
+                  ? "Снять фильтр — показать всех родственников"
+                  : "Оставить только мужчин по крови от старшего предка",
+                icon: <IconMaleLine />,
+                role: "menuitemcheckbox",
+                checked: maleLineOnly,
+                trailing: maleLineOnly ? maleLineCount : undefined,
+                onSelect: toggleMaleLine,
+              },
+            ]}
           >
             <span className="relative block">
               <IconFilter />
@@ -867,18 +1212,55 @@ function Canvas({
               )}
             </span>
             <span>Фильтр</span>
-          </button>
-          <button
-            type="button"
-            onClick={exportPng}
-            disabled={exporting}
-            aria-label="Скачать картинку"
-            title={exporting ? "Собираем картинку…" : "Скачать картинку"}
+          </MenuButton>
+          {/* Вид холста: переключатель переехал с левого верхнего угла в меню
+              этой кнопки. Активный вид отмечен галочкой и латунью. */}
+          <MenuButton
             className={DOCK_BTN}
+            ariaLabel={`Вид холста: ${CANVAS_VIEWS.find((item) => item.key === view)?.label ?? ""}`}
+            title="Вид холста"
+            menuLabel="Вид холста"
+            options={CANVAS_VIEWS.map((item) => ({
+              id: item.key,
+              label: item.label,
+              hint: item.hint,
+              icon: <item.icon />,
+              role: "menuitemradio",
+              checked: view === item.key,
+              onSelect: () => setView(item.key),
+            }))}
+          >
+            <IconView />
+            <span>Вид</span>
+          </MenuButton>
+          {/* Экспорт: PNG карточек и GEDCOM — тот же механизм, что в настройках
+              древа (см. exportGedcom и action exportTree). */}
+          <MenuButton
+            className={DOCK_BTN}
+            ariaLabel="Экспорт"
+            title="Экспорт"
+            menuLabel="Экспорт"
+            options={[
+              {
+                id: "png",
+                label: "Экспорт изображения древа",
+                hint: "PNG со всеми карточками и подписью",
+                icon: <IconDownload />,
+                disabled: exporting,
+                onSelect: () => void exportPng(),
+              },
+              {
+                id: "gedcom",
+                label: "Экспорт в формате GEDCOM",
+                hint: "Файл .ged для других генеалогических программ",
+                icon: <IconFile />,
+                onSelect: exportGedcom,
+              },
+            ]}
           >
             <IconDownload />
             <span>Экспорт</span>
-          </button>
+          </MenuButton>
         </div>
       </div>
 
@@ -886,7 +1268,7 @@ function Canvas({
           Только отображение — данные не меняются. Пилюля центрируется в
           свободной части холста: справа парит инспектор, под него не заезжаем.
           На телефоне пилюля скрыта: её перекрывает нижний лист инспектора,
-          а те же три действия лежат внутри листа (см. Inspector). */}
+          а те же действия лежат внутри листа (см. Inspector). */}
       {selectedIds.length > 1 && (
         <div className="absolute bottom-[152px] left-1/2 z-20 hidden max-w-[calc(100%-24px)] -translate-x-1/2 items-center gap-1.5 rounded-[14px] border border-[var(--p-line)] bg-[var(--p-glass)] px-3 py-1.5 shadow-[var(--shadow-lift)] backdrop-blur-[14px] sm:flex sm:max-w-[calc(100%-368px)] sm:left-[calc((100%-344px)/2)] sm:gap-2 lg:bottom-[86px] lg:left-[calc(240px+(100%-584px)/2)] lg:max-w-[calc(100%-608px)]">
           <b className="whitespace-nowrap text-[13px] font-medium text-brass-ink">
@@ -915,15 +1297,29 @@ function Canvas({
             <IconBranch />
             <span className="hidden sm:inline">Показать ветвь</span>
           </button>
-          <button
-            type="button"
-            onClick={hideSelected}
-            title="Скрыть на холсте — только отображение"
-            className="flex h-8 items-center gap-1.5 rounded-[10px] border border-[var(--p-line)] bg-[var(--p-field-bg)] px-2.5 text-[12.5px] text-ink-600 transition-colors hover:bg-[var(--p-hover-bg)] hover:text-ink-800"
-          >
-            <IconEyeOff />
-            <span className="hidden sm:inline">Скрыть на холсте</span>
-          </button>
+          {/* «Связь» — соединяет ровно двух выбранных: сначала тип связи, затем
+              серверное действие createRelationship (см. relateSelected). */}
+          {canEdit && (
+            <MenuButton
+              className="flex h-8 items-center gap-1.5 rounded-[10px] border border-[var(--p-line)] bg-[var(--p-field-bg)] px-2.5 text-[12.5px] text-ink-600 transition-colors hover:bg-[var(--p-hover-bg)] hover:text-ink-800"
+              ariaLabel="Связать выбранных"
+              title={
+                selectedIds.length === 2
+                  ? "Создать связь между двумя выбранными"
+                  : "Выберите ровно двух человек"
+              }
+              menuLabel="Тип связи"
+              note={
+                exactlyTwo
+                  ? undefined
+                  : `Нужно ровно два человека — сейчас выбрано ${selectedIds.length}`
+              }
+              options={relationOptions(exactlyTwo, relateSelected)}
+            >
+              <IconRelation />
+              <span className="hidden sm:inline">Связь</span>
+            </MenuButton>
+          )}
           <button
             type="button"
             onClick={clearSelection}
@@ -935,26 +1331,6 @@ function Canvas({
             <span className="hidden sm:inline">Снять</span>
           </button>
         </div>
-      )}
-
-      {/* Включённый фильтр: чип «Мужская линия» рядом с холстом — видно, что
-          показано, и легко вернуть всех */}
-      {maleLineOnly && (
-        <button
-          type="button"
-          onClick={toggleMaleLine}
-          title="Показать всех родственников"
-          style={{
-            borderColor: "var(--p-acc-line)",
-            background: "var(--p-acc-bg)",
-            color: "var(--p-brass-ink)",
-          }}
-          className="studio-chip absolute left-1/2 top-3 z-10 -translate-x-1/2 shadow-[var(--shadow-lift)]"
-        >
-          <IconMaleLine />
-          Мужская линия: {shownPersons.length} {peopleWord(shownPersons.length)}
-          <span className="text-ink-400">· показать всех</span>
-        </button>
       )}
 
       {/* Инспектор выделенного человека: панель справа или нижний лист.
@@ -978,6 +1354,8 @@ function Canvas({
               (gender ? `&gender=${gender}` : "")
           )
         }
+        onRelate={relateSelected}
+        onSheetMetrics={onSheetMetrics}
         onHide={(ids) => {
           setHiddenIds((prev) => [...new Set([...prev, ...ids])]);
           applySelection([]);
@@ -998,6 +1376,12 @@ function Canvas({
       />
     </div>
   );
+}
+
+/** Значение токена темы для картинки: цвет берём из текущей темы */
+function themeToken(name: string, fallback: string) {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return value || fallback;
 }
 
 /** Дорисовывает название древа и дату под картинкой */
