@@ -6,6 +6,7 @@ import {
   eventKind,
   expiryLabel,
   inDaysWord,
+  invitesWord,
   relativeTime,
   usesLabel,
   usesPercent,
@@ -14,10 +15,10 @@ import {
 } from "./overview";
 
 /*
- * Три блока дашборда — «История», «Ближайшие даты», «Приглашение».
- * Это только разметка: данные и запросы живут в page.tsx, а древо,
- * к которому относится строка, подписано рядом — блоки работают
- * и при нескольких древах сразу.
+ * Блоки дашборда — «История», «Ближайшие даты» и приглашения древа.
+ * Это только разметка: данные и запросы живут в page.tsx. «История» и
+ * «Ближайшие даты» подписаны древом и работают при нескольких древах сразу,
+ * а приглашения показывает `TreeInvites` — внутри карточки своего древа.
  */
 
 export type HistoryItem = {
@@ -32,7 +33,7 @@ export type HistoryItem = {
 
 export type DateItem = UpcomingDate & { treeTitle: string };
 
-export type InviteItem = Invite & { treeTitle: string; url: string };
+export type InviteItem = Invite & { url: string };
 
 /** «Пока ничего не менялось»: спокойная плашка вместо списка */
 function EmptyState({ title, hint }: { title: string; hint: string }) {
@@ -206,109 +207,96 @@ export function DatesBlock({ items, showTree }: { items: DateItem[]; showTree: b
 }
 
 /* ---------------------------------------------------------------------
-   Приглашение — активные ссылки-приглашения
+   Приглашения — активные ссылки-приглашения одного древа
    --------------------------------------------------------------------- */
 
-export function InvitesBlock({
+/**
+ * Живёт внутри карточки своего древа: приглашение относится к конкретному
+ * древу, поэтому общей панели «Приглашение» на странице больше нет.
+ * Нет активных ссылок — компонент не рисует ничего.
+ */
+export function TreeInvites({
+  treeId,
   items,
-  showTree,
-  createHref,
+  more = 0,
 }: {
+  treeId: string;
+  /** уже отфильтрованные активные ссылки этого древа; пусто — блока нет */
   items: InviteItem[];
-  showTree: boolean;
-  createHref: string | null;
+  /** сколько активных ссылок древа не поместилось в карточку */
+  more?: number;
 }) {
-  return (
-    <article className="panel flex min-w-0 flex-col p-5">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <h2 className="font-display text-[18px] leading-snug text-ink-800">Приглашение</h2>
-          <p className="mt-1 text-[13px] leading-relaxed text-ink-500">
-            Ссылки, по которым родные войдут в древо
-          </p>
-        </div>
+  if (items.length === 0) return null;
 
-        {createHref && (
-          <Link
-            href={createHref}
-            className="text-[12.5px] font-medium text-brass-500 transition-colors hover:text-brass-600"
-          >
-            Участники и доступ <span aria-hidden="true">→</span>
-          </Link>
-        )}
+  return (
+    <section className="mt-4 border-t border-[var(--p-line)] pt-3.5">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <h3 className="text-[13px] font-medium text-ink-800">
+          Приглашения
+          <span className="ml-1.5 font-normal text-ink-400">— ссылки для родных</span>
+        </h3>
+
+        <Link
+          href={`/tree/${treeId}/settings`}
+          className="text-[12.5px] font-medium text-brass-500 transition-colors hover:text-brass-600"
+        >
+          Участники и доступ <span aria-hidden="true">→</span>
+        </Link>
       </div>
 
-      {items.length === 0 ? (
-        <div className="mt-4">
-          <EmptyState
-            title="Активных ссылок-приглашений нет."
-            hint={
-              createHref
-                ? "Создайте ссылку в разделе «Участники и доступ» — она появится здесь со сроком и счётчиком переходов."
-                : "Ссылку-приглашение создаёт владелец древа — здесь появятся активные ссылки ваших древ."
-            }
-          />
-        </div>
-      ) : (
-        <ul className="mt-4 grid min-w-0 grid-cols-1 gap-3">
-          {items.map((invite) => {
-            const used = Number(invite.uses ?? 0);
-            const max =
-              invite.max_uses === null || invite.max_uses === undefined
-                ? null
-                : Number(invite.max_uses);
-            const percent = usesPercent(used, max);
+      <ul className="mt-3 grid min-w-0 grid-cols-1 gap-2.5">
+        {items.map((invite) => {
+          const used = Number(invite.uses ?? 0);
+          const max =
+            invite.max_uses === null || invite.max_uses === undefined
+              ? null
+              : Number(invite.max_uses);
+          const percent = usesPercent(used, max);
 
-            return (
-              <li
-                key={invite.id}
-                className="min-w-0 rounded-[14px] border border-[var(--p-line)] bg-[var(--p-row-bg)] p-3.5"
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="studio-chip">{ROLE_LABEL[invite.role] ?? invite.role}</span>
-                  <span className="studio-chip">{expiryLabel(invite.expires_at)}</span>
-                  {showTree && (
-                    <span className="min-w-0 truncate text-[12px] text-ink-400">
-                      {invite.treeTitle}
-                    </span>
-                  )}
-                  <Link
-                    href={`/tree/${invite.tree_id}/settings`}
-                    className="ml-auto text-[12.5px] font-medium text-brass-500 transition-colors hover:text-brass-600"
-                  >
-                    Участники и доступ <span aria-hidden="true">→</span>
-                  </Link>
-                </div>
+          return (
+            <li
+              key={invite.id}
+              className="min-w-0 rounded-[12px] border border-[var(--p-line)] bg-[var(--p-row-bg)] p-3"
+            >
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="studio-chip">{ROLE_LABEL[invite.role] ?? invite.role}</span>
+                <span className="studio-chip">{expiryLabel(invite.expires_at)}</span>
 
-                <p className="mt-3 flex flex-wrap items-baseline gap-x-1.5">
-                  <span className="font-mono text-[22px] leading-none tabular-nums text-ink-800">
+                <p className="ml-auto flex flex-wrap items-baseline gap-x-1.5">
+                  <span className="font-mono text-[15px] leading-none tabular-nums text-ink-800">
                     {used}
                   </span>
-                  <span className="text-[12px] leading-snug text-ink-400">
+                  <span className="text-[11.5px] leading-snug text-ink-400">
                     {usesLabel(used, max)}
                   </span>
                 </p>
+              </div>
 
-                {percent !== null && (
-                  <div
-                    aria-hidden="true"
-                    className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-[var(--p-line)]"
-                  >
-                    <span
-                      className="block h-full rounded-full bg-[linear-gradient(90deg,var(--p-brass-600),var(--p-brass-400))]"
-                      style={{ width: `${percent}%` }}
-                    />
-                  </div>
-                )}
-
-                <div className="mt-3">
-                  <CopyInvite url={invite.url} />
+              {percent !== null && (
+                <div
+                  aria-hidden="true"
+                  className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--p-line)]"
+                >
+                  <span
+                    className="block h-full rounded-full bg-[linear-gradient(90deg,var(--p-brass-600),var(--p-brass-400))]"
+                    style={{ width: `${percent}%` }}
+                  />
                 </div>
-              </li>
-            );
-          })}
-        </ul>
+              )}
+
+              <div className="mt-2.5">
+                <CopyInvite url={invite.url} />
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+
+      {more > 0 && (
+        <p className="mt-2 px-1 text-[12px] leading-snug text-ink-400">
+          Ещё {more} {invitesWord(more)} — в разделе «Участники и доступ»
+        </p>
       )}
-    </article>
+    </section>
   );
 }

@@ -6,7 +6,7 @@ import { NewTreeForm } from "./new-tree-form";
 import {
   DatesBlock,
   HistoryBlock,
-  InvitesBlock,
+  TreeInvites,
   type DateItem,
   type HistoryItem,
   type InviteItem,
@@ -18,7 +18,8 @@ export const metadata = { title: "Мои древа — Torlmud" };
 /** Сколько строк показываем в блоках, прежде чем увести в раздел целиком */
 const EVENTS_SHOWN = 5;
 const DATES_SHOWN = 5;
-const INVITES_SHOWN = 3;
+/** Приглашения показываем внутри карточки древа — не больше трёх на древо */
+const INVITES_PER_TREE = 3;
 
 /** «1 древо», «3 древа», «12 древ» */
 function treeWord(n: number) {
@@ -144,19 +145,24 @@ export default async function DashboardPage() {
     DATES_SHOWN
   ).map((date) => ({ ...date, treeTitle: treeTitles.get(date.treeId) ?? "Древо" }));
 
-  const inviteItems: InviteItem[] = activeInvites((invitesResult.data ?? []) as Invite[])
-    .slice(0, INVITES_SHOWN)
-    .map((invite) => ({
-      ...invite,
-      treeTitle: treeTitles.get(invite.tree_id) ?? "Древо",
-      url: `${siteUrl}/invite/${invite.token}`,
-    }));
+  // Приглашения раскладываем по древам: каждая ссылка показывается внутри
+  // карточки своего древа, общей панели «Приглашение» на странице нет.
+  // Считаем и все активные ссылки древа — чтобы честно сказать, сколько
+  // осталось за пределами карточки.
+  const invitesByTree = new Map<string, InviteItem[]>();
+  const inviteTotals = new Map<string, number>();
+  for (const invite of activeInvites((invitesResult.data ?? []) as Invite[])) {
+    inviteTotals.set(invite.tree_id, (inviteTotals.get(invite.tree_id) ?? 0) + 1);
+    const list = invitesByTree.get(invite.tree_id) ?? [];
+    if (list.length >= INVITES_PER_TREE) continue;
+    list.push({ ...invite, url: `${siteUrl}/invite/${invite.token}` });
+    invitesByTree.set(invite.tree_id, list);
+  }
 
   // при нескольких древах строки подписаны древом, а ссылка «вся история»
   // ведёт в ленту того древа, чьё событие показано первым
   const showTree = rows.length > 1;
   const historyHref = historyItems.length ? `/tree/${historyItems[0].treeId}/history` : null;
-  const createHref = ownedIds.length ? `/tree/${ownedIds[0]}/settings` : null;
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-5 sm:py-12">
@@ -204,57 +210,64 @@ export default async function DashboardPage() {
           <ul className="mt-5 grid gap-4 sm:grid-cols-2">
             {rows.map((r, i) => (
               <li key={r.trees.id} className="min-w-0">
-                <Link
-                  href={`/tree/${r.trees.id}`}
-                  className="panel group flex h-full flex-col p-5 transition-colors hover:border-[var(--p-line-3)]"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <h2 className="min-w-0 font-display text-[19px] leading-snug text-ink-800">
-                      {r.trees.title}
-                    </h2>
-                    <span className="studio-chip shrink-0">{ROLE_LABEL[r.role]}</span>
-                  </div>
-
-                  {r.trees.description && (
-                    <p className="mt-2 line-clamp-2 text-[13.5px] leading-relaxed text-ink-500">
-                      {r.trees.description}
-                    </p>
-                  )}
-
-                  <dl className="mt-5 flex flex-wrap gap-x-6 gap-y-3">
-                    <div>
-                      <dt className="text-[11.5px] uppercase tracking-[0.08em] text-ink-400">Людей</dt>
-                      <dd className="mt-0.5 text-[17px] tabular-nums text-ink-800">{counts[i]}</dd>
+                {/* Карточка древа: сама карточка — не ссылка, иначе внутри
+                    нельзя было бы держать копирование ссылки-приглашения. */}
+                <article className="panel flex h-full min-w-0 flex-col p-5 transition-colors hover:border-[var(--p-line-3)]">
+                  <Link
+                    href={`/tree/${r.trees.id}`}
+                    className="flex min-w-0 flex-1 flex-col rounded-[12px]"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <h2 className="min-w-0 font-display text-[19px] leading-snug text-ink-800">
+                        {r.trees.title}
+                      </h2>
+                      <span className="studio-chip shrink-0">{ROLE_LABEL[r.role]}</span>
                     </div>
-                    <div>
-                      <dt className="text-[11.5px] uppercase tracking-[0.08em] text-ink-400">Участников</dt>
-                      <dd className="mt-0.5 text-[17px] tabular-nums text-ink-800">
-                        {memberCounts.get(r.trees.id) ?? 0}
-                      </dd>
-                    </div>
-                    <div className="min-w-0">
-                      <dt className="text-[11.5px] uppercase tracking-[0.08em] text-ink-400">Обновлено</dt>
-                      <dd className="mt-0.5 text-[13px] tabular-nums text-ink-600">
-                        {formatDateTime(r.trees.updated_at)}
-                      </dd>
-                    </div>
-                  </dl>
 
-                  <span className="mt-auto pt-5 text-[13px] font-medium text-brass-500">
-                    Открыть древо <span aria-hidden="true">→</span>
-                  </span>
-                </Link>
+                    {r.trees.description && (
+                      <p className="mt-2 line-clamp-2 text-[13.5px] leading-relaxed text-ink-500">
+                        {r.trees.description}
+                      </p>
+                    )}
+
+                    <dl className="mt-5 flex flex-wrap gap-x-6 gap-y-3">
+                      <div>
+                        <dt className="text-[11.5px] uppercase tracking-[0.08em] text-ink-400">Людей</dt>
+                        <dd className="mt-0.5 text-[17px] tabular-nums text-ink-800">{counts[i]}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-[11.5px] uppercase tracking-[0.08em] text-ink-400">Участников</dt>
+                        <dd className="mt-0.5 text-[17px] tabular-nums text-ink-800">
+                          {memberCounts.get(r.trees.id) ?? 0}
+                        </dd>
+                      </div>
+                      <div className="min-w-0">
+                        <dt className="text-[11.5px] uppercase tracking-[0.08em] text-ink-400">Обновлено</dt>
+                        <dd className="mt-0.5 text-[13px] tabular-nums text-ink-600">
+                          {formatDateTime(r.trees.updated_at)}
+                        </dd>
+                      </div>
+                    </dl>
+
+                    <span className="mt-auto pt-5 text-[13px] font-medium text-brass-500">
+                      Открыть древо <span aria-hidden="true">→</span>
+                    </span>
+                  </Link>
+
+                  <TreeInvites
+                    treeId={r.trees.id}
+                    items={invitesByTree.get(r.trees.id) ?? []}
+                    more={(inviteTotals.get(r.trees.id) ?? 0) - (invitesByTree.get(r.trees.id)?.length ?? 0)}
+                  />
+                </article>
               </li>
             ))}
           </ul>
 
-          {/* Три блока как в прототипе: приглашение и даты рядом, история — лентой ниже */}
-          <div className="mt-8 grid gap-4 lg:grid-cols-2">
-            <InvitesBlock items={inviteItems} showTree={showTree} createHref={createHref} />
+          {/* Ниже — даты и история: приглашения уехали в карточки древ.
+              items-start: панель дат не растягивается по высоте ленты истории */}
+          <div className="mt-8 grid items-start gap-4 lg:grid-cols-2">
             <DatesBlock items={dateItems} showTree={showTree} />
-          </div>
-
-          <div className="mt-4">
             <HistoryBlock
               items={historyItems}
               total={eventsResult.count ?? historyItems.length}

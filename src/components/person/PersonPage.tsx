@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -307,11 +307,38 @@ export function PersonPage({
   const [pending, startTransition] = useTransition();
   const [uploading, setUploading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // всплывающее меню фотографии: открывается с портрета — кнопок «фото» в карточке нет
+  const [photoMenuOpen, setPhotoMenuOpen] = useState(false);
   const photoInput = useRef<HTMLInputElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const photoWrapRef = useRef<HTMLDivElement>(null);
+  const photoBtnRef = useRef<HTMLButtonElement>(null);
+  const photoMenuRef = useRef<HTMLDivElement>(null);
   const tabRefs = useRef<Partial<Record<TabId, HTMLButtonElement | null>>>({});
 
+  // Меню фото: Esc и клик мимо закрывают его, фокус возвращается на портрет.
+  useEffect(() => {
+    if (!photoMenuOpen) return;
+    photoMenuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
+    function onPointerDown(event: PointerEvent) {
+      if (!photoWrapRef.current?.contains(event.target as Node)) setPhotoMenuOpen(false);
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      setPhotoMenuOpen(false);
+      photoBtnRef.current?.focus();
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [photoMenuOpen]);
+
   const photoUrl = person ? publicUrl(SUPABASE_URL, "photos", person.photo_path) : null;
+  // у новой карточки ещё нет id, по которому класть файл в Storage — портрет неактивен
+  const photoAvailable = canEdit && !!person;
   const byId = new Map(persons.map((p) => [p.id, p]));
 
   const generationMap = useMemo(() => generations(persons, relationships), [persons, relationships]);
@@ -393,6 +420,7 @@ export function PersonPage({
       return;
     }
     setEditing(false);
+    setConfirmDelete(false);
     setGender(person?.gender ?? "unknown");
     setIsLiving(person ? person.is_living : true);
     setFirstName(person?.first_name ?? "");
@@ -472,6 +500,31 @@ export function PersonPage({
       router.refresh();
       toast.success("Фотография обновлена");
     });
+  }
+
+  /** «Убрать фото»: как и раньше — обнуляем ссылку в карточке и обновляем страницу. */
+  function removePhoto() {
+    if (!person) return;
+    startTransition(async () => {
+      await setPhoto(treeId, person.id, null);
+      router.refresh();
+    });
+  }
+
+  /** Стрелки вверх/вниз — по пунктам меню фото (обычное поведение role="menu"). */
+  function onPhotoMenuKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    const items = Array.from(
+      photoMenuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not([disabled])') ?? []
+    );
+    if (items.length < 2) return;
+    event.preventDefault();
+    const index = items.indexOf(document.activeElement as HTMLButtonElement);
+    const next =
+      event.key === "ArrowDown"
+        ? (index + 1) % items.length
+        : (index - 1 + items.length) % items.length;
+    items[next]?.focus();
   }
 
   async function uploadArchive(file: File) {
@@ -619,6 +672,32 @@ export function PersonPage({
         ? "border-female bg-female-tint"
         : "border-line bg-mist-50";
 
+  const faceSize =
+    "grid h-[92px] w-[92px] shrink-0 place-items-center overflow-hidden rounded-[20px] border sm:h-[112px] sm:w-[112px]";
+
+  /** Содержимое портрета: фото, заглушка по полу или инициалы — как было. */
+  const portraitFace = (
+    <>
+      {photoUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={photoUrl} alt="" className="h-full w-full object-cover" />
+      ) : !isNew && gender !== "unknown" ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={gender === "male" ? "/avatars/male.png" : "/avatars/female.png"}
+          alt=""
+          className="h-16 w-16 opacity-90 sm:h-20 sm:w-20"
+        />
+      ) : (
+        <span className="font-display text-[26px] text-ink-400 sm:text-[32px]">{heroInitials}</span>
+      )}
+    </>
+  );
+
+  /** Пункт всплывающего меню фотографии. */
+  const photoMenuItemClass =
+    "flex w-full items-center gap-2 rounded-[9px] px-2.5 py-1.5 text-left text-[13px] text-ink-700 transition-colors hover:bg-[var(--p-hover-bg)] hover:text-ink-800 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-brass-500 disabled:opacity-50";
+
   /* -------------------------------------------------------------------
      Строки «Фактов»: только поля карточки, ничего не выдумываем
      ------------------------------------------------------------------- */
@@ -680,7 +759,8 @@ export function PersonPage({
     <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-5 sm:py-8">
       <form id="person-form" action={submit} className="space-y-4">
         {/* ---------------- герой карточки ---------------- */}
-        <section className="panel overflow-hidden">
+        {/* без overflow-hidden: всплывающее меню фото не должно обрезаться панелью */}
+        <section className="panel">
           <div className="p-4 sm:p-6">
             <nav className="flex flex-wrap items-center gap-1.5 text-[13px] text-ink-400">
               <Link href="/dashboard" className="transition-colors hover:text-ink-700">
@@ -695,24 +775,88 @@ export function PersonPage({
             </nav>
 
             <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-5">
-              <div
-                className={`grid h-[92px] w-[92px] shrink-0 place-items-center self-start overflow-hidden rounded-[20px] border sm:h-[112px] sm:w-[112px] ${faceTone}`}
-              >
-                {photoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={photoUrl} alt="" className="h-full w-full object-cover" />
-                ) : !isNew && gender !== "unknown" ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={gender === "male" ? "/avatars/male.png" : "/avatars/female.png"}
-                    alt=""
-                    className="h-16 w-16 opacity-90 sm:h-20 sm:w-20"
-                  />
+              <div ref={photoWrapRef} className="relative shrink-0 self-start">
+                {photoAvailable ? (
+                  <button
+                    ref={photoBtnRef}
+                    type="button"
+                    aria-haspopup="menu"
+                    aria-expanded={photoMenuOpen}
+                    aria-label={
+                      photoUrl
+                        ? "Фотография: заменить или убрать"
+                        : "Фотография: добавить"
+                    }
+                    onClick={() => setPhotoMenuOpen((open) => !open)}
+                    className={`group relative cursor-pointer ${faceSize} ${faceTone}`}
+                  >
+                    {portraitFace}
+                    {/* иконка фотоаппарата — по наведению и по фокусу с клавиатуры */}
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-0 grid place-items-center bg-[rgba(15,23,42,0.42)] opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none"
+                    >
+                      <span className="icon-btn">
+                        <IconCamera />
+                      </span>
+                    </span>
+                  </button>
                 ) : (
-                  <span className="font-display text-[26px] text-ink-400 sm:text-[32px]">
-                    {heroInitials}
-                  </span>
+                  <div className={`${faceSize} ${faceTone}`}>{portraitFace}</div>
                 )}
+
+                {photoMenuOpen && person && (
+                  <div
+                    ref={photoMenuRef}
+                    role="menu"
+                    aria-label="Действия с фотографией"
+                    onKeyDown={onPhotoMenuKeyDown}
+                    // поверх текста карточки меню должно быть непрозрачным: у .glass фон
+                    // полупрозрачный, сквозь него читались бы заголовок и кнопки под меню
+                    style={{ background: "var(--color-surface)" }}
+                    className="glass absolute left-0 top-[calc(100%+8px)] z-30 flex w-[196px] flex-col gap-0.5 p-1.5"
+                  >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      disabled={uploading}
+                      className={photoMenuItemClass}
+                      onClick={() => {
+                        setPhotoMenuOpen(false);
+                        photoInput.current?.click();
+                      }}
+                    >
+                      <IconCamera />
+                      {uploading ? "Загружаем…" : photoUrl ? "Заменить фото" : "Добавить фото"}
+                    </button>
+                    {photoUrl && (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        disabled={pending}
+                        className={`${photoMenuItemClass} text-danger hover:bg-danger-soft hover:text-danger`}
+                        onClick={() => {
+                          setPhotoMenuOpen(false);
+                          removePhoto();
+                        }}
+                      >
+                        Убрать фото
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                <input
+                  ref={photoInput}
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (file) uploadPhoto(file);
+                  }}
+                />
               </div>
 
               <div className="min-w-0 flex-1">
@@ -738,7 +882,7 @@ export function PersonPage({
             </div>
           </div>
 
-          {/* действия героя: правка, фото, ветка, удаление */}
+          {/* действия героя: правка, ветка, удаление (удаление — только в правке) */}
           <div className="flex flex-wrap items-center gap-2 border-t border-line px-4 py-3 sm:px-6">
             {canEdit && (isNew || editing) && (
               <>
@@ -757,58 +901,9 @@ export function PersonPage({
               </>
             )}
             {canEdit && !isNew && !editing && (
-              <>
-                <Button type="button" variant="primary" size="sm" onClick={startEdit} disabled={pending}>
-                  Редактировать
-                </Button>
-                <Button type="button" variant="secondary" size="sm" onClick={back} disabled={pending}>
-                  К древу
-                </Button>
-              </>
-            )}
-            {!canEdit && (
-              <Button type="button" variant="secondary" size="sm" onClick={back} disabled={pending}>
-                К древу
+              <Button type="button" variant="primary" size="sm" onClick={startEdit} disabled={pending}>
+                Редактировать
               </Button>
-            )}
-
-            {canEdit && (
-              <>
-                <input
-                  ref={photoInput}
-                  type="file"
-                  accept="image/*"
-                  hidden
-                  onChange={(e) => e.target.files?.[0] && uploadPhoto(e.target.files[0])}
-                />
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  disabled={uploading || isNew}
-                  title={isNew ? "Сначала сохраните карточку" : undefined}
-                  onClick={() => photoInput.current?.click()}
-                >
-                  <IconCamera />
-                  {uploading ? "Загружаем…" : photoUrl ? "Заменить фото" : "Добавить фото"}
-                </Button>
-                {photoUrl && person && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    disabled={pending}
-                    onClick={() =>
-                      startTransition(async () => {
-                        await setPhoto(treeId, person.id, null);
-                        router.refresh();
-                      })
-                    }
-                  >
-                    Убрать фото
-                  </Button>
-                )}
-              </>
             )}
 
             {person && (
@@ -820,7 +915,7 @@ export function PersonPage({
               </Link>
             )}
 
-            {person && canEdit && (
+            {person && canEdit && editing && (
               <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
                 {confirmDelete ? (
                   <>

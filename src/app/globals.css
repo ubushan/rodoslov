@@ -277,92 +277,6 @@
   --p-shadow-plate: 0 2px 0 rgba(0, 0, 0, 0.4), 0 18px 48px -24px rgba(0, 0, 0, 0.8);
 }
 
-/* Сепия: тёплая светлая — бумага альбома, латунь темнее */
-[data-theme="sepia"] {
-  color-scheme: light;
-
-  --p-ink-900: #1c1409;
-  --p-ink-800: #2b2117;
-  --p-ink-700: #3d3022;
-  --p-ink-600: #55452f;
-  --p-ink-500: #6b5c46;
-  --p-ink-400: #6f6049;
-  --p-ink-300: #74654e;
-
-  --p-mist-50: #faf5ec;
-  --p-mist-100: #f3ede3;
-  --p-mist-200: #e7ddcb;
-  --p-mist-300: #d4c6ab;
-
-  --p-brass-500: #8a6a1f;
-  --p-brass-400: #b08b2e;
-  --p-brass-600: #6f5416;
-  --p-brass-ink: #8a6a1f;
-
-  --p-clay-400: #c0763a;
-  --p-clay-500: #a05f2c;
-
-  --p-bond-100: #ece3d4;
-  --p-bond-200: #d9cbb4;
-  --p-bond-400: #8d9cad;
-  --p-bond-500: #6d7f8e;
-
-  --p-surface: #fffbf4;
-
-  --p-album: #2b2117;
-  --p-album-2: #1c1409;
-  --p-album-text: #f7efe1;
-  --p-album-muted: #b9a382;
-
-  --p-canvas: #efe6d5;
-  --p-canvas-dot: #d6c6a8;
-  --p-canvas-line: #b3a184;
-  --p-canvas-minimap: #8a7a5e;
-  --p-canvas-mask: rgba(239, 230, 213, 0.78);
-
-  --p-male: #6f86a8;
-  --p-male-tint: #eae4d6;
-  --p-female: #c0763a;
-  --p-female-tint: #f7e6ca;
-  --p-plain: #c9b99c;
-  --p-plain-tint: #fffbf4;
-
-  /* Стекло, линии и состояния студии */
-  --p-glass: rgba(255, 251, 244, 0.75);
-  --p-glass-2: rgba(255, 251, 244, 0.96);
-  --p-line: rgba(43, 33, 23, 0.12);
-  --p-line-2: rgba(43, 33, 23, 0.07);
-  --p-line-3: rgba(43, 33, 23, 0.2);
-  --p-field-bg: rgba(255, 255, 255, 0.7);
-  --p-row-bg: rgba(43, 33, 23, 0.03);
-  --p-hover-bg: rgba(43, 33, 23, 0.05);
-  --p-press-bg: rgba(43, 33, 23, 0.1);
-  --p-acc-line: rgba(138, 106, 31, 0.5);
-  --p-acc-bg: rgba(224, 182, 74, 0.28);
-  --p-acc-soft: rgba(224, 182, 74, 0.22);
-  --p-fill: #e0b64a;
-  --p-fill-2: #c9a03a;
-  --p-on-fill: #2b2117;
-  --p-scrim: rgba(43, 33, 23, 0.3);
-  --p-inset-hi: inset 0 1px 0 rgba(255, 255, 255, 0.7);
-  --p-shadow-glass: 0 10px 26px -14px rgba(43, 33, 23, 0.28);
-  --p-shadow-sheet: 0 -18px 44px -24px rgba(43, 33, 23, 0.34);
-  --p-grid-dot: rgba(43, 33, 23, 0.1);
-
-  --p-danger: #a84f42;
-  --p-danger-soft: #f9efe9;
-  --p-danger-line: #ddbcb0;
-  --p-danger-ink: #7d3b31;
-
-  --p-ok: #4f6b3c;
-  --p-ok-soft: #f2f0e2;
-  --p-ok-line: #c9cbb0;
-  --p-ok-ink: #475c37;
-
-  --p-shadow-lift: 0 1px 2px rgba(43, 33, 23, 0.1), 0 8px 20px -8px rgba(43, 33, 23, 0.24);
-  --p-shadow-plate: 0 2px 0 rgba(43, 33, 23, 0.05), 0 18px 48px -24px rgba(43, 33, 23, 0.4);
-}
-
 html {
   scroll-behavior: smooth;
 }
@@ -631,7 +545,9 @@ body {
   border: 1px solid var(--p-line);
   border-bottom: 0;
   border-radius: 22px 22px 0 0;
-  background: var(--p-glass-2);
+  /* нижние листы — стекло 0.72, как на десктопе: плотный фон (--p-glass-2)
+     перекрывал содержимое под листом и ломал ощущение слоя */
+  background: var(--p-glass);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   box-shadow: var(--p-shadow-sheet);

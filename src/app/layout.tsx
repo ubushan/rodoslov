@@ -32,18 +32,19 @@ export const metadata: Metadata = {
 };
 
 /**
- * Тема применяется до первой отрисовки: иначе при «как в системе» и после
- * выбора тёмной на долю секунды мелькала бы светлая страница.
+ * Тема применяется до первой отрисовки: иначе после выбора тёмной на долю
+ * секунды мелькала бы светлая страница.
+ *
+ * Тем две, поэтому всё, что не «dark», — светлая. Значения куки из прежних
+ * версий тоже понятны: «sepia» читается как светлая, «auto» разрешается по
+ * схеме устройства. Слушателя смены схемы больше нет — следить не за чем.
  */
 const THEME_SCRIPT = `(function(){try{
 var read=function(){var m=document.cookie.match(/(?:^|; )${THEME_COOKIE}=([^;]*)/);return m?decodeURIComponent(m[1]):"light"};
-var q=window.matchMedia("(prefers-color-scheme: dark)");
-var apply=function(){var t=read();document.documentElement.dataset.theme=t==="auto"?(q.matches?"dark":"light"):t};
-apply();
-// слушатель ставим всегда, но перекрашиваем только пока выбран режим «как в системе»:
-// иначе после ручного выбора темы смена схемы в системе ломала бы выбор пользователя
-var on=function(){if(read()==="auto")apply()};
-q.addEventListener?q.addEventListener("change",on):q.addListener(on);
+var t=read();
+if(t==="auto")t=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";
+if(t!=="dark")t="light";
+document.documentElement.dataset.theme=t;
 }catch(e){}})();`;
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

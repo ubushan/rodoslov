@@ -55,6 +55,11 @@ export function AccountMenu({ name, isAdmin }: { name: string; isAdmin: boolean 
   const [open, setOpen] = useState(false);
   const [wide, setWide] = useState(true);
   const boxRef = useRef<HTMLDivElement>(null);
+  // Лист на телефоне уезжает в портал (document.body) — в boxRef его нет.
+  // Без отдельной ссылки на лист любой тап внутри него считался «вне меню»
+  // и закрывал лист на mousedown, поэтому пункты не получали click.
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const tree = useTreeContext();
 
   useEffect(() => {
@@ -65,21 +70,50 @@ export function AccountMenu({ name, isAdmin }: { name: string; isAdmin: boolean 
     return () => query.removeEventListener("change", sync);
   }, []);
 
+  /** Вернуть фокус на кнопку меню после закрытия — чтобы он не «залипал». */
+  const returnFocus = () => {
+    const restore = () => triggerRef.current?.focus({ preventScroll: true });
+    // при тапе по подложке фокус успевает уехать на body уже после закрытия —
+    // поэтому возвращаем его и в следующем кадре, и после завершения клика
+    requestAnimationFrame(restore);
+    window.setTimeout(restore, 0);
+  };
+
   useEffect(() => {
     if (!open) return;
-    const onDown = (event: MouseEvent) => {
-      if (!boxRef.current?.contains(event.target as Node)) setOpen(false);
+    const inside = (target: Node | null) =>
+      !!target && (!!boxRef.current?.contains(target) || !!sheetRef.current?.contains(target));
+    // pointerdown вместо mousedown: на телефоне тап по пустому месту закрывает
+    // лист так же надёжно, как клик мышью на десктопе.
+    const onDown = (event: Event) => {
+      const target = event.target as Element | null;
+      if (inside(target)) return;
+      // Подложку листа закрывает её собственный onClick: если снять лист уже на
+      // pointerdown, браузер не успевает вернуть фокус на кнопку меню.
+      if (target?.closest?.("[data-sheet-scrim]")) return;
+      setOpen(false);
+      returnFocus();
     };
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key !== "Escape") return;
+      setOpen(false);
+      returnFocus();
     };
-    document.addEventListener("mousedown", onDown);
+    document.addEventListener("pointerdown", onDown);
     document.addEventListener("keydown", onKey);
     return () => {
-      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("pointerdown", onDown);
       document.removeEventListener("keydown", onKey);
     };
+    // returnFocus и refs стабильны между рендерами
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  // Открытый лист забирает фокус внутрь себя: за подложкой он не виден,
+  // а Tab дальше идёт по пунктам листа.
+  useEffect(() => {
+    if (open && !wide) sheetRef.current?.focus({ preventScroll: true });
+  }, [open, wide]);
 
   const close = () => setOpen(false);
   const item =
@@ -89,15 +123,21 @@ export function AccountMenu({ name, isAdmin }: { name: string; isAdmin: boolean 
     <div className="fixed inset-0 z-[60] flex items-end">
       <button
         type="button"
+        data-sheet-scrim=""
         aria-label="Закрыть меню"
-        onClick={close}
+        onClick={() => {
+          close();
+          returnFocus();
+        }}
         className="absolute inset-0 bg-scrim backdrop-blur-[2px]"
       />
       <div
+        ref={sheetRef}
         role="dialog"
         aria-modal="true"
         aria-label="Меню аккаунта"
-        className="studio-sheet relative w-full max-h-[86dvh] overflow-y-auto"
+        tabIndex={-1}
+        className="studio-sheet relative w-full max-h-[86dvh] overflow-y-auto outline-none"
       >
         <p className="truncate text-[15px] text-ink-800">{name}</p>
         {tree && (
@@ -145,6 +185,7 @@ export function AccountMenu({ name, isAdmin }: { name: string; isAdmin: boolean 
   return (
     <div ref={boxRef} className="relative">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-haspopup={wide ? "menu" : "dialog"}

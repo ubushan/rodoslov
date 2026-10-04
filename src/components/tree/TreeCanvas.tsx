@@ -32,7 +32,7 @@ import { peopleWord, publicUrl, shortName } from "@/lib/format";
 import { autoLayout, CARD_W, CARD_H } from "@/lib/layout";
 import type { NewRelative } from "@/lib/place";
 import { maleLineIds } from "@/lib/maleLine";
-import { DEFAULT_THEME, THEMES, THEME_COOKIE, type ThemeKey } from "@/lib/theme";
+import { THEMES, THEME_COOKIE, resolveStoredTheme } from "@/lib/theme";
 import { deleteRelationship } from "@/app/actions/persons";
 import { exportTree } from "@/app/actions/gedcom";
 import type { Person, Relationship, Attachment, MemberRole } from "@/lib/types";
@@ -529,19 +529,16 @@ function Canvas({
     window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
   }, []);
 
-  // ---- Смена темы: та же кука и data-theme, что у переключателя в шапке ----
+  // ---- Смена темы: та же кука и data-theme, что у переключателя в шапке.
+  // Тем две (светлая и тёмная): старые значения куки — «sepia», «auto» —
+  // разбирает resolveStoredTheme из lib/theme.
   const cycleTheme = useCallback(() => {
     const match = document.cookie.match(new RegExp(`(?:^|; )${THEME_COOKIE}=([^;]*)`));
-    const current = (match ? decodeURIComponent(match[1]) : DEFAULT_THEME) as ThemeKey;
+    const current = resolveStoredTheme(match ? decodeURIComponent(match[1]) : null);
     const keys = THEMES.map((theme) => theme.key);
-    const next = keys[(Math.max(0, keys.indexOf(current)) + 1) % keys.length];
+    const next = keys[(keys.indexOf(current) + 1) % keys.length];
     document.cookie = `${THEME_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
-    document.documentElement.dataset.theme =
-      next === "auto"
-        ? window.matchMedia("(prefers-color-scheme: dark)").matches
-          ? "dark"
-          : "light"
-        : next;
+    document.documentElement.dataset.theme = next;
     toast.success(`Тема: ${(THEMES.find((theme) => theme.key === next)?.label ?? next).toLowerCase()}`);
   }, []);
 
@@ -609,7 +606,7 @@ function Canvas({
     list.push({
       id: "theme",
       title: "Переключить тему",
-      hint: "Светлая → тёмная → сепия → как в системе",
+      hint: "Светлая или тёмная",
       kbd: "T",
       icon: "theme",
       run: cycleTheme,
@@ -811,14 +808,14 @@ function Canvas({
         )}
       </div>
 
-      {/* Док действий: стеклянная панель снизу по центру, как в студии.
-          Состав — «Добавить · Фильтр · Экспорт»: раскладка автоматическая,
-          отдельной кнопки у неё нет. На телефоне это та же панель-пилюля
-          (см. .studio-dock и DOCK_BTN) вместо прежней свёрнутой кнопки.
-          Узкому десктопу (640–899px) панель мешала бы парящему инспектору,
-          поэтому там док центрируется в свободной части холста; от 900px —
-          по центру окна, как в прототипе. */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-[calc(12px+env(safe-area-inset-bottom))] z-10 flex justify-center sm:bottom-3 sm:pr-[344px] min-[900px]:pr-0">
+      {/* Док действий: стеклянная панель снизу строго по центру окна, как в
+          прототипе (.dock: left 50% + translateX(-50%)). Состав —
+          «Добавить · Фильтр · Экспорт»: раскладка автоматическая, отдельной
+          кнопки у неё нет. Панель деталей парит справа поверх холста и док не
+          сдвигает: на 1440/1280/1024 центр дока совпадает с центром окна и до
+          панели остаётся запас. На телефоне это та же панель-пилюля
+          (см. .studio-dock и DOCK_BTN). */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-[calc(12px+env(safe-area-inset-bottom))] z-10 flex justify-center sm:bottom-3">
         <div
           className="studio-dock pointer-events-auto max-sm:h-[58px] max-sm:gap-0.5 max-sm:rounded-full max-sm:p-1.5"
           role="toolbar"
@@ -847,13 +844,17 @@ function Canvas({
           >
             <span className="relative block">
               <IconFilter />
-              <i
-                aria-hidden="true"
-                className="absolute -right-3 -top-2 min-w-[16px] rounded-full px-1 text-[10px] font-semibold not-italic leading-4"
-                style={{ background: "var(--p-fill)", color: "var(--p-on-fill)" }}
-              >
-                {maleLineCount}
-              </i>
+              {/* счётчик — только у включённого фильтра: в обычном состоянии
+                  на кнопке никаких цифр (число видно ещё в чипе над холстом) */}
+              {maleLineOnly && (
+                <i
+                  aria-hidden="true"
+                  className="absolute -right-3 -top-2 min-w-[16px] rounded-full px-1 text-[10px] font-semibold not-italic leading-4"
+                  style={{ background: "var(--p-fill)", color: "var(--p-on-fill)" }}
+                >
+                  {maleLineCount}
+                </i>
+              )}
             </span>
             <span>Фильтр</span>
           </button>

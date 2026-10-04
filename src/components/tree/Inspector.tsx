@@ -43,7 +43,7 @@ type Props = {
   branchable: Set<string>;
   onSelect: (id: string) => void;
   onOpenCard: (id: string) => void;
-  /** «Правка» — та же карточка, но сразу у формы правки */
+  /** «Редактирование» из меню «…» — та же карточка, но сразу у формы правки */
   onEditCard: (id: string) => void;
   /** «Открыть семейную ветку» — отдельная страница ветки человека */
   onBranch: (id: string) => void;
@@ -56,12 +56,20 @@ type Props = {
 
 /**
  * Поверхность инспектора. На телефоне — нижний лист, который поднят над
- * нижней панелью действий (её высота 58px + отступ 12px + зазор). На десктопе —
- * парящая стеклянная панель справа поверх холста: холст при этом на всю ширину
- * окна, а место под панель учитывает только «уместить» (см. TreeCanvas).
+ * нижней панелью действий (её высота 58px + отступ 12px + зазор) и учитывает
+ * системный отступ снизу: иначе на телефоне с полосой-индикатором док заезжал
+ * бы на лист. На десктопе — парящая стеклянная панель справа поверх холста:
+ * холст при этом на всю ширину окна, а место под панель учитывает только
+ * «уместить» (см. TreeCanvas).
+ *
+ * Стекло — общий токен `--p-glass` (0.72) и на телефоне, и на десктопе:
+ * раньше лист брал `--p-glass-2` (0.94) и читался непрозрачной заливкой.
+ * Прокрутка: на телефоне лист целиком (`overflow-y-auto`) — на низких экранах
+ * фиксированные ряды выше `max-h`, и `overflow-hidden` срезал вкладки и низ
+ * карточки. На десктопе прокручивается только тело раздела.
  */
 const INSPECTOR_SURFACE =
-  "absolute inset-x-0 bottom-[76px] z-30 flex max-h-[46%] flex-col gap-3 overflow-hidden rounded-[22px] border border-[var(--p-line)] bg-[var(--p-glass-2)] p-4 pb-6 shadow-[var(--p-shadow-sheet)] backdrop-blur-[14px] sm:inset-x-auto sm:bottom-3 sm:right-3 sm:top-3 sm:max-h-none sm:w-[320px] sm:rounded-[20px] sm:bg-[var(--p-glass)] sm:p-3.5 sm:shadow-[var(--shadow-lift)]";
+  "absolute inset-x-0 bottom-[calc(76px+env(safe-area-inset-bottom))] z-30 flex max-h-[46%] flex-col gap-3 overflow-y-auto overscroll-contain rounded-[22px] border border-[var(--p-line)] bg-[var(--p-glass)] p-4 pb-6 shadow-[var(--p-shadow-sheet)] backdrop-blur-[14px] sm:inset-x-auto sm:bottom-3 sm:right-3 sm:top-3 sm:max-h-none sm:w-[320px] sm:overflow-hidden sm:rounded-[20px] sm:p-3.5 sm:shadow-[var(--shadow-lift)]";
 
 const TABS = [
   { id: "facts", label: "Факты" },
@@ -71,34 +79,28 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"];
 
-/** «3 события», «1 правка» — счётчики в подписях карточки */
-function plural(n: number, one: string, few: string, many: string) {
-  const m10 = n % 10;
-  const m100 = n % 100;
-  if (m10 === 1 && m100 !== 11) return one;
-  if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return few;
-  return many;
-}
-
 const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
 function roman(n: number) {
   return ROMAN[n] ?? String(n);
 }
 
-/** Плюс — «Добавить родственника» */
-function IconPlus() {
+/** «Человек + плюс» — «Добавить родственника»: надписи у кнопки нет */
+function IconPersonPlus() {
   return (
     <svg
-      width="16"
-      height="16"
+      width="18"
+      height="18"
       viewBox="0 0 18 18"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.7"
+      strokeWidth="1.6"
       strokeLinecap="round"
+      strokeLinejoin="round"
       aria-hidden="true"
     >
-      <path d="M9 3.5v11M3.5 9h11" />
+      <circle cx="7" cy="6.4" r="3.1" />
+      <path d="M1.9 15.4c0-2.7 2.3-4.4 5.1-4.4.9 0 1.7.2 2.4.5" />
+      <path d="M13.4 11.2v4.2M11.3 13.3h4.2" />
     </svg>
   );
 }
@@ -405,7 +407,8 @@ export function Inspector({
   function openAddMenu() {
     const rect = addRef.current?.getBoundingClientRect();
     if (!rect) return;
-    setAddMenu({ x: Math.round(rect.left), y: Math.round(rect.bottom + 8) });
+    // кнопка стоит в правом краю панели — меню выравниваем по её правому краю
+    setAddMenu({ x: Math.round(rect.right - 196), y: Math.round(rect.bottom + 8) });
   }
 
   // ---- никто не выбран: панели нет вовсе ----
@@ -437,7 +440,7 @@ export function Inspector({
         <p className="font-display text-[17px] text-ink-800">
           {selected.map((p) => p.first_name || shortName(p)).join(", ")}
         </p>
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="flex-1 sm:min-h-0 sm:overflow-x-hidden sm:overflow-y-auto">
           <div className="flex flex-col gap-1.5">
             {selected.map((p) => (
               <button
@@ -571,7 +574,6 @@ export function Inspector({
   ].filter((row): row is { label: string; value: string } => !!row && !!row.value);
 
   const age = ageYears(person);
-  const eventsCount = facts.length + personChanges.length;
 
   return (
     <aside
@@ -604,123 +606,53 @@ export function Inspector({
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             <span className="studio-chip">{genderLabel(person)}</span>
             <span className="studio-chip">Поколение {roman(generation)}</span>
-            <span
-              className="studio-chip"
-              style={{
-                borderColor: "var(--p-acc-line)",
-                background: "var(--p-acc-bg)",
-                color: "var(--p-brass-ink)",
-              }}
-            >
-              Выбран
-            </span>
-            <span className="studio-chip tabular-nums">
-              {eventsCount} {plural(eventsCount, "событие", "события", "событий")}
-            </span>
           </div>
         </div>
       </div>
 
-      {/* Действия: карточка, правка и «…» */}
-      <div className="flex shrink-0 flex-wrap gap-2">
+      {/* Действия: карточка, «Добавить родственника» иконкой и меню «…».
+          Отдельной кнопки «Правка» нет — правка открывается пунктом
+          «Редактирование» в «…» (для роли без прав кнопок правки нет вовсе). */}
+      <div className="flex shrink-0 items-center gap-2">
         <button
           type="button"
           onClick={() => onOpenCard(person.id)}
-          className="btn-accent h-9 flex-1 text-[13px]"
+          className="btn-accent h-9 min-w-0 flex-1 text-[13px]"
         >
           Открыть карточку
         </button>
         {canEdit && (
           <button
-            type="button"
-            onClick={() => onEditCard(person.id)}
-            className="inline-flex h-9 items-center rounded-[10px] border border-[var(--p-line)] bg-[var(--p-field-bg)] px-3 text-[13px] text-ink-600 transition-colors hover:bg-[var(--p-hover-bg)] hover:text-ink-800"
-          >
-            Правка
-          </button>
-        )}
-        <button
-          ref={moreRef}
-          type="button"
-          onClick={openMore}
-          aria-label="Ещё действия"
-          aria-haspopup="menu"
-          aria-expanded={!!menu}
-          title="Ещё действия"
-          className="icon-btn h-9 w-9"
-        >
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor" aria-hidden="true">
-            <circle cx="4" cy="9" r="1.5" />
-            <circle cx="9" cy="9" r="1.5" />
-            <circle cx="14" cy="9" r="1.5" />
-          </svg>
-        </button>
-
-        {menu && (
-          <NodeMenu x={menu.x} y={menu.y} onClose={() => setMenu(null)}>
-            <MenuItem
-              label="Открыть карточку"
-              onClick={() => {
-                setMenu(null);
-                onOpenCard(person.id);
-              }}
-            />
-            <MenuItem
-              label="Выбрать на холсте"
-              onClick={() => {
-                setMenu(null);
-                onSelect(person.id);
-              }}
-            />
-            <MenuItem
-              label="Скрыть на холсте"
-              onClick={() => {
-                setMenu(null);
-                onHide([person.id]);
-              }}
-            />
-            <MenuItem
-              label="Снять выделение"
-              onClick={() => {
-                setMenu(null);
-                onClear();
-              }}
-            />
-          </NodeMenu>
-        )}
-      </div>
-
-      {/* Семья и родня: раньше это были кнопки на карточке холста, теперь они
-          живут здесь — в панели деталей, которая открывается по клику. */}
-      <div className="flex shrink-0 flex-col gap-2">
-        {canEdit && (
-          <button
             ref={addRef}
             type="button"
             onClick={openAddMenu}
+            aria-label="Добавить родственника"
             aria-haspopup="menu"
             aria-expanded={!!addMenu}
             title="Добавить родственника"
-            className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-[10px] border border-[var(--p-line)] bg-[var(--p-field-bg)] px-3 text-[13px] text-ink-600 transition-colors hover:bg-[var(--p-hover-bg)] hover:text-ink-800"
+            className="icon-btn h-9 w-9 shrink-0"
           >
-            <IconPlus />
-            Добавить родственника
+            <IconPersonPlus />
           </button>
         )}
-        <button
-          type="button"
-          onClick={() => onBranch(person.id)}
-          disabled={!branchable.has(person.id)}
-          title={
-            branchable.has(person.id)
-              ? "Открыть семейную ветку"
-              : "Нет супругов и детей — ветки не будет"
-          }
-          className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-[10px] border border-[var(--p-line)] bg-[var(--p-field-bg)] px-3 text-[13px] text-ink-600 transition-colors hover:bg-[var(--p-hover-bg)] hover:text-ink-800 disabled:pointer-events-none disabled:opacity-45"
-        >
-          <IconBranch />
-          Открыть семейную ветку
-        </button>
+        {canEdit && (
+          <button
+            ref={moreRef}
+            type="button"
+            onClick={openMore}
+            aria-label="Ещё действия"
+            aria-haspopup="menu"
+            aria-expanded={!!menu}
+            title="Ещё действия"
+            className="icon-btn h-9 w-9 shrink-0"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor" aria-hidden="true">
+              <circle cx="4" cy="9" r="1.5" />
+              <circle cx="9" cy="9" r="1.5" />
+              <circle cx="14" cy="9" r="1.5" />
+            </svg>
+          </button>
+        )}
 
         {addMenu && (
           <NodeMenu x={addMenu.x} y={addMenu.y} onClose={() => setAddMenu(null)}>
@@ -738,6 +670,38 @@ export function Inspector({
             ))}
           </NodeMenu>
         )}
+
+        {/* «…» — одно действие: форма правки карточки */}
+        {menu && (
+          <NodeMenu x={menu.x} y={menu.y} onClose={() => setMenu(null)}>
+            <MenuItem
+              label="Редактирование"
+              onClick={() => {
+                setMenu(null);
+                onEditCard(person.id);
+              }}
+            />
+          </NodeMenu>
+        )}
+      </div>
+
+      {/* Семья: отдельная страница ветки человека. Добавление родственников —
+          иконкой в ряду действий выше, меню с роднёй — там же. */}
+      <div className="flex shrink-0 flex-col gap-2">
+        <button
+          type="button"
+          onClick={() => onBranch(person.id)}
+          disabled={!branchable.has(person.id)}
+          title={
+            branchable.has(person.id)
+              ? "Открыть семейную ветку"
+              : "Нет супругов и детей — ветки не будет"
+          }
+          className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-[10px] border border-[var(--p-line)] bg-[var(--p-field-bg)] px-3 text-[13px] text-ink-600 transition-colors hover:bg-[var(--p-hover-bg)] hover:text-ink-800 disabled:pointer-events-none disabled:opacity-45"
+        >
+          <IconBranch />
+          Открыть семейную ветку
+        </button>
       </div>
 
       {/* Вкладки разделов */}
@@ -764,8 +728,11 @@ export function Inspector({
         ))}
       </div>
 
-      {/* Содержимое раздела */}
-      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pr-0.5">
+      {/* Содержимое раздела. На телефоне прокручивается сам лист целиком
+          (см. INSPECTOR_SURFACE): здесь высота по содержимому и никакого
+          `overflow`, иначе высота схлопнулась бы в ноль. На десктопе прокрутка
+          своя, а фиксированные ряды остаются на месте. */}
+      <div className="flex-1 pr-0.5 sm:min-h-0 sm:overflow-x-hidden sm:overflow-y-auto">
         {tab === "facts" && (
           <div>
             {facts.length ? (
@@ -810,7 +777,7 @@ export function Inspector({
             />
             {!(kin?.spouses.length || kin?.parents.length || kin?.children.length || kin?.grandkids.length) && (
               <p className="px-1 py-2 text-[12.5px] text-ink-400">
-                Связей пока нет — их добавляют кнопкой «Добавить родственника» выше.
+                Связей пока нет — их добавляют иконкой «человек + плюс» в ряду действий выше.
               </p>
             )}
           </div>
