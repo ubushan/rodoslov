@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -339,7 +339,9 @@ export function PersonPage({
   const photoUrl = person ? publicUrl(SUPABASE_URL, "photos", person.photo_path) : null;
   // у новой карточки ещё нет id, по которому класть файл в Storage — портрет неактивен
   const photoAvailable = canEdit && !!person;
-  const byId = new Map(persons.map((p) => [p.id, p]));
+  // Словарь людей для поиска родни: строится один раз на загрузку данных, а не
+  // на каждый рендер (ввод в ФИО, переключение вкладок и т. п.).
+  const byId = useMemo(() => new Map(persons.map((p) => [p.id, p])), [persons]);
 
   const generationMap = useMemo(() => generations(persons, relationships), [persons, relationships]);
   const generation = person ? generationMap.get(person.id) ?? 1 : null;
@@ -363,8 +365,16 @@ export function PersonPage({
               : "супруг(а)"
     : null;
 
-  const kinGroups = person ? buildKin(person) : [];
-  const linksCount = kinGroups.reduce((sum, group) => sum + group.rows.length, 0);
+  // «Семья» — самый дорогой расчёт карточки: пересобирается только когда реально
+  // меняются данные древа, а не на каждый ввод или переключение вкладки.
+  const kinGroups = useMemo(
+    () => (person ? buildKin(person, byId, persons, relationships) : []),
+    [person, byId, persons, relationships]
+  );
+  const linksCount = useMemo(
+    () => kinGroups.reduce((sum, group) => sum + group.rows.length, 0),
+    [kinGroups]
+  );
 
   // Имя в шапке: при правке ФИО обновляется прямо во время набора
   const typedName = [firstName, lastName].filter(Boolean).join(" ");
@@ -543,127 +553,46 @@ export function PersonPage({
     });
   }
 
-  function addLink(fd: FormData) {
-    if (!person) return;
-    const otherId = String(fd.get("other_id") ?? "");
-    const type = String(fd.get("link_type") ?? "");
-    if (!otherId || !type) return;
+  const addLink = useCallback(
+    (fd: FormData) => {
+      if (!person) return;
+      const otherId = String(fd.get("other_id") ?? "");
+      const type = String(fd.get("link_type") ?? "");
+      if (!otherId || !type) return;
 
-    startTransition(async () => {
-      let kind: RelationKind = "parent";
-      let from = person.id;
-      let to = otherId;
-      if (type === "parent_of") { kind = "parent"; from = person.id; to = otherId; }
-      if (type === "child_of") { kind = "parent"; from = otherId; to = person.id; }
-      if (type === "spouse") { kind = "spouse"; from = person.id; to = otherId; }
+      startTransition(async () => {
+        let kind: RelationKind = "parent";
+        let from = person.id;
+        let to = otherId;
+        if (type === "parent_of") { kind = "parent"; from = person.id; to = otherId; }
+        if (type === "child_of") { kind = "parent"; from = otherId; to = person.id; }
+        if (type === "spouse") { kind = "spouse"; from = person.id; to = otherId; }
 
-      const res = await createRelationship(treeId, kind, from, to);
-      if (res.error) toast.error(res.error);
-      else {
+        const res = await createRelationship(treeId, kind, from, to);
+        if (res.error) toast.error(res.error);
+        else {
+          router.refresh();
+          toast.success("Связь добавлена");
+        }
+      });
+    },
+    [person, treeId, router]
+  );
+
+  /** Разрыв связи — один обработчик на просмотр и правку, без новых функций. */
+  const breakLink = useCallback(
+    (edgeId: string) => {
+      startTransition(async () => {
+        await deleteRelationship(treeId, edgeId);
         router.refresh();
-        toast.success("Связь добавлена");
-      }
-    });
-  }
-
-  /** Родня человека, сгруппированная по строкам, как в блоке «Семья» прототипа. */
-  function buildKin(main: Person): KinGroup[] {
-    const groups: KinGroup[] = [];
-    const nameOf = (id: string) => {
-      const p = byId.get(id);
-      return p ? shortName(p) : "Удалённая карточка";
-    };
-    const genderOf = (id: string) => byId.get(id)?.gender ?? "unknown";
-    const row = (p: Person | undefined, label: string, edgeId?: string, hint?: string): KinRow => ({
-      key: `${label}-${p?.id ?? edgeId ?? "?"}`,
-      label,
-      name: p ? shortName(p) : "Удалённая карточка",
-      years: p ? lifespan(p) : null,
-      person: p,
-      edgeId,
-      hint,
-    });
-    const parentsOf = (childId: string) =>
-      new Set(
-        relationships.filter((r) => r.kind === "parent" && r.to_person_id === childId).map((r) => r.from_person_id)
-      );
-    // старшие — выше; без даты — в конце
-    const birthKey = (p: Person) =>
-      p.birth_date ? `d${p.birth_date}` : p.birth_year ? `y${String(p.birth_year).padStart(4, "0")}` : "z";
-
-    // 1. супруг(а)
-    const spouses: KinRow[] = [];
-    for (const r of relationships) {
-      if (r.kind !== "spouse") continue;
-      if (r.from_person_id !== main.id && r.to_person_id !== main.id) continue;
-      const other = r.from_person_id === main.id ? r.to_person_id : r.from_person_id;
-      spouses.push(row(byId.get(other), "Супруг(а)", r.id));
-    }
-    if (spouses.length) {
-      groups.push({
-        key: "spouse",
-        label:
-          main.gender === "male" ? "Супруга" : main.gender === "female" ? "Супруг" : "Супруг(а)",
-        rows: spouses,
+        toast.success("Связь удалена");
       });
-    }
+    },
+    [treeId, router]
+  );
 
-    // 2. родители: отец, затем мать
-    const parents = relationships
-      .filter((r) => r.kind === "parent" && r.to_person_id === main.id)
-      .map((r) => {
-        const g = genderOf(r.from_person_id);
-        return {
-          rank: g === "male" ? 0 : g === "female" ? 1 : 2,
-          label: g === "male" ? "Отец" : g === "female" ? "Мать" : "Родитель",
-          row: row(byId.get(r.from_person_id), g === "male" ? "Отец" : g === "female" ? "Мать" : "Родитель", r.id),
-        };
-      })
-      .sort((a, b) => a.rank - b.rank);
-    if (parents.length) groups.push({ key: "parents", label: "Родители", rows: parents.map((p) => p.row) });
+  const toggleLink = useCallback(() => setLinkOpen((value) => !value), []);
 
-    // 3. братья и сёстры — по общим родителям, по старшинству
-    const myParents = parentsOf(main.id);
-    if (myParents.size) {
-      const siblings = persons
-        .filter((p) => p.id !== main.id)
-        .map((p) => ({ p, theirs: parentsOf(p.id) }))
-        .filter(({ theirs }) => theirs.size > 0 && [...theirs].some((id) => myParents.has(id)))
-        .map(({ p, theirs }) => {
-          const shared = [...theirs].filter((id) => myParents.has(id));
-          const full = shared.length === myParents.size && theirs.size === myParents.size;
-          return {
-            p,
-            row: row(
-              p,
-              full ? "Брат или сестра" : "Сводный брат или сестра",
-              undefined,
-              full ? undefined : `Общий родитель: ${shared.map(nameOf).join(", ")}`
-            ),
-          };
-        })
-        .sort((a, b) => (birthKey(a.p) < birthKey(b.p) ? -1 : 1));
-      if (siblings.length) {
-        groups.push({ key: "siblings", label: "Братья и сёстры", rows: siblings.map((s) => s.row) });
-      }
-    }
-
-    // 4. дети — по старшинству
-    const children = relationships
-      .filter((r) => r.kind === "parent" && r.from_person_id === main.id)
-      .map((r) => ({
-        child: byId.get(r.to_person_id),
-        row: row(byId.get(r.to_person_id), "Ребёнок", r.id),
-      }))
-      .sort((a, b) => {
-        const ka = a.child ? birthKey(a.child) : "z";
-        const kb = b.child ? birthKey(b.child) : "z";
-        return ka < kb ? -1 : 1;
-      });
-    if (children.length) groups.push({ key: "children", label: "Дети", rows: children.map((c) => c.row) });
-
-    return groups;
-  }
 
   const faceTone =
     gender === "male"
@@ -701,39 +630,60 @@ export function PersonPage({
   /* -------------------------------------------------------------------
      Строки «Фактов»: только поля карточки, ничего не выдумываем
      ------------------------------------------------------------------- */
-  const factRows: { key: string; label: string; value: React.ReactNode }[] = [];
-  if (person) {
+  const factRows = useMemo(() => {
+    const rows: { key: string; label: string; value: React.ReactNode }[] = [];
+    if (!person) return rows;
     if (person.gender !== "unknown") {
-      factRows.push({ key: "gender", label: "Пол", value: genderLabel(person.gender) });
+      rows.push({ key: "gender", label: "Пол", value: genderLabel(person.gender) });
     }
-    factRows.push({ key: "name", label: "ФИО", value: fullName(person) });
+    rows.push({ key: "name", label: "ФИО", value: fullName(person) });
     if (person.maiden_name) {
-      factRows.push({ key: "maiden", label: "Девичья фамилия", value: person.maiden_name });
+      rows.push({ key: "maiden", label: "Девичья фамилия", value: person.maiden_name });
     }
     if (person.other_names) {
-      factRows.push({ key: "other", label: "Другие имена", value: person.other_names });
+      rows.push({ key: "other", label: "Другие имена", value: person.other_names });
     }
     const born = [birthLabel(person), person.birth_place].filter(Boolean).join(" · ");
-    if (born) factRows.push({ key: "birth", label: "Рождение", value: born });
+    if (born) rows.push({ key: "birth", label: "Рождение", value: born });
     const died = [deathLabel(person), person.death_place].filter(Boolean).join(" · ");
-    if (!person.is_living && died) factRows.push({ key: "death", label: "Смерть", value: died });
+    if (!person.is_living && died) rows.push({ key: "death", label: "Смерть", value: died });
     if (age !== null) {
-      factRows.push({ key: "age", label: "Возраст", value: `${age} ${yearsWord(age)}` });
+      rows.push({ key: "age", label: "Возраст", value: `${age} ${yearsWord(age)}` });
     }
-    factRows.push({ key: "living", label: "Жив ли", value: person.is_living ? "да" : "нет" });
+    rows.push({ key: "living", label: "Жив ли", value: person.is_living ? "да" : "нет" });
     if (person.residence) {
-      factRows.push({ key: "residence", label: "Проживание", value: person.residence });
+      rows.push({ key: "residence", label: "Проживание", value: person.residence });
     }
     if (person.bio) {
-      factRows.push({
+      rows.push({
         key: "bio",
         label: "Биография",
         value: <span className="whitespace-pre-line">{person.bio}</span>,
       });
     }
-  }
-  const factsFilled = factRows.some((r) =>
-    ["birth", "death", "age", "residence", "bio"].includes(r.key)
+    return rows;
+  }, [person, age]);
+  const factsFilled = useMemo(
+    () => factRows.some((r) => ["birth", "death", "age", "residence", "bio"].includes(r.key)),
+    [factRows]
+  );
+
+  // Документы: размер и подписи считаем один раз на смену набора файлов, а не
+  // на каждый рендер вкладки (загрузка, удаление, переключение «Сохраняем…»).
+  const docs = useMemo(
+    () =>
+      attachments.map((a) => {
+        const size = attachmentSizes[a.id];
+        const meta = [
+          size ? formatBytes(size) : null,
+          a.kind === "photo" ? "Изображение" : "Документ",
+          formatDateTime(a.created_at),
+        ]
+          .filter(Boolean)
+          .join(" · ");
+        return { attachment: a, meta };
+      }),
+    [attachments, attachmentSizes]
   );
 
   function onTabKeyDown(event: React.KeyboardEvent) {
@@ -1150,15 +1100,9 @@ export function PersonPage({
                     canEdit={canEdit}
                     pending={pending}
                     linkOpen={linkOpen}
-                    onToggleLink={() => setLinkOpen((v) => !v)}
-                    onBreak={(edgeId, label, name) =>
-                      startTransition(async () => {
-                        await deleteRelationship(treeId, edgeId);
-                        router.refresh();
-                        toast.success("Связь удалена");
-                      })
-                    }
-                    onAdd={(fd) => addLink(fd)}
+                    onToggleLink={toggleLink}
+                    onBreak={breakLink}
+                    onAdd={addLink}
                     person={person!}
                     persons={persons}
                   />
@@ -1258,15 +1202,9 @@ export function PersonPage({
                     canEdit={canEdit}
                     pending={pending}
                     linkOpen={linkOpen}
-                    onToggleLink={() => setLinkOpen((v) => !v)}
-                    onBreak={(edgeId) =>
-                      startTransition(async () => {
-                        await deleteRelationship(treeId, edgeId);
-                        router.refresh();
-                        toast.success("Связь удалена");
-                      })
-                    }
-                    onAdd={(fd) => addLink(fd)}
+                    onToggleLink={toggleLink}
+                    onBreak={breakLink}
+                    onAdd={addLink}
                     person={person}
                     persons={persons}
                   />
@@ -1281,15 +1219,7 @@ export function PersonPage({
                     </p>
                   ) : (
                     <ul className="grid list-none gap-2 p-0 sm:grid-cols-2">
-                      {attachments.map((a) => {
-                        const size = attachmentSizes[a.id];
-                        const meta = [
-                          size ? formatBytes(size) : null,
-                          a.kind === "photo" ? "Изображение" : "Документ",
-                          formatDateTime(a.created_at),
-                        ]
-                          .filter(Boolean)
-                          .join(" · ");
+                      {docs.map(({ attachment: a, meta }) => {
                         return (
                           <li
                             key={a.id}
@@ -1416,7 +1346,130 @@ type KinRow = {
 
 type KinGroup = { key: string; label: string; rows: KinRow[] };
 
-function KinBlock({
+/**
+ * Родня человека, сгруппированная по строкам, как в блоке «Семья» прототипа.
+ * Чистая функция: вызывается из `useMemo`, а связи разбираются одним проходом
+ * (родители и дети по индексам), а не фильтрацией всего списка на каждого
+ * человека — иначе на большом древе это повторялось бы на каждый рендер.
+ */
+function buildKin(
+  main: Person,
+  byId: Map<string, Person>,
+  persons: Person[],
+  relationships: Relationship[]
+): KinGroup[] {
+  const groups: KinGroup[] = [];
+  const nameOf = (id: string) => {
+    const p = byId.get(id);
+    return p ? shortName(p) : "Удалённая карточка";
+  };
+  const genderOf = (id: string) => byId.get(id)?.gender ?? "unknown";
+  const row = (p: Person | undefined, label: string, edgeId?: string, hint?: string): KinRow => ({
+    key: `${label}-${p?.id ?? edgeId ?? "?"}`,
+    label,
+    name: p ? shortName(p) : "Удалённая карточка",
+    years: p ? lifespan(p) : null,
+    person: p,
+    edgeId,
+    hint,
+  });
+
+  // связи «родитель → ребёнок» одним проходом: и родители, и дети берутся из
+  // индексов вместе с id самой связи (по ней родство разрывается)
+  type ParentLink = { id: string; edgeId: string };
+  const parentsByChild = new Map<string, ParentLink[]>();
+  const childrenByParent = new Map<string, ParentLink[]>();
+  for (const r of relationships) {
+    if (r.kind !== "parent") continue;
+    const parents = parentsByChild.get(r.to_person_id);
+    if (parents) parents.push({ id: r.from_person_id, edgeId: r.id });
+    else parentsByChild.set(r.to_person_id, [{ id: r.from_person_id, edgeId: r.id }]);
+    const children = childrenByParent.get(r.from_person_id);
+    if (children) children.push({ id: r.to_person_id, edgeId: r.id });
+    else childrenByParent.set(r.from_person_id, [{ id: r.to_person_id, edgeId: r.id }]);
+  }
+  const parentsOf = (childId: string) => new Set((parentsByChild.get(childId) ?? []).map((l) => l.id));
+
+  // старшие — выше; без даты — в конце
+  const birthKey = (p: Person) =>
+    p.birth_date ? `d${p.birth_date}` : p.birth_year ? `y${String(p.birth_year).padStart(4, "0")}` : "z";
+
+  // 1. супруг(а)
+  const spouses: KinRow[] = [];
+  for (const r of relationships) {
+    if (r.kind !== "spouse") continue;
+    if (r.from_person_id !== main.id && r.to_person_id !== main.id) continue;
+    const other = r.from_person_id === main.id ? r.to_person_id : r.from_person_id;
+    spouses.push(row(byId.get(other), "Супруг(а)", r.id));
+  }
+  if (spouses.length) {
+    groups.push({
+      key: "spouse",
+      label:
+        main.gender === "male" ? "Супруга" : main.gender === "female" ? "Супруг" : "Супруг(а)",
+      rows: spouses,
+    });
+  }
+
+  // 2. родители: отец, затем мать
+  const parents = (parentsByChild.get(main.id) ?? [])
+    .map(({ id: parentId, edgeId }) => {
+      const g = genderOf(parentId);
+      return {
+        rank: g === "male" ? 0 : g === "female" ? 1 : 2,
+        row: row(
+          byId.get(parentId),
+          g === "male" ? "Отец" : g === "female" ? "Мать" : "Родитель",
+          edgeId
+        ),
+      };
+    })
+    .sort((a, b) => a.rank - b.rank);
+  if (parents.length) groups.push({ key: "parents", label: "Родители", rows: parents.map((p) => p.row) });
+
+  // 3. братья и сёстры — по общим родителям, по старшинству
+  const myParents = parentsOf(main.id);
+  if (myParents.size) {
+    const siblings = persons
+      .filter((p) => p.id !== main.id)
+      .map((p) => ({ p, theirs: parentsOf(p.id) }))
+      .filter(({ theirs }) => theirs.size > 0 && [...theirs].some((id) => myParents.has(id)))
+      .map(({ p, theirs }) => {
+        const shared = [...theirs].filter((id) => myParents.has(id));
+        const full = shared.length === myParents.size && theirs.size === myParents.size;
+        return {
+          p,
+          row: row(
+            p,
+            full ? "Брат или сестра" : "Сводный брат или сестра",
+            undefined,
+            full ? undefined : `Общий родитель: ${shared.map(nameOf).join(", ")}`
+          ),
+        };
+      })
+      .sort((a, b) => (birthKey(a.p) < birthKey(b.p) ? -1 : 1));
+    if (siblings.length) {
+      groups.push({ key: "siblings", label: "Братья и сёстры", rows: siblings.map((s) => s.row) });
+    }
+  }
+
+  // 4. дети — по старшинству
+  const children = (childrenByParent.get(main.id) ?? [])
+    .map(({ id: childId, edgeId }) => ({
+      child: byId.get(childId),
+      row: row(byId.get(childId), "Ребёнок", edgeId),
+    }))
+    .sort((a, b) => {
+      const ka = a.child ? birthKey(a.child) : "z";
+      const kb = b.child ? birthKey(b.child) : "z";
+      return ka < kb ? -1 : 1;
+    });
+  if (children.length) groups.push({ key: "children", label: "Дети", rows: children.map((c) => c.row) });
+
+  return groups;
+}
+
+const KinBlock = memo(function KinBlock({
   groups,
   treeId,
   canEdit,
@@ -1434,7 +1487,7 @@ function KinBlock({
   pending: boolean;
   linkOpen: boolean;
   onToggleLink: () => void;
-  onBreak: (edgeId: string, label: string, name: string) => void;
+  onBreak: (edgeId: string) => void;
   onAdd: (fd: FormData) => void;
   person: Person;
   persons: Person[];
@@ -1481,7 +1534,7 @@ function KinBlock({
                       title="Разорвать связь"
                       disabled={pending}
                       className="grid h-6 w-6 shrink-0 place-items-center rounded-full border border-line bg-field text-[11px] leading-none text-ink-400 transition-colors hover:border-danger-line hover:bg-danger-soft hover:text-danger disabled:opacity-50"
-                      onClick={() => onBreak(row.edgeId!, row.label, row.name)}
+                      onClick={() => onBreak(row.edgeId!)}
                     >
                       ✕
                     </button>
@@ -1543,4 +1596,4 @@ function KinBlock({
       )}
     </>
   );
-}
+});

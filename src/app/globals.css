@@ -644,6 +644,33 @@ body {
   background: var(--p-line-3);
 }
 
+/* Системная настройка «меньше прозрачности» (macOS «Уменьшить прозрачность»,
+   Windows «Эффекты прозрачности»): стеклянные слои холста — шапка, док, меню,
+   нижний лист, инспектор и палитра — отдают плотный фон без backdrop-filter.
+   Блюр больших поверхностей пересчитывается на каждое изменение холста под
+   ними; на слабых машинах это самая дорогая часть кадра. Вид по умолчанию не
+   меняется: правило срабатывает только по запросу системы. */
+@media (prefers-reduced-transparency: reduce) {
+  .glass,
+  .studio-dock,
+  .dock-menu,
+  .studio-sheet {
+    background: var(--p-glass-2);
+  }
+  /* Tailwind-утилиты стекла: поверхности инспектора и палитры */
+  [class*="backdrop-blur"] {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  .glass,
+  .studio-dock,
+  .dock-menu,
+  .studio-sheet {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}
+
 /* Фон холста в точку: используется страницами вне React Flow */
 .canvas-dots {
   background-color: var(--color-canvas);

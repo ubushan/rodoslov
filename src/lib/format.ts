@@ -20,14 +20,21 @@ export function formatDate(iso: string | null | undefined): string | null {
   return `${m[3]}.${m[2]}.${m[1]}`;
 }
 
+/**
+ * Форматтеры даты и времени создаются один раз на модуль: `toLocale*` каждый раз
+ * собирает новый `Intl.DateTimeFormat`, а это самая дорогая часть форматирования.
+ * Страница истории показывает сотни событий, поэтому кэш заметно экономит время
+ * серверного рендера (локаль фиксирована — «ru-RU»).
+ */
+const dateFormatter = new Intl.DateTimeFormat("ru-RU");
+const timeFormatter = new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit" });
+
 /** «29.09.2026, 14:35» — для списков админки */
 export function formatDateTime(iso: string | null | undefined): string | null {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  const date = d.toLocaleDateString("ru-RU");
-  const time = d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-  return `${date}, ${time}`;
+  return `${dateFormatter.format(d)}, ${timeFormatter.format(d)}`;
 }
 
 /** Дата рождения, как её показывать: полная дата, иначе год, иначе null */

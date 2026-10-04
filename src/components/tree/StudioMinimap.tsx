@@ -78,6 +78,30 @@ export function StudioMinimap({ className = "" }: { className?: string }) {
     [box, setCenter, transform]
   );
 
+  // силуэт карточек: пересобирается только при смене состава и геометрии.
+  // Панорама и зум меняют только transform, поэтому 30 прямоугольников (а на
+  // большом древе — сотни) не пересобираются на каждый кадр перетаскивания.
+  const cards = useMemo(
+    () =>
+      people.map((node) => {
+        const person = node.data?.person as { gender?: Gender } | undefined;
+        const w = node.measured?.width ?? CARD_W;
+        const h = node.measured?.height ?? CARD_H;
+        return (
+          <rect
+            key={node.id}
+            x={node.position.x}
+            y={node.position.y}
+            width={w}
+            height={h}
+            rx={14}
+            style={{ fill: fillFor(person?.gender) }}
+          />
+        );
+      }),
+    [people]
+  );
+
   return (
     <div className={`glass h-[120px] w-[200px] p-2 ${className}`}>
       {box ? (
@@ -107,22 +131,7 @@ export function StudioMinimap({ className = "" }: { className?: string }) {
               }}
             />
           )}
-          {people.map((node) => {
-            const person = node.data?.person as { gender?: Gender } | undefined;
-            const w = node.measured?.width ?? CARD_W;
-            const h = node.measured?.height ?? CARD_H;
-            return (
-              <rect
-                key={node.id}
-                x={node.position.x}
-                y={node.position.y}
-                width={w}
-                height={h}
-                rx={14}
-                style={{ fill: fillFor(person?.gender) }}
-              />
-            );
-          })}
+          {cards}
         </svg>
       ) : (
         <span className="grid h-full w-full place-items-center text-[11.5px] text-ink-400">

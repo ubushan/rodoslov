@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { memo, useCallback, useDeferredValue, useMemo, useState } from "react";
 import type { Gender } from "@/lib/types";
 
 /** Строка списка: всё уже посчитано на сервере, клиент только ищет и фильтрует. */
@@ -63,7 +63,7 @@ const FACE_COLOR: Record<Gender, string> = {
 };
 
 /** Силуэт по полу — та же «плитка», что в прототипе, но без картинок. */
-function PersonFace({ gender }: { gender: Gender }) {
+const PersonFace = memo(function PersonFace({ gender }: { gender: Gender }) {
   return (
     <span
       aria-hidden="true"
@@ -75,7 +75,7 @@ function PersonFace({ gender }: { gender: Gender }) {
       </svg>
     </span>
   );
-}
+});
 
 function IconSearch() {
   return (
@@ -96,6 +96,82 @@ function IconSearch() {
   );
 }
 
+/**
+ * Строка списка в `memo`: при вводе в поиск и смене фильтра перерисовываются
+ * только те строки, которые действительно появились или исчезли, — у оставшихся
+ * `row` тот же объект, что пришёл с сервера. Это главный выигрыш: на 600 людях
+ * список больше не пересобирается целиком на каждый символ.
+ */
+const PeopleRowItem = memo(function PeopleRowItem({
+  treeId,
+  row,
+}: {
+  treeId: string;
+  row: PeopleRow;
+}) {
+  return (
+    <li>
+      <Link
+        href={`/tree/${treeId}/person/${row.id}`}
+        className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 border-b border-[var(--p-line-2)] px-3.5 py-2.5 text-ink-800 transition-colors last:border-b-0 hover:bg-[var(--p-hover-bg)] focus-visible:bg-[var(--p-acc-soft)] sm:grid-cols-[minmax(0,1.7fr)_120px_140px_minmax(0,1fr)]"
+      >
+        <span className="flex min-w-0 items-center gap-2.5">
+          <PersonFace gender={row.gender} />
+          <span className="min-w-0">
+            <span className="block truncate text-[14px] leading-snug">{row.name}</span>
+            {row.maiden && (
+              <span className="block truncate text-[11.5px] leading-snug text-ink-400">
+                в девичестве {row.maiden}
+              </span>
+            )}
+          </span>
+        </span>
+
+        <span className="justify-self-end whitespace-nowrap font-mono text-[12.5px] text-ink-600 sm:justify-self-start">
+          {row.years ?? "нет дат"}
+        </span>
+
+        <span className="col-span-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 sm:contents">
+          <span className="whitespace-nowrap text-[12.5px] text-ink-500">
+            {row.generation ? `${roman(row.generation)} поколение` : "—"}
+          </span>
+          <span className="min-w-0 truncate text-[12.5px] text-ink-500">
+            {row.place ?? "—"}
+          </span>
+        </span>
+      </Link>
+    </li>
+  );
+});
+
+/** Фильтр-пилюля в `memo`: активной меняется только нажатая и предыдущая. */
+const FilterButton = memo(function FilterButton({
+  value,
+  label,
+  active,
+  onSelect,
+}: {
+  value: FilterKey;
+  label: string;
+  active: boolean;
+  onSelect: (key: FilterKey) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(value)}
+      aria-pressed={active}
+      className={`inline-flex h-[30px] items-center rounded-full border px-3 text-[12.5px] transition-colors ${
+        active
+          ? "border-transparent bg-fill font-semibold text-on-fill"
+          : "border-[var(--p-line)] bg-[var(--p-field-bg)] text-ink-500 hover:bg-[var(--p-hover-bg)] hover:text-ink-800"
+      }`}
+    >
+      {label}
+    </button>
+  );
+});
+
 export function PeopleList({
   treeId,
   treeTitle,
@@ -108,27 +184,45 @@ export function PeopleList({
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
 
-  const found = useMemo(() => {
-    const q = normalize(query);
-    return rows.filter((row) => {
-      if (filter === "male" && row.gender !== "male") return false;
-      if (filter === "female" && row.gender !== "female") return false;
-      if (filter === "living" && !row.isLiving) return false;
-      if (filter === "nodate" && row.hasDates) return false;
-      if (!q) return true;
-      return (
-        normalize(row.name).includes(q) ||
-        (row.maiden ? normalize(row.maiden).includes(q) : false) ||
-        (row.place ? normalize(row.place).includes(q) : false) ||
-        (row.years ? normalize(row.years).includes(q) : false)
-      );
-    });
-  }, [rows, query, filter]);
+  // Ввод и нажатия на фильтры остаются мгновенными: список пересобирается на
+  // отложенном значении, а не в том же кадре, что нажатие.
+  const deferredQuery = useDeferredValue(query);
+  const deferredFilter = useDeferredValue(filter);
+  const stale = query !== deferredQuery || filter !== deferredFilter;
 
-  function reset() {
+  // Текст для поиска нормализуем один раз на строку, а не на каждый символ.
+  const index = useMemo(
+    () =>
+      rows.map((row) => ({
+        row,
+        text: [row.name, row.maiden, row.place, row.years]
+          .filter(Boolean)
+          .map((value) => normalize(String(value)))
+          .join(" "),
+      })),
+    [rows]
+  );
+
+  const found = useMemo(() => {
+    const q = normalize(deferredQuery);
+    const out: PeopleRow[] = [];
+    for (const entry of index) {
+      const { row } = entry;
+      if (deferredFilter === "male" && row.gender !== "male") continue;
+      if (deferredFilter === "female" && row.gender !== "female") continue;
+      if (deferredFilter === "living" && !row.isLiving) continue;
+      if (deferredFilter === "nodate" && row.hasDates) continue;
+      if (q && !entry.text.includes(q)) continue;
+      out.push(row);
+    }
+    return out;
+  }, [index, deferredQuery, deferredFilter]);
+
+  const selectFilter = useCallback((key: FilterKey) => setFilter(key), []);
+  const reset = useCallback(() => {
     setQuery("");
     setFilter("all");
-  }
+  }, []);
 
   return (
     <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col gap-3 px-3 pb-4 pt-4 sm:px-5 sm:pb-6 sm:pt-6">
@@ -163,24 +257,15 @@ export function PeopleList({
         </label>
 
         <div role="group" aria-label="Фильтры списка" className="flex flex-wrap items-center gap-1.5">
-          {FILTERS.map((item) => {
-            const on = filter === item.key;
-            return (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => setFilter(item.key)}
-                aria-pressed={on}
-                className={`inline-flex h-[30px] items-center rounded-full border px-3 text-[12.5px] transition-colors ${
-                  on
-                    ? "border-transparent bg-fill font-semibold text-on-fill"
-                    : "border-[var(--p-line)] bg-[var(--p-field-bg)] text-ink-500 hover:bg-[var(--p-hover-bg)] hover:text-ink-800"
-                }`}
-              >
-                {item.label}
-              </button>
-            );
-          })}
+          {FILTERS.map((item) => (
+            <FilterButton
+              key={item.key}
+              value={item.key}
+              label={item.label}
+              active={filter === item.key}
+              onSelect={selectFilter}
+            />
+          ))}
         </div>
 
         <span
@@ -224,39 +309,14 @@ export function PeopleList({
               <span>Место</span>
             </div>
 
-            <ul className="min-h-0 flex-1 overflow-y-auto">
+            <ul
+              aria-busy={stale}
+              className={`min-h-0 flex-1 overflow-y-auto transition-opacity duration-150 motion-reduce:transition-none ${
+                stale ? "opacity-60" : ""
+              }`}
+            >
               {found.map((row) => (
-                <li key={row.id}>
-                  <Link
-                    href={`/tree/${treeId}/person/${row.id}`}
-                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 border-b border-[var(--p-line-2)] px-3.5 py-2.5 text-ink-800 transition-colors last:border-b-0 hover:bg-[var(--p-hover-bg)] focus-visible:bg-[var(--p-acc-soft)] sm:grid-cols-[minmax(0,1.7fr)_120px_140px_minmax(0,1fr)]"
-                  >
-                    <span className="flex min-w-0 items-center gap-2.5">
-                      <PersonFace gender={row.gender} />
-                      <span className="min-w-0">
-                        <span className="block truncate text-[14px] leading-snug">{row.name}</span>
-                        {row.maiden && (
-                          <span className="block truncate text-[11.5px] leading-snug text-ink-400">
-                            в девичестве {row.maiden}
-                          </span>
-                        )}
-                      </span>
-                    </span>
-
-                    <span className="justify-self-end whitespace-nowrap font-mono text-[12.5px] text-ink-600 sm:justify-self-start">
-                      {row.years ?? "нет дат"}
-                    </span>
-
-                    <span className="col-span-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 sm:contents">
-                      <span className="whitespace-nowrap text-[12.5px] text-ink-500">
-                        {row.generation ? `${roman(row.generation)} поколение` : "—"}
-                      </span>
-                      <span className="min-w-0 truncate text-[12.5px] text-ink-500">
-                        {row.place ?? "—"}
-                      </span>
-                    </span>
-                  </Link>
-                </li>
+                <PeopleRowItem key={row.id} row={row} treeId={treeId} />
               ))}
             </ul>
           </>

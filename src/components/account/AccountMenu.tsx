@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { signOut } from "@/app/actions/auth";
@@ -71,13 +71,13 @@ export function AccountMenu({ name, isAdmin }: { name: string; isAdmin: boolean 
   }, []);
 
   /** Вернуть фокус на кнопку меню после закрытия — чтобы он не «залипал». */
-  const returnFocus = () => {
+  const returnFocus = useCallback(() => {
     const restore = () => triggerRef.current?.focus({ preventScroll: true });
     // при тапе по подложке фокус успевает уехать на body уже после закрытия —
     // поэтому возвращаем его и в следующем кадре, и после завершения клика
     requestAnimationFrame(restore);
     window.setTimeout(restore, 0);
-  };
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -105,9 +105,7 @@ export function AccountMenu({ name, isAdmin }: { name: string; isAdmin: boolean 
       document.removeEventListener("pointerdown", onDown);
       document.removeEventListener("keydown", onKey);
     };
-    // returnFocus и refs стабильны между рендерами
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, returnFocus]);
 
   // Открытый лист забирает фокус внутрь себя: за подложкой он не виден,
   // а Tab дальше идёт по пунктам листа.
@@ -119,7 +117,9 @@ export function AccountMenu({ name, isAdmin }: { name: string; isAdmin: boolean 
   const item =
     "flex w-full items-center gap-2 rounded-[10px] px-3 py-2 text-left text-[13px] transition-colors";
 
-  const sheet = (
+  // Лист для телефона собираем только когда он действительно показан: закрытое
+  // меню не создаёт зря дерево элементов, а портал появляется лишь на тач-экране.
+  const sheet = open && !wide ? (
     <div className="fixed inset-0 z-[60] flex items-end">
       <button
         type="button"
@@ -180,7 +180,7 @@ export function AccountMenu({ name, isAdmin }: { name: string; isAdmin: boolean 
         </form>
       </div>
     </div>
-  );
+  ) : null;
 
   return (
     <div ref={boxRef} className="relative">
@@ -241,7 +241,7 @@ export function AccountMenu({ name, isAdmin }: { name: string; isAdmin: boolean 
         </div>
       )}
 
-      {open && !wide && typeof document !== "undefined" && createPortal(sheet, document.body)}
+      {sheet && typeof document !== "undefined" && createPortal(sheet, document.body)}
     </div>
   );
 }

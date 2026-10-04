@@ -22,7 +22,7 @@ import { toast } from "sonner";
 
 import { PersonNode } from "./PersonNode";
 import { CouplePlate } from "./CouplePlate";
-import { FamilyBusEdge } from "./FamilyBusEdge";
+import { FamilyBusEdge, familyEdgeGeometry } from "./FamilyBusEdge";
 import { StudioMinimap } from "./StudioMinimap";
 import { StudioZoom } from "./StudioZoom";
 import { CANVAS_VIEWS, isCanvasView, type CanvasView } from "./ViewSwitcher";
@@ -42,6 +42,12 @@ import type { Person, Relationship, Attachment, MemberRole } from "@/lib/types";
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const nodeTypes = { person: PersonNode, couplePlate: CouplePlate };
 const edgeTypes = { family: FamilyBusEdge };
+/**
+ * proOptions — константа, а не объект в JSX: новая ссылка на каждом рендере
+ * холста заставляла React Flow перерисовывать всё дерево узлов и рёбер даже
+ * тогда, когда менялось только состояние интерфейса (меню, палитра, лист).
+ */
+const PRO_OPTIONS = { hideAttribution: true };
 
 /**
  * Сколько места справа занимает парящий инспектор (панель 320px + поля).
@@ -319,12 +325,9 @@ function Canvas({
     [shownRelationships, visibleIds]
   );
 
-  /** Направление связей в текущем виде — его читает FamilyBusEdge */
-  const edgeDir = horizontal ? "right" : mirror ? "up" : "down";
-
   /**
-   * Рёбра для раскладки: ей нужны только вид связи и её направление, а сторону
-   * хэндлов (её выбирает вид) на этом шаге ещё нельзя посчитать — позиций нет.
+   * Рёбра для раскладки: ей нужен только вид связи, а сторону хэндлов (её
+   * выбирает вид) на этом шаге ещё нельзя посчитать — позиций нет.
    */
   const layoutEdges = useMemo<Edge[]>(
     () =>
@@ -333,9 +336,9 @@ function Canvas({
         source: r.from_person_id,
         target: r.to_person_id,
         type: r.kind === "spouse" ? "straight" : "family",
-        data: { kind: r.kind, dir: edgeDir },
+        data: { kind: r.kind },
       })),
-    [visibleRelationships, edgeDir]
+    [visibleRelationships]
   );
 
   /**
@@ -366,6 +369,17 @@ function Canvas({
       ])
     );
   }, [visiblePersons, layoutEdges, mirror, horizontal]);
+
+  /**
+   * Готовые пути рёбер «родитель — ребёнок»: одна шина на семью, считается по
+   * раскладке (не по состоянию React Flow). Раньше это делало само ребро — на
+   * каждое изменение узлов и с O(E)-поиском внутри O(E)-перебора; теперь путь
+   * считается один раз на раскладку, а ребро остаётся чистой отрисовкой.
+   */
+  const familyEdges = useMemo(
+    () => familyEdgeGeometry(visibleRelationships, (id) => layoutPositions.get(id), { horizontal, mirror }),
+    [visibleRelationships, layoutPositions, horizontal, mirror]
+  );
 
   /**
    * Рёбра холста. Хэндлы выбираются по виду: в вертикальных видах связи идут
@@ -406,8 +420,8 @@ function Canvas({
           targetHandle,
           type: spouse ? "straight" : "family",
           animated: false,
-          // dir читает FamilyBusEdge: куда строится стебель, шина и отводы
-          data: { kind: r.kind, dir: edgeDir },
+          // family читает FamilyBusEdge: готовый путь стебля, шины и отводов
+          data: { kind: r.kind, family: familyEdges.get(r.id) ?? null },
           style: spouse
             ? // связь супругов — сплошная линия чуть плотнее кровной, как
               // .w-bond в прототипе: цвет --wire-bond, без пунктира
@@ -415,7 +429,7 @@ function Canvas({
             : { stroke: "var(--color-canvas-line)", strokeWidth: 1.5 },
         };
       }),
-    [visibleRelationships, layoutPositions, horizontal, edgeDir]
+    [visibleRelationships, layoutPositions, horizontal, familyEdges]
   );
 
   const initialNodes = useMemo<Node[]>(
@@ -748,6 +762,26 @@ function Canvas({
     return () => clearTimeout(timer);
   }, [view, fitAll]);
 
+  /**
+   * Отпечаток геометрии карточек: id, позиция и измеренный размер. Нужен, чтобы
+   * список рамок не пересобирался от одной лишь смены выделения: массив nodes
+   * при этом получает новую ссылку, а геометрия не меняется.
+   *
+   * Без этого React Flow на каждой пересборке получал новые объекты рамок,
+   * заново их измерял и слал dimensions в onNodesChange — холст перерисовывался
+   * бесконечно (замер: ~216 перерисовок в секунду в покое).
+   */
+  const nodesGeometryKey = useMemo(
+    () =>
+      nodes
+        .map(
+          (n) =>
+            `${n.id}:${n.position.x},${n.position.y},${n.measured?.width ?? 0}x${n.measured?.height ?? 0}`
+        )
+        .join("|"),
+    [nodes]
+  );
+
   // Мягкая рамка вокруг пары супругов — когда они рядом.
   // Кнопок «+» на линии пары больше нет: добавление родственников живёт
   // в панели деталей (инспекторе) и не всплывает при наведении.
@@ -790,7 +824,15 @@ function Canvas({
       });
     }
     return out;
-  }, [nodes, edges, horizontal]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- геометрию читаем через отпечаток
+  }, [nodesGeometryKey, edges, horizontal]);
+
+  /**
+   * Список узлов для React Flow: карточки людей и рамки пар. Одна и та же
+   * ссылка, пока не изменились ни узлы, ни рамки: новая ссылка на каждом
+   * рендере холста заставляла React Flow пересобирать внутренний список узлов.
+   */
+  const flowNodes = useMemo<Node[]>(() => [...nodes, ...plateNodes], [nodes, plateNodes]);
 
   // ---- Правки родственников приходят без перезагрузки страницы ----
   useEffect(() => {
@@ -1037,6 +1079,48 @@ function Canvas({
       числе выбранных, кроме двух, пункты выключены с подсказкой. */
   const exactlyTwo = selectedIds.length === 2;
 
+  /**
+   * Имена выбранных для пилюли мультивыделения. Считаем по словарю людей, а не
+   * поиском по всему списку на каждую карточку: раньше это был O(выбранных ×
+   * людей) на каждом рендере холста.
+   */
+  const selectedNames = useMemo(() => {
+    if (selectedIds.length < 2) return "";
+    const byId = new Map(persons.map((person) => [person.id, person]));
+    return selectedIds
+      .map((id) => {
+        const person = byId.get(id);
+        return person ? shortName(person) : "";
+      })
+      .filter(Boolean)
+      .join(", ");
+  }, [selectedIds, persons]);
+
+  /* Колбэки холста — стабильные: React Flow сравнивает пропсы по ссылке, и новые
+     функции на каждом рендере холста тянули за собой перерисовку узлов и рёбер
+     при любом изменении состояния интерфейса (меню, палитра, метрики листа). */
+
+  /** Двойной клик по линии связи — разрыв (только для владельца и редактора) */
+  const onEdgeDoubleClick = useCallback(
+    (_: React.MouseEvent, edge: Edge) => {
+      if (!canEdit) return;
+      if (!confirm("Разорвать эту связь?")) return;
+      startTransition(async () => {
+        await deleteRelationship(treeId, edge.id);
+        router.refresh();
+      });
+    },
+    [canEdit, treeId, router]
+  );
+
+  /** Выделение живёт в React Flow: здесь только читаем набор людей */
+  const onFlowSelectionChange = useCallback(({ nodes: selected }: { nodes: Node[] }) => {
+    setSelectedIds((prev) => {
+      const next = selected.filter((n) => n.type === "person").map((n) => n.id);
+      return next.length === prev.length && next.every((id, i) => id === prev[i]) ? prev : next;
+    });
+  }, []);
+
   return (
     <div className={`relative h-full w-full bg-canvas ${exporting ? "exporting" : ""}`}>
       {/* Ореол холста — как .app__halo прототипа: холодное пятно слева сверху и
@@ -1049,26 +1133,14 @@ function Canvas({
           раскладку и направление связей — сам холст один и тот же. */}
       <div className="relative z-[1] h-full w-full">
         <ReactFlow
-          nodes={[...nodes, ...plateNodes]}
+          nodes={flowNodes}
           edges={edges}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
-          onEdgeDoubleClick={(_, edge) => {
-            if (!canEdit) return;
-            if (!confirm("Разорвать эту связь?")) return;
-            startTransition(async () => {
-              await deleteRelationship(treeId, edge.id);
-              router.refresh();
-            });
-          }}
-          onSelectionChange={({ nodes: selected }) =>
-            setSelectedIds((prev) => {
-              const next = selected.filter((n) => n.type === "person").map((n) => n.id);
-              return next.length === prev.length && next.every((id, i) => id === prev[i]) ? prev : next;
-            })
-          }
+          onEdgeDoubleClick={onEdgeDoubleClick}
+          onSelectionChange={onFlowSelectionChange}
           elementsSelectable
           /* выделение: клик — один, Shift + клик — добавить к выделению */
           multiSelectionKeyCode="Shift"
@@ -1077,7 +1149,7 @@ function Canvas({
           nodesDraggable={false}
           minZoom={0.15}
           maxZoom={2}
-          proOptions={{ hideAttribution: true }}
+          proOptions={PRO_OPTIONS}
         >
           {/* холст в точку: шаг и диаметр точки — как у .canvas-dots прототипа */}
           <Background variant={BackgroundVariant.Dots} gap={26} size={2} color="var(--color-canvas-dot)" />
@@ -1275,13 +1347,7 @@ function Canvas({
             Выбрано: {selectedIds.length}
           </b>
           <span className="hidden max-w-[200px] truncate text-[12px] text-ink-400 sm:block">
-            {selectedIds
-              .map((id) => {
-                const person = persons.find((p) => p.id === id);
-                return person ? shortName(person) : "";
-              })
-              .filter(Boolean)
-              .join(", ")}
+            {selectedNames}
           </span>
           <button
             type="button"
