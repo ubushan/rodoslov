@@ -65,15 +65,21 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const name = profile?.full_name ?? user.email ?? "Аккаунт";
 
+  // Страница холста: шапка вынута из потока, чтобы полотно занимало всю высоту
+  // страницы. Вокруг панели — холст, а не фон; на остальных страницах шапка
+  // по-прежнему стоит в потоке и контент начинается под ней.
+  const pathname = (await headers()).get("x-pathname") ?? "";
+  const isCanvasPage = /^\/tree\/[^/]+\/?$/.test(pathname);
+
   return (
-    <div className="flex h-dvh flex-col bg-mist-100">
+    <div className="relative flex h-dvh flex-col bg-mist-100">
       {/* Парящая стеклянная шапка: бренд, контекст древа (название, раздел,
           роль) и разделы; справа — поиск, темы и меню аккаунта, куда уезжают
           участники, профиль, админка и выход. Стопки аватаров в шапке нет:
           состав древа — строка «Участники и доступ» в меню.
           На телефоне слова «Torlmud» нет, а темы переключаются одной кнопкой. */}
       <header
-        className="sticky top-0 z-30 shrink-0 px-3 sm:px-4"
+        className={`${isCanvasPage ? "absolute" : "sticky"} top-0 z-30 shrink-0 px-3 sm:px-4`}
         style={{ paddingTop: "calc(env(safe-area-inset-top) + 0.75rem)" }}
       >
         <div className="glass mx-auto flex min-h-[52px] w-full max-w-[1600px] items-center gap-2 px-2.5 py-2 sm:gap-3 sm:px-3">
