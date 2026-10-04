@@ -287,7 +287,10 @@ export default async function DashboardPage() {
                             description={r.trees.description}
                           />
 
-                          <span className="mt-auto pt-6 text-[13px] font-medium text-brass-500">
+                          {/* Главное действие карточки — кнопкой, а не текстом:
+                              иначе не видно, куда нажимать. Ссылка обёрнута
+                              вокруг всей карточки, кнопка — её видимый вход. */}
+                          <span className="btn-accent mt-auto self-start">
                             Открыть древо <span aria-hidden="true">→</span>
                           </span>
                         </Link>
@@ -323,7 +326,7 @@ export default async function DashboardPage() {
                             updatedAt={r.trees.updated_at}
                           />
 
-                          <span className="mt-auto pt-5 text-[13px] font-medium text-brass-500">
+                          <span className="btn-accent mt-auto self-start">
                             Открыть древо <span aria-hidden="true">→</span>
                           </span>
                         </Link>
