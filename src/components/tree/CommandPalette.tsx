@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { PersonFace } from "@/components/person/PersonFace";
 import { lifespan, peopleWord, shortName } from "@/lib/format";
 import type { Person } from "@/lib/types";
 
@@ -477,23 +478,20 @@ export function CommandPalette({
                         aria-hidden="true"
                         className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-full bg-[var(--p-row-bg)]"
                       >
-                        {row.person.photo_path ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/photos/${row.person.photo_path}`}
-                            alt=""
-                            className="h-[30px] w-[30px] rounded-full object-cover"
-                          />
-                        ) : row.person.gender !== "unknown" ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={row.person.gender === "male" ? "/avatars/male.png" : "/avatars/female.png"}
-                            alt=""
-                            className="h-[30px] w-[30px] rounded-full"
-                          />
-                        ) : (
-                          <Icon name="person" />
-                        )}
+                        {/* портрет строки — общий PersonFace: фото, иначе
+                            холстовый силуэт по полу (была серая картинка
+                            /avatars/*.png), иначе иконка человека */}
+                        <PersonFace
+                          photoUrl={
+                            row.person.photo_path
+                              ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/photos/${row.person.photo_path}`
+                              : null
+                          }
+                          gender={row.person.gender}
+                          size={30}
+                          photoClassName="h-full w-full rounded-full"
+                          fallback={<Icon name="person" />}
+                        />
                       </span>
                     ) : (
                       <span

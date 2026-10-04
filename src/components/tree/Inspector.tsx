@@ -4,13 +4,21 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NodeMenu, MenuItem } from "./NodeMenu";
 import { MenuButton, type MenuOption } from "./DockMenu";
 import {
+  IconBranch,
+  IconMore,
+  IconPersonPlus,
+  PERSON_DETAILS_SURFACE,
+  PersonDetailsFace,
+  PersonDetailsFacts,
+  PersonDetailsPortrait,
+} from "@/components/person/PersonDetailsFace";
+import {
   ageYears,
   birthLabel,
   deathLabel,
   initials,
   lifespan,
   shortName,
-  yearsWord,
 } from "@/lib/format";
 import type { NewRelative } from "@/lib/place";
 import type { Person, Relationship } from "@/lib/types";
@@ -66,28 +74,11 @@ type Props = {
 };
 
 /**
- * Поверхность инспектора. На телефоне — нижний лист, который поднят над
- * нижней панелью действий (её высота 58px + отступ 12px + зазор) и учитывает
- * системный отступ снизу: иначе на телефоне с полосой-индикатором док заезжал
- * бы на лист. На десктопе — парящая стеклянная панель справа поверх холста:
- * холст при этом на всю ширину окна, а место под панель учитывает только
- * «уместить» (см. TreeCanvas).
- *
- * Стекло — общий токен `--p-glass` (0.72) и на телефоне, и на десктопе:
- * раньше лист брал `--p-glass-2` (0.94) и читался непрозрачной заливкой.
- * Прокрутка: на телефоне лист целиком (`overflow-y-auto`) — на низких экранах
- * фиксированные ряды выше `max-h`, и `overflow-hidden` срезал вкладки и низ
- * карточки. На десктопе прокручивается только тело раздела.
- *
- * Потолок высоты листа — 56% холста (было 46%): на телефоне лист читался
- * приплюснутым, а список фактов и истории упирался в прокрутку на первом же
- * экране. Отсчёт идёт от высоты холста (окно без шапки), поэтому запас до
- * нижней панели остаётся и на низких экранах: 56% + 76px дока + зазор всегда
- * меньше высоты холста.
+ * Поверхность инспектора (нижний лист на телефоне, панель справа на десктопе)
+ * и внешность самой панели деталей живут в PersonDetailsFace: там же описано,
+ * почему высота листа именно такая. Здесь остаётся мультивыделение — у него своя
+ * разметка (список людей и массовые действия), но поверхность та же.
  */
-const INSPECTOR_SURFACE =
-  "absolute inset-x-0 bottom-[calc(76px+env(safe-area-inset-bottom))] z-30 flex max-h-[56%] flex-col gap-3 overflow-y-auto overscroll-contain rounded-[22px] border border-[var(--p-line)] bg-[var(--p-glass)] p-4 pb-6 shadow-[var(--p-shadow-sheet)] backdrop-blur-[14px] sm:inset-x-auto sm:bottom-3 sm:right-3 sm:top-3 sm:max-h-none sm:w-[320px] sm:overflow-hidden sm:rounded-[20px] sm:p-3.5 sm:shadow-[var(--shadow-lift)]";
-
 const TABS = [
   { id: "facts", label: "Факты" },
   { id: "family", label: "Семья" },
@@ -101,49 +92,7 @@ function roman(n: number) {
   return ROMAN[n] ?? String(n);
 }
 
-/** «Человек + плюс» — «Добавить родственника»: надписи у кнопки нет */
-function IconPersonPlus() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 18 18"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <circle cx="7" cy="6.4" r="3.1" />
-      <path d="M1.9 15.4c0-2.7 2.3-4.4 5.1-4.4.9 0 1.7.2 2.4.5" />
-      <path d="M13.4 11.2v4.2M11.3 13.3h4.2" />
-    </svg>
-  );
-}
-
-/** Ветвь: карточка и её семья — «Открыть семейную ветку» */
-function IconBranch() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 18 18"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <rect x="6.5" y="2.5" width="5" height="4" rx="1" />
-      <rect x="2.5" y="11.5" width="5" height="4" rx="1" />
-      <rect x="10.5" y="11.5" width="5" height="4" rx="1" />
-      <path d="M9 6.5v2.5M5 11.5V9h8v2.5" />
-    </svg>
-  );
-}
-
+/** Подпись пола для чипа в шапке панели деталей */
 function genderLabel(person: Person) {
   if (person.gender === "male") return "Мужчина";
   if (person.gender === "female") return "Женщина";
@@ -311,59 +260,6 @@ function kinOf(id: string, relationships: Relationship[]) {
   };
 }
 
-/** Небольшой портрет для строк «Семьи»: фото, иначе силуэт по полу */
-function Face({
-  person,
-  photoUrl,
-  size = 22,
-}: {
-  person: Person;
-  photoUrl: string | null;
-  size?: number;
-}) {
-  if (photoUrl) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={photoUrl}
-        alt=""
-        className="shrink-0 rounded-full object-cover"
-        style={{ width: size, height: size }}
-      />
-    );
-  }
-  if (person.gender !== "unknown") {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={person.gender === "male" ? "/avatars/male.png" : "/avatars/female.png"}
-        alt=""
-        className="shrink-0 rounded-full"
-        style={{ width: size, height: size }}
-      />
-    );
-  }
-  return (
-    <span
-      aria-hidden="true"
-      className="grid shrink-0 place-items-center rounded-full bg-[var(--p-row-bg)] text-[10px] text-ink-500"
-      style={{ width: size, height: size }}
-    >
-      {initials(person)}
-    </span>
-  );
-}
-
-/** Строка «подпись — значение»: факты и данные человека */
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-start gap-3 border-t border-[var(--p-line-2)] py-2 first:border-t-0 first:pt-0">
-      <span className="w-[74px] shrink-0 text-[12.5px] leading-5 text-ink-400">{label}</span>
-      <span className="min-w-0 flex-1 text-[13px] leading-5 text-ink-700">{children}</span>
-    </div>
-  );
-}
-
 /** Кликабельная родня: клик переводит выделение на этого человека */
 function KinChip({
   person,
@@ -381,7 +277,12 @@ function KinChip({
       title={`Выбрать на холсте: ${shortName(person)}`}
       className="inline-flex max-w-full items-center gap-2 rounded-full border border-[var(--p-line)] bg-[var(--p-field-bg)] py-1 pl-1 pr-2.5 text-left text-[12.5px] text-ink-700 transition-colors hover:border-[var(--p-acc-line)] hover:bg-[var(--p-acc-bg)] hover:text-brass-ink"
     >
-      <Face person={person} photoUrl={photoUrl} size={22} />
+      <PersonDetailsPortrait
+        photoUrl={photoUrl}
+        gender={person.gender}
+        initials={initials(person)}
+        size={22}
+      />
       <span className="min-w-0 truncate">{shortName(person)}</span>
       {lifespan(person) && (
         <span className="shrink-0 text-[11.5px] text-ink-400">{lifespan(person)}</span>
@@ -531,7 +432,7 @@ export function Inspector({
       <aside
         ref={sheetRef}
         aria-label="Инспектор выделенного человека"
-        className={INSPECTOR_SURFACE}
+        className={PERSON_DETAILS_SURFACE}
       >
         <span
           aria-hidden="true"
@@ -555,7 +456,12 @@ export function Inspector({
                 onClick={() => onSelect(p.id)}
                 className="flex items-center gap-2 rounded-xl border border-[var(--p-line)] bg-[var(--p-field-bg)] px-2 py-1.5 text-left text-[13px] text-ink-700 transition-colors hover:border-[var(--p-acc-line)] hover:bg-[var(--p-acc-bg)] hover:text-brass-ink"
               >
-                <Face person={p} photoUrl={photoUrlFor(p)} size={24} />
+                <PersonDetailsPortrait
+                  photoUrl={photoUrlFor(p)}
+                  gender={p.gender}
+                  initials={initials(p)}
+                  size={24}
+                />
                 <span className="min-w-0 flex-1 truncate">{shortName(p)}</span>
                 <span className="shrink-0 text-[11.5px] text-ink-400">{lifespan(p) ?? "—"}</span>
               </button>
@@ -696,47 +602,38 @@ export function Inspector({
   const age = ageYears(person);
 
   return (
-    <aside
-      ref={sheetRef}
-      aria-label="Инспектор выделенного человека"
-      className={INSPECTOR_SURFACE}
-    >
-      <span
-        aria-hidden="true"
-        className="mx-auto h-1 w-10 shrink-0 rounded-full bg-[var(--p-line-3)] sm:hidden"
-      />
-
-      {/* Шапка: портрет, имя, годы, место и поколение, чипы */}
-      <div className="flex shrink-0 items-start gap-3">
-        <Face person={person} photoUrl={photoUrlFor(person)} size={52} />
-        <div className="min-w-0 flex-1">
-          <h3 className="font-display text-[17px] leading-tight text-ink-800">{shortName(person)}</h3>
-          <span className="mt-0.5 block text-[12.5px] text-ink-500">
-            {lifespan(person) ?? "Годы неизвестны"}
-            {age != null && (
-              <span className="text-ink-400">
-                {" "}
-                · {age} {yearsWord(age)}
-              </span>
-            )}
-          </span>
-          <span className="mt-0.5 block truncate text-[12px] text-ink-400">
-            {person.birth_place ?? person.residence ?? "Место не указано"} · {roman(generation)}{" "}
-            поколение
-          </span>
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <span className="studio-chip">{genderLabel(person)}</span>
-            <span className="studio-chip">Поколение {roman(generation)}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Действия: карточка, «Скрыть на холсте» иконкой, «Добавить родственника»
-          и меню «…». Отдельной кнопки «Правка» нет — правка открывается пунктом
-          «Редактирование» в «…» (для роли без прав кнопок правки нет вовсе).
-          Скрытие — только отображение, поэтому доступно всем ролям; из
-          мультивыделения его кнопка убрана, механизм живёт здесь. */}
-      <div className="flex shrink-0 items-center gap-2">
+    /* Внешность панели деталей — в PersonDetailsFace: поверхность, шапка, чипы,
+       ряд действий, вкладки и строки фактов. Здесь остаются данные, обработчики
+       и вкладки «Семья»/«История», поэтому разметка панели не дублируется. */
+    <PersonDetailsFace
+      surfaceRef={sheetRef}
+      name={shortName(person)}
+      years={lifespan(person)}
+      age={age}
+      place={`${person.birth_place ?? person.residence ?? "Место не указано"} · ${roman(
+        generation
+      )} поколение`}
+      portrait={
+        <PersonDetailsPortrait
+          photoUrl={photoUrlFor(person)}
+          gender={person.gender}
+          initials={initials(person)}
+          size={52}
+        />
+      }
+      chips={
+        <>
+          <span className="studio-chip">{genderLabel(person)}</span>
+          <span className="studio-chip">Поколение {roman(generation)}</span>
+        </>
+      }
+      actions={
+        <>
+          {/* Действия: карточка, «Скрыть на холсте» иконкой, «Добавить родственника»
+              и меню «…». Отдельной кнопки «Правка» нет — правка открывается пунктом
+              «Редактирование» в «…» (для роли без прав кнопок правки нет вовсе).
+              Скрытие — только отображение, поэтому доступно всем ролям; из
+              мультивыделения его кнопка убрана, механизм живёт здесь. */}
         <button
           type="button"
           onClick={() => onOpenCard(person.id)}
@@ -815,11 +712,11 @@ export function Inspector({
             />
           </NodeMenu>
         )}
-      </div>
-
-      {/* Семья: отдельная страница ветки человека. Добавление родственников —
-          иконкой в ряду действий выше, меню с роднёй — там же. */}
-      <div className="flex shrink-0 flex-col gap-2">
+        </>
+      }
+      branch={
+        /* Семья: отдельная страница ветки человека. Добавление родственников —
+           иконкой в ряду действий, меню с роднёй — там же. */
         <button
           type="button"
           onClick={() => onBranch(person.id)}
@@ -834,123 +731,83 @@ export function Inspector({
           <IconBranch />
           Открыть семейную ветку
         </button>
-      </div>
+      }
+      tabs={TABS}
+      activeTab={tab}
+      onTabChange={setTab}
+      footer={
+        /* Подвал: подсказка о холсте, как в прототипе */
+        <div className="hidden shrink-0 border-t border-[var(--p-line-2)] pt-2.5 sm:block">
+          <p className="text-[11.5px] text-ink-400">
+            {(kin?.children.length ?? 0) > 0 && `Дети: ${kin!.children.length} · `}
+            {(kin?.parents.length ?? 0) > 0 && `Родители: ${kin!.parents.length} · `}
+            Shift + клик — к нескольким, ⌘K — все команды.
+          </p>
+        </div>
+      }
+    >
+      {tab === "facts" && <PersonDetailsFacts rows={facts} />}
 
-      {/* Вкладки разделов */}
-      <div
-        role="tablist"
-        aria-label="Разделы инспектора"
-        className="flex shrink-0 gap-0.5 border-b border-[var(--p-line)]"
-      >
-        {TABS.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            role="tab"
-            aria-selected={tab === item.id}
-            onClick={() => setTab(item.id)}
-            className={`-mb-px border-b-2 px-3 py-1.5 text-[13px] transition-colors ${
-              tab === item.id
-                ? "border-brass-500 text-ink-800"
-                : "border-transparent text-ink-400 hover:text-ink-700"
-            }`}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
+      {tab === "family" && (
+        <div className="flex flex-col divide-y divide-[var(--p-line-2)]">
+          <KinRow
+            label={person.gender === "male" ? "Супруга" : person.gender === "female" ? "Супруг" : "Супруг(а)"}
+            people={people(kin?.spouses ?? [])}
+            photoUrlFor={photoUrlFor}
+            onSelect={onSelect}
+          />
+          <KinRow
+            label="Родители"
+            people={people(kin?.parents ?? [])}
+            photoUrlFor={photoUrlFor}
+            onSelect={onSelect}
+          />
+          <KinRow
+            label="Дети"
+            people={people(kin?.children ?? [])}
+            photoUrlFor={photoUrlFor}
+            onSelect={onSelect}
+          />
+          <KinRow
+            label="Внуки"
+            people={people(kin?.grandkids ?? [])}
+            photoUrlFor={photoUrlFor}
+            onSelect={onSelect}
+          />
+          {!(kin?.spouses.length || kin?.parents.length || kin?.children.length || kin?.grandkids.length) && (
+            <p className="px-1 py-2 text-[12.5px] text-ink-400">
+              Связей пока нет — их добавляют иконкой «человек + плюс» в ряду действий выше.
+            </p>
+          )}
+        </div>
+      )}
 
-      {/* Содержимое раздела. На телефоне прокручивается сам лист целиком
-          (см. INSPECTOR_SURFACE): здесь высота по содержимому и никакого
-          `overflow`, иначе высота схлопнулась бы в ноль. На десктопе прокрутка
-          своя, а фиксированные ряды остаются на месте. */}
-      <div className="flex-1 pr-0.5 sm:min-h-0 sm:overflow-x-hidden sm:overflow-y-auto">
-        {tab === "facts" && (
-          <div>
-            {facts.length ? (
-              facts.map((row) => (
-                <Row key={row.label} label={row.label}>
-                  {row.value}
-                </Row>
-              ))
-            ) : (
-              <p className="px-1 py-2 text-[12.5px] text-ink-400">
-                Дат и мест пока нет — их можно добавить в карточке человека.
-              </p>
-            )}
-          </div>
-        )}
-
-        {tab === "family" && (
-          <div className="flex flex-col divide-y divide-[var(--p-line-2)]">
-            <KinRow
-              label={person.gender === "male" ? "Супруга" : person.gender === "female" ? "Супруг" : "Супруг(а)"}
-              people={people(kin?.spouses ?? [])}
-              photoUrlFor={photoUrlFor}
-              onSelect={onSelect}
-            />
-            <KinRow
-              label="Родители"
-              people={people(kin?.parents ?? [])}
-              photoUrlFor={photoUrlFor}
-              onSelect={onSelect}
-            />
-            <KinRow
-              label="Дети"
-              people={people(kin?.children ?? [])}
-              photoUrlFor={photoUrlFor}
-              onSelect={onSelect}
-            />
-            <KinRow
-              label="Внуки"
-              people={people(kin?.grandkids ?? [])}
-              photoUrlFor={photoUrlFor}
-              onSelect={onSelect}
-            />
-            {!(kin?.spouses.length || kin?.parents.length || kin?.children.length || kin?.grandkids.length) && (
-              <p className="px-1 py-2 text-[12.5px] text-ink-400">
-                Связей пока нет — их добавляют иконкой «человек + плюс» в ряду действий выше.
-              </p>
-            )}
-          </div>
-        )}
-
-        {tab === "history" && (
-          <div className="flex flex-col gap-2">
-            {changes === null ? (
-              <p className="px-1 py-2 text-[12.5px] text-ink-400">
-                История правок этого древа недоступна.
-              </p>
-            ) : personChanges.length ? (
-              personChanges.slice(0, 12).map((change) => (
-                <div
-                  key={change.id}
-                  className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-0.5 rounded-xl border border-[var(--p-line)] bg-[var(--p-row-bg)] px-2.5 py-2"
-                >
-                  <span className="min-w-0 truncate text-[12.5px] text-ink-700">{change.author}</span>
-                  <span className="shrink-0 text-[11.5px] tabular-nums text-ink-400">{change.at}</span>
-                  <span className="col-span-2 text-[12px] leading-relaxed text-ink-500">
-                    {change.summary}
-                  </span>
-                </div>
-              ))
-            ) : (
-              <p className="px-1 py-2 text-[12.5px] text-ink-400">
-                Карточку ещё не правили — здесь появятся последние изменения.
-              </p>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Подвал: подсказка о холсте, как в прототипе */}
-      <div className="hidden shrink-0 border-t border-[var(--p-line-2)] pt-2.5 sm:block">
-        <p className="text-[11.5px] text-ink-400">
-          {(kin?.children.length ?? 0) > 0 && `Дети: ${kin!.children.length} · `}
-          {(kin?.parents.length ?? 0) > 0 && `Родители: ${kin!.parents.length} · `}
-          Shift + клик — к нескольким, ⌘K — все команды.
-        </p>
-      </div>
-    </aside>
+      {tab === "history" && (
+        <div className="flex flex-col gap-2">
+          {changes === null ? (
+            <p className="px-1 py-2 text-[12.5px] text-ink-400">
+              История правок этого древа недоступна.
+            </p>
+          ) : personChanges.length ? (
+            personChanges.slice(0, 12).map((change) => (
+              <div
+                key={change.id}
+                className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-0.5 rounded-xl border border-[var(--p-line)] bg-[var(--p-row-bg)] px-2.5 py-2"
+              >
+                <span className="min-w-0 truncate text-[12.5px] text-ink-700">{change.author}</span>
+                <span className="shrink-0 text-[11.5px] tabular-nums text-ink-400">{change.at}</span>
+                <span className="col-span-2 text-[12px] leading-relaxed text-ink-500">
+                  {change.summary}
+                </span>
+              </div>
+            ))
+          ) : (
+            <p className="px-1 py-2 text-[12.5px] text-ink-400">
+              Карточку ещё не правили — здесь появятся последние изменения.
+            </p>
+          )}
+        </div>
+      )}
+    </PersonDetailsFace>
   );
 }

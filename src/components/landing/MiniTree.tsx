@@ -1,103 +1,162 @@
-type Person = {
-  id: string;
-  name: string;
-  years: string;
-  place: string;
-  x: number;
-  y: number;
-  i: string;
-  sex: "male" | "female";
-};
-
-const PEOPLE: Person[] = [
-  { id: "p1", name: "Пётр Ковалёв", years: "1931 — 2004", place: "Вологда", x: 0, y: 0, i: "ПК", sex: "male" },
-  { id: "p2", name: "Анна Ковалёва", years: "1934 — 2011", place: "Вологда", x: 196, y: 0, i: "АК", sex: "female" },
-  { id: "p3", name: "Сергей Ковалёв", years: "р. 1958", place: "Ярославль", x: 98, y: 132, i: "СК", sex: "male" },
-  { id: "p4", name: "Мария Ковалёва", years: "р. 1989", place: "Москва", x: 0, y: 264, i: "МК", sex: "female" },
-  { id: "p5", name: "Артём Ковалёв", years: "р. 1993", place: "Тбилиси", x: 196, y: 264, i: "АК", sex: "male" },
-];
+import { PersonCardFace } from "@/components/person/PersonCardFace";
+import { familyEdgeGeometry } from "@/components/tree/familyGeometry";
+import { CARD_W, CARD_H } from "@/lib/place";
+import type { Relationship } from "@/lib/types";
 
 /**
- * Фрагмент древа на холсте в точку: связи поколений — цветом линий холста,
- * супружество — пунктиром цвета связи, кромка карточки — по полу.
- * Карточки те же, что и в редакторе, только уменьшенные.
+ * Фрагмент древа на главной.
+ *
+ * ВАЖНО: пример обязан собираться из тех же компонентов и токенов, что и холст:
+ * карточка — PersonCardFace, связи — familyEdgeGeometry (та чистая геометрия,
+ * которой FamilyBusEdge рисует стебель, шину и отводы), размеры — CARD_W/CARD_H.
+ * Своей разметки карточки, своей геометрии и своих цветов здесь быть не должно:
+ * иначе пример снова разойдётся с приложением — ровно на это и была жалоба.
+ *
+ * Модуль серверный: ни React Flow, ни лишний клиентский JS на главную не
+ * попадают, хотя пример и берёт геометрию холста — она вынесена в отдельный
+ * чистый модуль без библиотеки холста (./tree/familyGeometry).
+ *
+ * Карточки настоящие, 176×100: фрагмент уменьшается целиком контейнером
+ * (.mini-tree, transform: scale), а не подгонкой размеров карточек, поэтому
+ * пропорции, кегли и кромка пола — как на холсте.
+ *
+ * Родство примера: Пётр и Анна Ковалёвы, их сын Сергей, внуки Мария и Артём.
+ * Зазоры — как в автораскладке холста (NODE_GAP/RANK_GAP в lib/layout.ts).
  */
+
+/** зазор между супругами в ряду — NODE_GAP автораскладки */
+const COUPLE_GAP = 34;
+/** зазор между поколениями — RANK_GAP автораскладки */
+const RANK_GAP = 64;
+/** ширина и высота фрагмента: три ряда по три карточки-места */
+const FRAGMENT_W = CARD_W * 2 + COUPLE_GAP;
+const FRAGMENT_H = CARD_H * 3 + RANK_GAP * 2;
+/** поле вокруг фрагмента: тени карточек не должны обрезаться контейнером */
+const PAD = 16;
+/** размер сцены до масштабирования — её и уменьшает .mini-tree */
+const STAGE_W = FRAGMENT_W + PAD * 2;
+const STAGE_H = FRAGMENT_H + PAD * 2;
+
+/** ось семьи: середина пары — на ней же стоит сын и его дети */
+const AXIS = FRAGMENT_W / 2;
+
+type ExamplePerson = {
+  id: string;
+  name: string;
+  /** годы в том же виде, что печатает cardYears на холсте */
+  years: string;
+  gender: "male" | "female";
+  isLiving: boolean;
+  x: number;
+  y: number;
+};
+
+const PEOPLE: ExamplePerson[] = [
+  { id: "p1", name: "Пётр Ковалёв", years: "1931–2004", gender: "male", isLiving: false, x: 0, y: 0 },
+  { id: "p2", name: "Анна Ковалёва", years: "1934–2011", gender: "female", isLiving: false, x: CARD_W + COUPLE_GAP, y: 0 },
+  { id: "p3", name: "Сергей Ковалёв", years: "1958", gender: "male", isLiving: true, x: AXIS - CARD_W / 2, y: CARD_H + RANK_GAP },
+  { id: "p4", name: "Мария Ковалёва", years: "1989", gender: "female", isLiving: true, x: 0, y: (CARD_H + RANK_GAP) * 2 },
+  { id: "p5", name: "Артём Ковалёв", years: "1993", gender: "male", isLiving: true, x: CARD_W + COUPLE_GAP, y: (CARD_H + RANK_GAP) * 2 },
+];
+
+const at = (id: string) => {
+  const person = PEOPLE.find((p) => p.id === id);
+  if (!person) throw new Error(`мини-древо: нет карточки ${id}`);
+  return person;
+};
+
+/** связи примера в том же виде, в каком их читает геометрия холста */
+const RELATIONSHIPS: Pick<Relationship, "id" | "kind" | "from_person_id" | "to_person_id">[] = [
+  { id: "s1", kind: "spouse", from_person_id: "p1", to_person_id: "p2" },
+  { id: "c1", kind: "parent", from_person_id: "p1", to_person_id: "p3" },
+  { id: "c2", kind: "parent", from_person_id: "p2", to_person_id: "p3" },
+  { id: "c3", kind: "parent", from_person_id: "p3", to_person_id: "p4" },
+  { id: "c4", kind: "parent", from_person_id: "p3", to_person_id: "p5" },
+];
+
+/** стебли, шины и отводы — ровно те же path, что FamilyBusEdge рисует на холсте */
+const FAMILY_PATHS = [
+  ...familyEdgeGeometry(RELATIONSHIPS, (id) => at(id), { horizontal: false, mirror: false }).values(),
+].map((family) => family.d);
+
+/** связь супругов: в вертикальном виде — прямой отрезок между боковыми кромками */
+const SPOUSE_PATHS = RELATIONSHIPS.filter((r) => r.kind === "spouse").map((r) => {
+  const from = at(r.from_person_id);
+  const to = at(r.to_person_id);
+  const [left, right] = from.x <= to.x ? [from, to] : [to, from];
+  return `M ${left.x + CARD_W},${left.y + CARD_H / 2} H ${right.x}`;
+});
+
 export function MiniTree() {
   return (
     <div
-      className="panel canvas-dots mx-auto w-full max-w-[440px] p-3"
+      className="mini-tree canvas-surface panel mx-auto w-fit max-w-full overflow-hidden p-3"
       style={{ borderColor: "var(--p-line-3)" }}
     >
-      <div className="relative w-full select-none" style={{ aspectRatio: "376 / 364" }}>
-        <svg
-          viewBox="0 0 376 364"
-          className="absolute inset-0 h-full w-full"
-          aria-hidden="true"
-          fill="none"
+      <div
+        className="relative"
+        style={{
+          width: `calc(${STAGE_W}px * var(--mini-tree-scale))`,
+          height: `calc(${STAGE_H}px * var(--mini-tree-scale))`,
+        }}
+      >
+        <div
+          className="absolute left-0 top-0"
+          style={{
+            width: STAGE_W,
+            height: STAGE_H,
+            transform: "scale(var(--mini-tree-scale))",
+            transformOrigin: "top left",
+          }}
         >
-          {/* супруги */}
-          <path
-            d="M172 50 H 204"
-            stroke="var(--color-bond-400)"
-            strokeWidth="2"
-            strokeDasharray="5 4"
-          />
-          {/* родители → сын */}
-          <path
-            d="M188 58 V 96 Q 188 108 188 120"
-            stroke="var(--color-canvas-line)"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-          {/* сын → дети */}
-          <path
-            d="M188 190 V 214 Q 188 226 176 226 H 76 Q 64 226 64 238 V 258"
-            stroke="var(--color-canvas-line)"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-          <path
-            d="M188 190 V 214 Q 188 226 200 226 H 300 Q 312 226 312 238 V 258"
-            stroke="var(--color-canvas-line)"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-        </svg>
-
-        {PEOPLE.map((p, idx) => (
-          <article
-            key={p.id}
-            className="rise absolute flex items-center gap-2 overflow-hidden rounded-[13px] border border-[var(--p-line)] bg-surface px-2.5 py-2 shadow-lift"
-            style={{
-              left: `${(p.x / 376) * 100}%`,
-              top: `${(p.y / 364) * 100}%`,
-              width: `${(180 / 376) * 100}%`,
-              animationDelay: `${0.12 * idx + 0.15}s`,
-            }}
+          <svg
+            className="absolute inset-0 h-full w-full"
+            viewBox={`${-PAD} ${-PAD} ${STAGE_W} ${STAGE_H}`}
+            fill="none"
+            aria-hidden="true"
           >
-            <span
-              aria-hidden="true"
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-album font-display text-[11.5px] text-brass-400"
-            >
-              {p.i}
-            </span>
-            <span className="min-w-0">
-              <span className="block truncate font-display text-[13px] leading-tight text-ink-800">
-                {p.name}
-              </span>
-              <span className="block truncate text-[11px] leading-tight text-ink-400">
-                {p.years} · {p.place}
-              </span>
-            </span>
-            <span
-              aria-hidden="true"
-              className="absolute inset-x-0 bottom-0 h-[2px]"
+            {/* связь супругов — сплошная и тонкая, как --color-wire-bond на холсте */}
+            {SPOUSE_PATHS.map((d) => (
+              <path
+                key={d}
+                d={d}
+                stroke="var(--color-wire-bond)"
+                strokeWidth={1.5}
+                strokeLinecap="round"
+              />
+            ))}
+            {/* кровные связи — цвет и толщина линий холста, углы прямые со скруглением */}
+            {FAMILY_PATHS.map((d) => (
+              <path
+                key={d}
+                d={d}
+                stroke="var(--color-canvas-line)"
+                strokeWidth={1.5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            ))}
+          </svg>
+
+          {PEOPLE.map((person, index) => (
+            <div
+              key={person.id}
+              className="rise absolute"
               style={{
-                background: p.sex === "female" ? "var(--color-female)" : "var(--color-male)",
+                left: PAD + person.x,
+                top: PAD + person.y,
+                animationDelay: `${0.12 * index + 0.15}s`,
               }}
-            />
-          </article>
-        ))}
+            >
+              <PersonCardFace
+                name={person.name}
+                years={person.years}
+                gender={person.gender}
+                isLiving={person.isLiving}
+              />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

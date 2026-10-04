@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea, Select } from "@/components/ui/field";
+import { PersonFace } from "./PersonFace";
 import { PersonHistory, type ChangeRow } from "./PersonHistory";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -604,23 +605,25 @@ export function PersonPage({
   const faceSize =
     "grid h-[92px] w-[92px] shrink-0 place-items-center overflow-hidden rounded-[20px] border sm:h-[112px] sm:w-[112px]";
 
-  /** Содержимое портрета: фото, заглушка по полу или инициалы — как было. */
+  /**
+   * Содержимое портрета: фото, холстовый силуэт по полу или инициалы.
+   *
+   * Силуэт рисует общий PersonFace — ровно тот же круг с человечком, что на
+   * карточке холста: раньше здесь стояла серая картинка /avatars/*.png, из-за
+   * чего открытая карточка расходилась с холстом (на это и жаловался
+   * владелец). Инициалы остаются для новой карточки (пол ещё не записан) и для
+   * неизвестного пола — как было.
+   */
   const portraitFace = (
-    <>
-      {photoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={photoUrl} alt="" className="h-full w-full object-cover" />
-      ) : !isNew && gender !== "unknown" ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={gender === "male" ? "/avatars/male.png" : "/avatars/female.png"}
-          alt=""
-          className="h-16 w-16 opacity-90 sm:h-20 sm:w-20"
-        />
-      ) : (
+    <PersonFace
+      photoUrl={photoUrl}
+      gender={isNew ? "unknown" : gender}
+      className="grid h-full w-full place-items-center [--face-size:64px] sm:[--face-size:80px]"
+      photoClassName="h-full w-full"
+      fallback={
         <span className="font-display text-[26px] text-ink-400 sm:text-[32px]">{heroInitials}</span>
-      )}
-    </>
+      }
+    />
   );
 
   /** Пункт всплывающего меню фотографии. */

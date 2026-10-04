@@ -689,6 +689,44 @@ body {
   pointer-events: none;
 }
 
+/* Холст вне React Flow: та же сетка точек поверх ореола, что в редакторе
+   (в TreeCanvas .canvas-halo лежит под Background). У .canvas-dots подложка
+   непрозрачная, поэтому фон собран из тех же токенов, но без неё. */
+.canvas-surface {
+  background-color: var(--color-canvas);
+  background-image:
+    radial-gradient(circle at 1px 1px, var(--color-canvas-dot) 1px, transparent 0),
+    var(--p-halo);
+  background-size: 26px 26px, auto, auto;
+  background-position: 13px 13px, 0 0, 0 0;
+}
+
+/* Масштаб примеров на главной: карточки везде настоящие 176×100, а фрагмент
+   уменьшается (или увеличивается) целиком контейнером. Шаги мини-древа
+   подобраны так, чтобы фрагмент с полем под тени всегда помещался в блок
+   шириной ~440px — без обрезки и без горизонтальной прокрутки. */
+.mini-tree { --mini-tree-scale: 0.58; }
+@media (min-width: 360px) { .mini-tree { --mini-tree-scale: 0.7; } }
+@media (min-width: 400px) { .mini-tree { --mini-tree-scale: 0.79; } }
+@media (min-width: 440px) { .mini-tree { --mini-tree-scale: 0.88; } }
+@media (min-width: 480px) { .mini-tree { --mini-tree-scale: 0.95; } }
+
+/* Превью панели деталей в секции «Карточка»: панель настоящая, 320px (её рисует
+   PersonDetailsFace), а увеличивает её контейнер — как мини-древо и карточку.
+   Шаги подобраны так, чтобы увеличенная панель с полем под тень всегда
+   помещалась в колонку секции — без обрезки и без горизонтальной прокрутки
+   (328px сцены + рамка при 1.6 — это 531px против 532px колонки). На
+   1024–1151px колонка уже (468–515px), поэтому там шаг меньше: иначе панель
+   вылезала бы за сетку. */
+.details-preview { --details-preview-scale: 0.8; }
+@media (min-width: 360px) { .details-preview { --details-preview-scale: 0.95; } }
+@media (min-width: 400px) { .details-preview { --details-preview-scale: 1.05; } }
+@media (min-width: 440px) { .details-preview { --details-preview-scale: 1.2; } }
+@media (min-width: 480px) { .details-preview { --details-preview-scale: 1.3; } }
+@media (min-width: 560px) { .details-preview { --details-preview-scale: 1.55; } }
+@media (min-width: 1024px) { .details-preview { --details-preview-scale: 1.35; } }
+@media (min-width: 1152px) { .details-preview { --details-preview-scale: 1.6; } }
+
 /* Тиснёная поверхность: очень тонкая фактура на тёмных «обложках» */
 .plate {
   background-image:

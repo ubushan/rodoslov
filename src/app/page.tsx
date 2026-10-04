@@ -2,6 +2,15 @@ import Link from "next/link";
 import { TorlmudMark } from "@/components/brand/TorlmudMark";
 import { ThemeSwitcher } from "@/components/theme/ThemeSwitcher";
 import { MiniTree } from "@/components/landing/MiniTree";
+import {
+  IconBranch,
+  IconMore,
+  IconPersonPlus,
+  PERSON_DETAILS_PANEL_SURFACE,
+  PersonDetailsFace,
+  PersonDetailsFacts,
+  PersonDetailsPortrait,
+} from "@/components/person/PersonDetailsFace";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 
@@ -42,6 +51,42 @@ const CARD_FIELDS = [
   ["История", "Биография, заметки, устные семейные воспоминания"],
   ["Архив", "Сканы свидетельств, писем, справок и дополнительные снимки"],
 ];
+
+/**
+ * Пример панели деталей для секции «Карточка» — та же панель, что открывается
+ * на холсте по клику на карточку. Данные статичные и осмысленные: Анна
+ * Ковалёва, 1934–2011, Вологда, II поколение — та же семья, что в мини-древе
+ * выше. Вкладка «Факты» — потому что панель на холсте открывается на ней.
+ */
+const DETAILS_TABS = [
+  { id: "facts", label: "Факты" },
+  { id: "family", label: "Семья" },
+  { id: "history", label: "История" },
+] as const;
+
+const DETAILS_FACTS = [
+  { label: "Рождение", value: "12.03.1934 · г. Вологда" },
+  { label: "Брак", value: "Пётр Ковалёв (1931–2004)" },
+];
+
+/**
+ * Размер сцены превью в масштабе 1 — панель настоящая, 320px (ширина панели на
+ * десктопе), и увеличивается целиком через transform: scale, как мини-древо.
+ * Высоту блока приходится задавать числом: transform размеров в раскладке не
+ * меняет, а место под панель занять надо. 345px — высота панели с шапкой, рядом
+ * действий, веткой, вкладками и двумя строками фактов (замер на 1440px). Нижнее
+ * поле взято с запасом: на телефоне у панели появляется ручка нижнего листа, и
+ * панель становится выше на 16px. Если содержимое примера поменяется, высоту
+ * нужно померить заново: иначе низ панели срежет overflow-hidden.
+ */
+const PANEL_W = 320;
+const PANEL_H = 345;
+const STAGE_PAD_X = 4;
+const STAGE_PAD_TOP = 4;
+/** место под тень и под ручку нижнего листа, которая есть на телефоне */
+const STAGE_PAD_BOTTOM = 24;
+const STAGE_W = PANEL_W + STAGE_PAD_X * 2;
+const STAGE_H = PANEL_H + STAGE_PAD_TOP + STAGE_PAD_BOTTOM;
 
 const Eyebrow = ({ children }: { children: React.ReactNode }) => (
   <p className="text-[11.5px] font-semibold uppercase tracking-[0.16em] text-brass-600">
@@ -197,44 +242,94 @@ export default async function LandingPage() {
             </dl>
           </div>
 
-          {/* Реалистичное превью карточки */}
+          {/* Превью панели деталей — ровно та панель, что открывается на холсте
+              по клику на карточку: её рисует PersonDetailsFace, а не отдельная
+              разметка примера (иначе главная снова разошлась бы с приложением).
+              Панель настоящая, 320px: увеличивает её контейнер (.details-preview),
+              поэтому кегли, чипы и кнопки — как на холсте.
+
+              Интерактив на главной не нужен: обёртка с inert и aria-hidden
+              делает кнопки примеров нефокусируемыми и некликабельными. */}
           <div className="relative">
-            <div className="studio-card is-female mx-auto max-w-[380px] overflow-hidden">
-              <div className="plate grain relative h-28" />
-              <div className="-mt-11 px-6 pb-7">
-                <div className="grid h-20 w-20 place-items-center rounded-[18px] border-4 border-[var(--color-surface)] bg-album font-display text-xl text-brass-400">
-                  МК
-                </div>
-                <h3 className="mt-4 text-[21px] leading-tight text-ink-800">
-                  Ковалёва Мария Сергеевна
-                </h3>
-                <p className="mt-1 text-sm text-ink-400">в девичестве Лебедева · р. 1989</p>
-
-                <div className="rule-brass my-5" />
-
-                <dl className="space-y-3 text-sm">
-                  <div className="flex gap-3">
-                    <dt className="w-28 shrink-0 text-ink-400">Место рождения</dt>
-                    <dd className="text-ink-700">Ярославль</dd>
-                  </div>
-                  <div className="flex gap-3">
-                    <dt className="w-28 shrink-0 text-ink-400">Живёт</dt>
-                    <dd className="text-ink-700">Москва</dd>
-                  </div>
-                  <div className="flex gap-3">
-                    <dt className="w-28 shrink-0 text-ink-400">Родители</dt>
-                    <dd className="text-ink-700">Сергей Ковалёв</dd>
-                  </div>
-                </dl>
-
-                <p className="mt-5 text-sm leading-relaxed text-ink-500">
-                  Закончила музыкальное училище, переехала в Москву в 2011-м. Хранит
-                  письма деда с фронта — сканы в архиве карточки.
-                </p>
-
-                <div className="mt-5 flex flex-wrap gap-2">
-                  <span className="studio-chip">4 документа</span>
-                  <span className="studio-chip">7 фотографий</span>
+            <div
+              className="details-preview canvas-surface panel mx-auto w-fit max-w-full overflow-hidden p-0.5"
+              style={{ borderColor: "var(--p-line-3)" }}
+            >
+              <div
+                className="relative"
+                style={{
+                  width: `calc(${STAGE_W}px * var(--details-preview-scale))`,
+                  height: `calc(${STAGE_H}px * var(--details-preview-scale))`,
+                }}
+              >
+                <div
+                  className="absolute left-0 top-0"
+                  style={{
+                    width: STAGE_W,
+                    height: STAGE_H,
+                    padding: `${STAGE_PAD_TOP}px ${STAGE_PAD_X}px ${STAGE_PAD_BOTTOM}px`,
+                    transform: "scale(var(--details-preview-scale))",
+                    transformOrigin: "top left",
+                  }}
+                  inert
+                  aria-hidden="true"
+                >
+                  <PersonDetailsFace
+                    surfaceClassName={PERSON_DETAILS_PANEL_SURFACE}
+                    surfaceLabel="Панель деталей человека — пример"
+                    name="Анна Ковалёва"
+                    years="1934–2011"
+                    age={77}
+                    place="г. Вологда · II поколение"
+                    portrait={<PersonDetailsPortrait gender="female" initials="АК" />}
+                    chips={
+                      <>
+                        <span className="studio-chip">Женщина</span>
+                        <span className="studio-chip">Поколение II</span>
+                      </>
+                    }
+                    actions={
+                      <>
+                        <button
+                          type="button"
+                          tabIndex={-1}
+                          className="btn-accent h-9 min-w-0 flex-1 text-[13px]"
+                        >
+                          Открыть карточку
+                        </button>
+                        <button
+                          type="button"
+                          tabIndex={-1}
+                          aria-label="Добавить родственника"
+                          className="icon-btn h-9 w-9 shrink-0"
+                        >
+                          <IconPersonPlus />
+                        </button>
+                        <button
+                          type="button"
+                          tabIndex={-1}
+                          aria-label="Ещё действия"
+                          className="icon-btn h-9 w-9 shrink-0"
+                        >
+                          <IconMore />
+                        </button>
+                      </>
+                    }
+                    branch={
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-[10px] border border-[var(--p-line)] bg-[var(--p-field-bg)] px-3 text-[13px] text-ink-600 transition-colors hover:bg-[var(--p-hover-bg)] hover:text-ink-800"
+                      >
+                        <IconBranch />
+                        Открыть семейную ветку
+                      </button>
+                    }
+                    tabs={DETAILS_TABS}
+                    activeTab="facts"
+                  >
+                    <PersonDetailsFacts rows={DETAILS_FACTS} />
+                  </PersonDetailsFace>
                 </div>
               </div>
             </div>
