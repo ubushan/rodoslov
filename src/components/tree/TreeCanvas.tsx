@@ -245,7 +245,9 @@ function Canvas({
         data: { kind: r.kind },
         style:
           r.kind === "spouse"
-            ? { stroke: "var(--color-bond-400)", strokeWidth: 1.5, strokeDasharray: "6 5" }
+            ? // связь супругов — сплошная линия чуть плотнее кровной, как
+              // .w-bond в прототипе: цвет --wire-bond, без пунктира
+              { stroke: "var(--color-wire-bond)", strokeWidth: 1.5 }
             : { stroke: "var(--color-canvas-line)", strokeWidth: 1.5 },
       })),
     [visibleRelationships]
@@ -720,10 +722,14 @@ function Canvas({
 
   return (
     <div className={`relative h-full w-full bg-canvas ${exporting ? "exporting" : ""}`}>
+      {/* Ореол холста — как .app__halo прототипа: холодное пятно слева сверху и
+          тёплое справа. Лежит под сеткой React Flow, ничего не ловит и в
+          экспорт картинки не попадает (тот снимает только viewport). */}
+      <div aria-hidden="true" className="canvas-halo" />
       {/* Холст — на всю ширину окна, без сужения и без отдельного слоя точек
           под панелью: инспектор парит поверх холста, а место под него
           резервирует только «уместить» (см. fitAll) */}
-      <div className="h-full w-full">
+      <div className="relative z-[1] h-full w-full">
         <ReactFlow
           nodes={[...nodes, ...plateNodes]}
           edges={edges}
@@ -755,8 +761,8 @@ function Canvas({
           maxZoom={2}
           proOptions={{ hideAttribution: true }}
         >
-          {/* холст в точку: шаг тот же, что у .canvas-dots */}
-          <Background variant={BackgroundVariant.Dots} gap={26} size={1.4} color="var(--color-canvas-dot)" />
+          {/* холст в точку: шаг и диаметр точки — как у .canvas-dots прототипа */}
+          <Background variant={BackgroundVariant.Dots} gap={26} size={2} color="var(--color-canvas-dot)" />
         </ReactFlow>
       </div>
 
@@ -793,7 +799,11 @@ function Canvas({
           родитель — ребёнок
         </span>
         <span className="studio-chip">
-          <span aria-hidden="true" className="h-0 w-6 border-t-2 border-dashed border-bond-400" />
+          <span
+            aria-hidden="true"
+            className="h-0.5 w-6 rounded-[2px]"
+            style={{ background: "var(--color-wire-bond)" }}
+          />
           супруги
         </span>
         {hiddenIds.length > 0 && (

@@ -56,6 +56,8 @@
   --color-canvas-line: var(--p-canvas-line);
   --color-canvas-minimap: var(--p-canvas-minimap);
   --color-canvas-mask: var(--p-canvas-mask);
+  /* Линия супружества на холсте — как --wire-bond в прототипе */
+  --color-wire-bond: var(--p-wire-bond);
 
   /* Карточка человека: цвет по полу */
   --color-male: var(--p-male);
@@ -147,6 +149,16 @@
   --p-canvas-line: rgba(15, 23, 42, 0.34);
   --p-canvas-minimap: #94a3b8;
   --p-canvas-mask: rgba(241, 243, 245, 0.78);
+  /* Связь супругов: чуть плотнее кровной линии, но тот же серый — как в прототипе */
+  --p-wire-bond: rgba(15, 23, 42, 0.44);
+  /* Карточка на холсте: градиент поверхности, тень и лёгкий ореол холста */
+  --p-card-bg: linear-gradient(180deg, #ffffff, #fafbfc);
+  --p-card-bg-hover: linear-gradient(180deg, #ffffff, #f2f5f9);
+  --p-face-bg: linear-gradient(160deg, #e2e8f0, #f4f6f9);
+  --p-shadow-card: 0 10px 24px -14px rgba(15, 23, 42, 0.28);
+  --p-halo:
+    radial-gradient(90% 60% at 8% -12%, rgba(59, 130, 246, 0.1), transparent 62%),
+    radial-gradient(70% 50% at 100% 0, rgba(234, 179, 8, 0.12), transparent 60%);
 
   --p-male: #3b82f6;
   --p-male-tint: #eaf2fe;
@@ -229,10 +241,19 @@
   --p-album-muted: #93a0b8;
 
   --p-canvas: #0d131f;
-  --p-canvas-dot: #2b3446;
+  --p-canvas-dot: rgba(200, 215, 240, 0.06);
   --p-canvas-line: #46536b;
   --p-canvas-minimap: #8fa2c0;
   --p-canvas-mask: rgba(13, 19, 31, 0.78);
+  /* Связь супругов и ореол холста — как --wire-bond и --halo прототипа */
+  --p-wire-bond: #6b7a95;
+  --p-card-bg: linear-gradient(180deg, rgba(38, 47, 65, 0.94), rgba(21, 27, 38, 0.94));
+  --p-card-bg-hover: linear-gradient(180deg, rgba(50, 62, 84, 0.96), rgba(26, 33, 46, 0.96));
+  --p-face-bg: linear-gradient(160deg, #2a3448, #151b28);
+  --p-shadow-card: 0 12px 26px -16px rgba(0, 0, 0, 0.9);
+  --p-halo:
+    radial-gradient(90% 60% at 8% -12%, rgba(46, 66, 104, 0.55), transparent 62%),
+    radial-gradient(70% 50% at 100% 0, rgba(211, 171, 53, 0.1), transparent 60%);
 
   --p-male: #6f9cc4;
   --p-male-tint: #1d2d3e;
@@ -339,27 +360,41 @@ body {
 }
 
 /* Карточка на холсте — 176×100 как в прототипе: скругление 12px, кромка по
-   низу повторяет тот же радиус. Остальные .studio-card (лендинг, страница
-   ветки) остаются на 18px. */
+   низу повторяет тот же радиус, поверхность — градиент, тень — карточная.
+   Остальные .studio-card (лендинг, страница ветки) остаются на 18px. */
 .person-card {
+  /* диаметр портрета: карточка, сетка и круг читают одно значение */
+  --face-size: 34px;
   border-radius: 12px;
+  background: var(--p-card-bg);
+  box-shadow: var(--p-shadow-card);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease,
+    opacity 0.2s ease, transform 0.1s ease;
+}
+.person-card:hover {
+  background: var(--p-card-bg-hover);
+  border-color: var(--p-line-3);
+}
+.person-card:active {
+  transform: scale(0.985);
 }
 .person-card::after {
   border-radius: 0 0 11px 11px;
 }
 
-/* Портрет без фотографии — силуэт как в прототипе: круг 26px, внутри голова
-   и плечи цветом пола. Раньше здесь стояли растровые заглушки: на тёмной
-   карточке их светлая подложка читалась ярким пятном. */
+/* Портрет без фотографии — силуэт как в прототипе: круг с головой и плечами
+   цветом пола; размер задаёт --face-size карточки, поэтому круг растёт вместе
+   с ним. Раньше здесь стояли растровые заглушки: на тёмной карточке их
+   светлая подложка читалась ярким пятном. */
 .card-face {
   --face: var(--color-plain);
   position: relative;
-  width: 26px;
-  height: 26px;
+  width: var(--face-size, 34px);
+  height: var(--face-size, 34px);
   overflow: hidden;
   border: 1px solid var(--p-line);
   border-radius: 50%;
-  background: var(--p-row-bg);
+  background: var(--p-face-bg);
 }
 .is-male .card-face {
   --face: var(--color-male);
@@ -371,9 +406,9 @@ body {
   content: "";
   position: absolute;
   left: 50%;
-  top: 4px;
-  width: 8px;
-  height: 8px;
+  top: 19%;
+  width: 31%;
+  height: 31%;
   border-radius: 50%;
   background: var(--face);
   transform: translateX(-50%);
@@ -383,9 +418,9 @@ body {
   position: absolute;
   left: 50%;
   bottom: -1px;
-  width: 16px;
-  height: 9px;
-  border-radius: 8px 8px 0 0;
+  width: 62%;
+  height: 35%;
+  border-radius: 50% 50% 0 0;
   background: var(--face);
   transform: translateX(-50%);
 }
@@ -570,6 +605,16 @@ body {
   background-position: 13px 13px;
 }
 
+/* Ореол холста — два мягких пятна (холодное слева сверху, тёплое справа),
+   как .app__halo прототипа. Лежит под сеткой React Flow и ничего не ловит. */
+.canvas-halo {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: var(--p-halo);
+  pointer-events: none;
+}
+
 /* Тиснёная поверхность: очень тонкая фактура на тёмных «обложках» */
 .plate {
   background-image:
@@ -630,10 +675,14 @@ h1, h2, h3, .display {
   pointer-events: none !important;
 }
 
-/* Выделение карточки: рамка акцента и кольцо вместо свечения */
+/* Выделение карточки: рамка латунью, кольцо и мягкое свечение — как
+   .card--sel в прототипе (там же тень карточки, а не мягкая тень студии) */
 .react-flow__node.selected .person-card {
   border-color: var(--color-brass-500);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brass-500) 24%, transparent), var(--shadow-lift);
+  box-shadow:
+    0 0 0 1px var(--p-acc-line),
+    0 0 30px -6px var(--p-acc-line),
+    var(--p-shadow-card);
 }
 
 /* Скрываем интерфейсные элементы при экспорте картинки */

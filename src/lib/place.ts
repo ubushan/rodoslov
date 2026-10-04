@@ -8,8 +8,11 @@ import type { Person, Relationship } from "./types";
 export const CARD_W = 176;
 export const CARD_H = 100;
 
-const SIDE_GAP = 46; // зазор между карточками в одном ряду — как NODE_GAP в раскладке
-const ROW_GAP = 128; // зазор между поколениями
+// Зазоры как в автораскладке (NODE_GAP / RANK_GAP в layout.ts): холст позиции из
+// базы больше не читает, но новая карточка должна вставать на то же место, куда
+// её потом поставит раскладка.
+const SIDE_GAP = 34;
+const ROW_GAP = 64;
 
 /** Кем приходится новый человек тому, от чьей карточки его добавляют. */
 export type NewRelative = "child" | "spouse" | "father" | "mother" | "brother" | "sister";

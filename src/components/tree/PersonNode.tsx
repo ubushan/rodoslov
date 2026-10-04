@@ -36,9 +36,12 @@ function cardYears(person: Person) {
 
 /**
  * Карточка на холсте — 176×100, как в прототипе студии:
- *   верхняя строка  — портрет 26px кругом слева, годы справа;
+ *   верхняя строка  — портрет кругом слева, годы справа;
  *   нижняя строка   — имя (до трёх строк);
  *   кромка по низу  — цвет пола (рисует .studio-card).
+ *
+ * Диаметр портрета задаёт --face-size в .person-card: карточка, сетка и круг
+ * берут одно значение, поэтому круг можно растить, не трогая размеры карточки.
  *
  * Кнопок на самой карточке нет: клик выделяет человека и открывает панель
  * деталей (инспектор) справа, там «Открыть карточку», «Открыть семейную
@@ -51,23 +54,15 @@ function PersonNodeComponent({ data, selected }: NodeProps) {
   const years = cardYears(person);
 
   // кромка по низу — по полу: значения заданы токенами темы, поэтому карточка
-  // читается и в тёмной, и в сепии. Полосу 2px рисует .studio-card через
+  // читается и в тёмной, и в светлой. Полосу 2px рисует .studio-card через
   // .is-male/.is-female.
   const genderClass =
     person.gender === "male" ? "is-male" : person.gender === "female" ? "is-female" : "";
 
   return (
     <div
-      style={
-        selected
-          ? {
-              // выделение — янтарное кольцо и мягкая тень, без свечения
-              borderColor: "var(--p-acc-line)",
-              boxShadow: "0 0 0 3px var(--p-acc-soft), var(--shadow-lift)",
-            }
-          : undefined
-      }
-      className={`person-card studio-card ${genderClass} relative grid h-[100px] w-[176px] cursor-pointer grid-cols-[26px_1fr] grid-rows-[26px_auto] content-start gap-x-2 gap-y-[5px] px-2.5 py-2 transition-colors`}
+      data-selected={selected ? "true" : undefined}
+      className={`person-card studio-card ${genderClass} relative grid h-[100px] w-[176px] cursor-pointer grid-cols-[var(--face-size)_1fr] grid-rows-[var(--face-size)_auto] content-start gap-x-2 px-2.5 py-2`}
       onDoubleClick={() => onOpen(person.id)}
       role="button"
       tabIndex={0}
@@ -80,14 +75,14 @@ function PersonNodeComponent({ data, selected }: NodeProps) {
       <Handle id="spouse-l" type="target" position={Position.Left} />
       <Handle id="spouse-r" type="source" position={Position.Right} />
 
-      {/* верхняя строка: портрет кругом 26px — фото или силуэт по полу */}
+      {/* верхняя строка: портрет кругом --face-size — фото или силуэт по полу */}
       {photoUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={photoUrl}
           alt=""
           crossOrigin="anonymous"
-          className={`col-start-1 row-start-1 h-[26px] w-[26px] rounded-full border border-[var(--p-line)] object-cover ${
+          className={`col-start-1 row-start-1 h-[var(--face-size)] w-[var(--face-size)] rounded-full border border-[var(--p-line)] object-cover ${
             person.is_living ? "" : "opacity-80 saturate-50"
           }`}
         />
@@ -107,8 +102,9 @@ function PersonNodeComponent({ data, selected }: NodeProps) {
         </span>
       )}
 
-      {/* имя — во всю ширину, до трёх строк */}
-      <span className="col-span-2 col-start-1 row-start-2 line-clamp-3 font-display text-[15px] font-medium leading-[1.08] tracking-[-0.01em] text-ink-800 [overflow-wrap:anywhere]">
+      {/* имя — во всю ширину, до трёх строк: кегль прототипа (15px) сохранён,
+          три строки влезают в карточку рядом с крупным портретом */}
+      <span className="col-span-2 col-start-1 row-start-2 line-clamp-3 font-display text-[15px] font-medium leading-[1.07] tracking-[-0.01em] text-ink-800 [overflow-wrap:anywhere]">
         {shortName(person)}
       </span>
 

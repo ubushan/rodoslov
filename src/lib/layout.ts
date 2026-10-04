@@ -5,9 +5,11 @@ import type { Person } from "./types";
 export { CARD_W, CARD_H } from "./place";
 import { CARD_W, CARD_H } from "./place";
 
-const NODE_GAP = 46; // между карточками внутри одной семьи
+const NODE_GAP = 34; // между карточками в одной семье — как в прототипе (пары и братья)
 const BRANCH_GAP = 150; // между ветвями внутри семьи — у каждой своя пирамида
 const FAMILY_GAP = 260; // между семьями — чтобы границы семей читались сразу
+/** Зазор между поколениями по вертикали: у прототипа 56–82px, берём середину. */
+const RANK_GAP = 64;
 
 type Placed = { x: number; y: number; w: number; h: number };
 
@@ -49,7 +51,7 @@ export function autoLayout(nodes: Node[], edges: Edge[]) {
   // ---- опорные центры от dagre: только иерархия родитель → ребёнок ----
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: "TB", nodesep: NODE_GAP, ranksep: 110, marginx: 40, marginy: 40 });
+  g.setGraph({ rankdir: "TB", nodesep: NODE_GAP, ranksep: RANK_GAP, marginx: 40, marginy: 40 });
   nodes.forEach((n) => g.setNode(n.id, sizeOf(n)));
   parentEdges.forEach((e) => g.setEdge(e.source, e.target, { weight: 2, minlen: 1 }));
   dagre.layout(g);
