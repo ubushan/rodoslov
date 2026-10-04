@@ -835,3 +835,31 @@ h1, h2, h3, .display {
     height: 34px;
   }
 }
+
+/*
+ * Панель масштаба на телефоне: стоит у правого края по центру — под большой
+ * палец, поэтому кнопки крупнее обычных 32px, а поверхность матовая
+ * полупрозрачная (лёгкое размытие вместо плотного стекла), чтобы холст
+ * просвечивал. На широком экране вид прежний — панель у левого нижнего угла.
+ */
+@media (max-width: 1023px) {
+  .zoom-pad {
+    width: 54px;
+    gap: 6px;
+    padding: 7px;
+    border-radius: 20px;
+    background: color-mix(in srgb, var(--color-surface) 58%, transparent);
+    backdrop-filter: blur(9px) saturate(1.05);
+    -webkit-backdrop-filter: blur(9px) saturate(1.05);
+    box-shadow: var(--p-shadow-card);
+  }
+  .zoom-pad__b {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    font-size: 20px;
+  }
+  .zoom-pad__v {
+    font-size: 11px;
+  }
+}

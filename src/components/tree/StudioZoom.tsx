@@ -21,14 +21,18 @@ function IconFit() {
   );
 }
 
-/** Кнопка панели масштаба: квадрат под иконку, подсветка при наведении */
+/** Кнопка панели масштаба: квадрат под иконку, подсветка при наведении.
+ *  Класс `zoom-pad__b` увеличивает её на телефоне (см. globals.css). */
 const ZOOM_BTN =
-  "grid h-8 w-8 place-items-center rounded-[9px] text-[17px] leading-none text-ink-500 transition-colors hover:bg-[var(--p-hover-bg)] hover:text-ink-800";
+  "zoom-pad__b grid h-8 w-8 place-items-center rounded-[9px] text-[17px] leading-none text-ink-500 transition-colors hover:bg-[var(--p-hover-bg)] hover:text-ink-800";
 
 /**
  * Панель масштаба — вертикальная стеклянная, как в прототипе:
  * приблизить, отдалить, «уместить» и текущий уровень в процентах.
- * Стоит в левом нижнем углу, прямо над миникартой.
+ * На широком экране стоит в левом нижнем углу, прямо над миникартой; на
+ * телефоне холст переносит её к правому краю по центру (под большой палец),
+ * там же она становится крупнее и матово-полупрозрачной — см. `.zoom-pad`
+ * в globals.css.
  *
  * `onFit` передаёт холст: он умеет оставлять место под парящий инспектор,
  * поэтому библиотечный fitView здесь не используется.
@@ -48,7 +52,7 @@ export function StudioZoom({
     <div
       role="group"
       aria-label="Масштаб холста"
-      className={`glass grid w-11 gap-1 p-[5px] ${className}`}
+      className={`glass zoom-pad grid w-11 gap-1 p-[5px] ${className}`}
     >
       <button
         type="button"
@@ -79,7 +83,7 @@ export function StudioZoom({
       </button>
       <span
         aria-hidden="true"
-        className="pb-0.5 text-center font-mono text-[10px] tabular-nums text-ink-400"
+        className="zoom-pad__v pb-0.5 text-center font-mono text-[10px] tabular-nums text-ink-400"
       >
         {Math.round(zoom * 100)}%
       </span>
